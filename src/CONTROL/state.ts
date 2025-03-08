@@ -53,12 +53,11 @@ const gameStateMachine = createMachine({
 // 状態マシンのアクターを作成
 const gameService = createActor(gameStateMachine);
 
-let test;
+
 gameService.subscribe({
   next: (state) => {
     // スナップショットの処理
     console.log(`State changed to: ${state.value}`);
-    test = state.value;
   },
   error: (err: unknown) => {
     console.error(err);
