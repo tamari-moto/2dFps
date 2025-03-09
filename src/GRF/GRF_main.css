@@ -1,0 +1,17 @@
+.grf-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.grf-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.cross-keypad {
+  position: absolute;
+  top: 10px; /* Adjust as needed */
+  left: 10px; /* Adjust as needed */
+  z-index: 10; /* Ensure CrossKeypad is on top */
+}
