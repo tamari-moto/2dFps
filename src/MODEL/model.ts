@@ -2,14 +2,15 @@ import { node } from './node';
 import { Graph } from './Graph';
 import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
+import { MapConfig, PlayerConfig, ObstacleConfig, ComplexMapConfig, CalculatedConfig } from '../config/GameConfig';
 
 class Model {
   public nodeList: node[] = [];
   public player: node = new node;
   public emeny: node = new node;
   public Edges: Graph = new Graph();
-  private kakudo: number = 60;
-  private NodesInGridSize: number = 20;
+  private kakudo: number = PlayerConfig.ViewAngle;
+  private NodesInGridSize: number = MapConfig.NodesInGridSize;
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
 
@@ -27,8 +28,8 @@ class Model {
       for (let j = 0; j < size; j++) {
         let tmp = new node();
         tmp.id = count;
-        tmp.x = i * 30;
-        tmp.y = j * 30;
+        tmp.x = i * MapConfig.NodeSpacing;
+        tmp.y = j * MapConfig.NodeSpacing;
 
         this.nodeList.push(tmp);
         this.Edges.addVertex(count);
@@ -69,7 +70,7 @@ class Model {
   public connectNearNodes() {
     for (let i = 0; i < this.nodeList.length; i++) {
       for (let j = i + 1; j < this.nodeList.length; j++) {
-        if(this.getNodeDistance(this.nodeList[i], this.nodeList[j]) < 1000) {
+        if(this.getNodeDistance(this.nodeList[i], this.nodeList[j]) < PlayerConfig.MaxViewDistance) {
           this.Edges.addEdgeDirected(this.nodeList[i].id, this.nodeList[j].id);
           this.Edges.addEdgeDirected(this.nodeList[j].id, this.nodeList[i].id);
         }
@@ -329,15 +330,15 @@ class Model {
    * @param maxHeight - Maximum height of obstacles (default: 150)
    */
   private generateRandomObstaclesInternal(
-    count: number = 3,
-    minWidth: number = 60,
-    maxWidth: number = 150,
-    minHeight: number = 60,
-    maxHeight: number = 150
+    count: number = ObstacleConfig.DefaultCount,
+    minWidth: number = ObstacleConfig.MinWidth,
+    maxWidth: number = ObstacleConfig.MaxWidth,
+    minHeight: number = ObstacleConfig.MinHeight,
+    maxHeight: number = ObstacleConfig.MaxHeight
   ): void {
     // Calculate map boundaries
-    const mapSize = (this.NodesInGridSize - 1) * 30;
-    const margin = 30; // Minimum distance from map edges
+    const mapSize = CalculatedConfig.MapSize;
+    const margin = MapConfig.ObstacleMargin; // Minimum distance from map edges
 
     // Generate random obstacles
     for (let i = 0; i < count; i++) {
@@ -370,11 +371,11 @@ class Model {
    * @param maxHeight - Maximum height of obstacles (default: 150)
    */
   public generateRandomObstacles(
-    count: number = 3,
-    minWidth: number = 60,
-    maxWidth: number = 150,
-    minHeight: number = 60,
-    maxHeight: number = 150
+    count: number = ObstacleConfig.DefaultCount,
+    minWidth: number = ObstacleConfig.MinWidth,
+    maxWidth: number = ObstacleConfig.MaxWidth,
+    minHeight: number = ObstacleConfig.MinHeight,
+    maxHeight: number = ObstacleConfig.MaxHeight
   ): void {
     // Clear existing obstacles
     this.Lines = [];
