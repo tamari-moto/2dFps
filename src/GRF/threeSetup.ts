@@ -4,6 +4,7 @@ import { Vector3 } from "three";
 import { StateMachine, State, GameEvent } from './StateMachine';
 import { Model } from '../MODEL/model';
 import { gsap } from "gsap";
+import { PlayerConfig, EnemyConfig, NodeConfig, AnimationConfig, CameraConfig, ObstacleConfig } from '../config/GameConfig';
 
 export class ThreeSetup {
   private canvas: HTMLCanvasElement;
@@ -45,16 +46,16 @@ export class ThreeSetup {
 
     this.scene = new THREE.Scene();
 
-    this.camera = new THREE.PerspectiveCamera(90, 1.0);
+    this.camera = new THREE.PerspectiveCamera(CameraConfig.FOV, 1.0);
     this.camera.aspect = width / height;
-    this.camera.position.set(0, 0, 10);
+    this.camera.position.set(0, 0, CameraConfig.InitialZPosition);
     this.camera.updateProjectionMatrix();
 
     this.oribitControls = new OrbitControls(this.camera, canvas);
     this.oribitControls.target = new Vector3(0, 0, 0);
-    this.oribitControls.minDistance = 2.0;
-    this.oribitControls.maxDistance = 1000.0;
-    this.oribitControls.enableRotate = false;
+    this.oribitControls.minDistance = CameraConfig.MinDistance;
+    this.oribitControls.maxDistance = CameraConfig.MaxDistance;
+    this.oribitControls.enableRotate = CameraConfig.EnableRotate;
 
     this.raycaster = new THREE.Raycaster();
 
@@ -75,7 +76,7 @@ export class ThreeSetup {
 
   private API_Init() {
     for (const node of this.model.nodeList) {
-      let tmp = this.API_setCircle(node.x, node.y, 10).id;
+      let tmp = this.API_setCircle(node.x, node.y, NodeConfig.CircleSize).id;
       this.meshid_to_nodeid.set(tmp, node.id);
       this.nodeid_to_meshid.set(node.id, tmp);
     }
@@ -92,28 +93,28 @@ export class ThreeSetup {
     gsap.to(this.emenycube.position, {
       x: this.model.emeny.x,
       y: this.model.emeny.y,
-      duration: 1,
+      duration: AnimationConfig.MovementDuration,
     });
     gsap.to(this.playercube.position, {
       x: this.model.player.x,
       y: this.model.player.y,
-      duration: 1,
+      duration: AnimationConfig.MovementDuration,
     });
 
     this.meshList.map((mesh) => {
-      mesh.material.color.setHex(0xA0A0A0);
+      mesh.material.color.setHex(NodeConfig.DefaultColor);
     });
     if (this.player_shot !== undefined) {
-      this.player_shot.material.color.setHex(0xff0000);
+      this.player_shot.material.color.setHex(NodeConfig.ShotTargetColor);
     }
 
 
 
 
-    for (const nodeA of this.model.getVisibleNodesAtAngle(this.model.player, this.player_Angle, 1000)) {
+    for (const nodeA of this.model.getVisibleNodesAtAngle(this.model.player, this.player_Angle, PlayerConfig.MaxViewDistance)) {
       let mesh = this.meshList.find(mesh => this.meshid_to_nodeid.get(mesh.id) == nodeA.id);
       if (mesh !== undefined) {
-        mesh.material.color.setHex(0xffffff);
+        mesh.material.color.setHex(NodeConfig.VisibleColor);
       }
 
       if (this.model.emeny.id == nodeA.id) {
@@ -122,24 +123,24 @@ export class ThreeSetup {
     }
 
     if (this.player_select !== undefined) {
-      this.player_select.material.color.setHex(0x0000ff);
+      this.player_select.material.color.setHex(NodeConfig.SelectedColor);
     }
     if (this.player_next !== undefined) {
-      this.player_next.material.color.setHex(0x00ff00);
+      this.player_next.material.color.setHex(NodeConfig.NextMoveColor);
     }
     if (this.player_shot !== undefined) {
-      this.player_shot.material.color.setHex(0xff0000);
+      this.player_shot.material.color.setHex(NodeConfig.ShotTargetColor);
       gsap.fromTo(
         this.player_shot.scale,
         { x: 1, y: 1 },
         {
-          x: 1.3,
-          y: 1.3,
-          duration: 0.5,
+          x: AnimationConfig.ShotPulseScale,
+          y: AnimationConfig.ShotPulseScale,
+          duration: AnimationConfig.ShotPulseDuration,
           yoyo: true,
           repeat: 1,
-          repeatDelay: 0.02,
-          ease: "elastic.out(1, 0.3)", // プルンプルン跳ねる
+          repeatDelay: AnimationConfig.ShotPulseRepeatDelay,
+          ease: AnimationConfig.ShotPulseEase, // プルンプルン跳ねる
           overwrite: "auto",
         }
       );
@@ -148,7 +149,7 @@ export class ThreeSetup {
 
 
   private API_setCircle(x: number, y: number, size: number) {
-    const geometry2 = new THREE.CircleGeometry(size, 100).center();
+    const geometry2 = new THREE.CircleGeometry(size, NodeConfig.CircleSegments).center();
     const material2 = new THREE.MeshBasicMaterial({ color: 0xffff00 });
     const circle = new THREE.Mesh(geometry2, material2);
     this.scene.add(circle);
@@ -158,7 +159,7 @@ export class ThreeSetup {
   }
 
   private API_setLineSegment(x1: number, y1: number, x2: number, y2: number) {
-    const material = new THREE.LineBasicMaterial({ color: 0x00ffff });
+    const material = new THREE.LineBasicMaterial({ color: ObstacleConfig.LineColor });
     const points = [];
     points.push(new THREE.Vector3(x1, y1, 0));
     points.push(new THREE.Vector3(x2, y2, 0));
@@ -168,7 +169,7 @@ export class ThreeSetup {
   }
 
   private API_setPlayer() {
-    const geometry = new THREE.BoxGeometry(10, 10, 10);
+    const geometry = new THREE.BoxGeometry(PlayerConfig.CubeSize, PlayerConfig.CubeSize, PlayerConfig.CubeSize);
     const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
     const tmp = new THREE.Mesh(geometry, material);
     this.scene.add(tmp);
@@ -176,7 +177,7 @@ export class ThreeSetup {
   }
 
   private API_setEmenyc() {
-    const geometry2 = new THREE.BoxGeometry(10, 10, 10);
+    const geometry2 = new THREE.BoxGeometry(EnemyConfig.CubeSize, EnemyConfig.CubeSize, EnemyConfig.CubeSize);
     const material2 = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const tmp = new THREE.Mesh(geometry2, material2);
     this.scene.add(tmp);
@@ -228,7 +229,7 @@ export class ThreeSetup {
         const B =this.meshid_to_nodeid.get(this.player_next.id)
         if ((B !== undefined) && (A !== undefined)) {
           // Check if target is visible from the player's next position
-          const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, 1000);
+          const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, PlayerConfig.MaxViewDistance);
           const isVisible = visibleNodes.some(n => n.id === A);
           if (isVisible) {
             this.sm.transition(GameEvent.ShotPlayer);
@@ -269,7 +270,7 @@ export class ThreeSetup {
           const B =this.meshid_to_nodeid.get(this.player_next.id)
           if ((B !== undefined) && (A !== undefined)) {
             // Check if target is visible from the player's next position
-            const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, 1000);
+            const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, PlayerConfig.MaxViewDistance);
             const isVisible = visibleNodes.some(n => n.id === A);
             if (isVisible) {
               this.sm.transition(GameEvent.ShotPlayer);

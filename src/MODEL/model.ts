@@ -437,7 +437,7 @@ class Model {
     // Reset edges to original state
     this.resetGraphEdges();
 
-    const mapSize = (this.NodesInGridSize - 1) * 30;
+    const mapSize = CalculatedConfig.MapSize;
     let obstacleId = 1;
 
     // Choose a random map pattern
@@ -480,13 +480,13 @@ class Model {
    */
   private generateMazePattern(startId: number, mapSize: number): void {
     let id = startId;
-    const wallThickness = 20;
+    const wallThickness = ObstacleConfig.WallThickness;
 
     // Horizontal walls
-    for (let i = 0; i < 4; i++) {
-      const y = 100 + i * 150;
-      const startX = 60 + Math.random() * 100;
-      const width = 200 + Math.random() * 150;
+    for (let i = 0; i < ComplexMapConfig.MazeHorizontalWalls; i++) {
+      const y = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
+      const startX = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
+      const width = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
 
       const segments = createRectangleSegments(startX, y, width, wallThickness);
       this.obstacles.push({ id: id++, segments });
@@ -494,10 +494,10 @@ class Model {
     }
 
     // Vertical walls
-    for (let i = 0; i < 4; i++) {
-      const x = 100 + i * 150;
-      const startY = 60 + Math.random() * 100;
-      const height = 200 + Math.random() * 150;
+    for (let i = 0; i < ComplexMapConfig.MazeVerticalWalls; i++) {
+      const x = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
+      const startY = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
+      const height = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
 
       const segments = createRectangleSegments(x, startY, wallThickness, height);
       this.obstacles.push({ id: id++, segments });
@@ -510,15 +510,15 @@ class Model {
    */
   private generateRoomsPattern(startId: number, mapSize: number): void {
     let id = startId;
-    const roomCount = 3;
+    const roomCount = ComplexMapConfig.RoomCount;
 
     for (let i = 0; i < roomCount; i++) {
-      const roomX = 60 + (i % 2) * 250;
-      const roomY = 60 + Math.floor(i / 2) * 250;
-      const roomWidth = 180;
-      const roomHeight = 180;
-      const wallThickness = 15;
-      const doorWidth = 60;
+      const roomX = ComplexMapConfig.RoomBaseOffset + (i % 2) * ComplexMapConfig.RoomSpacingMultiplier;
+      const roomY = ComplexMapConfig.RoomBaseOffset + Math.floor(i / 2) * ComplexMapConfig.RoomSpacingMultiplier;
+      const roomWidth = ComplexMapConfig.RoomWidth;
+      const roomHeight = ComplexMapConfig.RoomHeight;
+      const wallThickness = ObstacleConfig.RoomWallThickness;
+      const doorWidth = ObstacleConfig.RoomDoorWidth;
 
       // Top wall with doorway
       const topLeftWidth = (roomWidth - doorWidth) / 2;
@@ -557,13 +557,13 @@ class Model {
    */
   private generateScatteredPattern(startId: number, mapSize: number): void {
     let id = startId;
-    const coverCount = 8 + Math.floor(Math.random() * 5);
+    const coverCount = ComplexMapConfig.ScatteredMinCount + Math.floor(Math.random() * ComplexMapConfig.ScatteredRandomCountRange);
 
     for (let i = 0; i < coverCount; i++) {
-      const width = 40 + Math.random() * 80;
-      const height = 40 + Math.random() * 80;
-      const x = 60 + Math.random() * (mapSize - width - 120);
-      const y = 60 + Math.random() * (mapSize - height - 120);
+      const width = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
+      const height = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
+      const x = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - width - ComplexMapConfig.ScatteredSpacingBuffer);
+      const y = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - height - ComplexMapConfig.ScatteredSpacingBuffer);
 
       const segments = createRectangleSegments(x, y, width, height);
       this.obstacles.push({ id: id++, segments });
@@ -578,13 +578,13 @@ class Model {
     let id = startId;
     const centerX = mapSize / 2;
     const centerY = mapSize / 2;
-    const obstacleCount = 4;
+    const obstacleCount = ComplexMapConfig.SymmetricObstacleCount;
 
     for (let i = 0; i < obstacleCount; i++) {
-      const width = 60 + Math.random() * 60;
-      const height = 60 + Math.random() * 60;
-      const offsetX = 80 + Math.random() * 120;
-      const offsetY = 80 + Math.random() * 120;
+      const width = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
+      const height = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
+      const offsetX = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
+      const offsetY = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
 
       // Four symmetric positions
       const positions = [
@@ -595,7 +595,7 @@ class Model {
       ];
 
       positions.forEach(pos => {
-        if (pos.x >= 30 && pos.y >= 30 && pos.x + width <= mapSize - 30 && pos.y + height <= mapSize - 30) {
+        if (pos.x >= MapConfig.ObstacleMargin && pos.y >= MapConfig.ObstacleMargin && pos.x + width <= mapSize - MapConfig.ObstacleMargin && pos.y + height <= mapSize - MapConfig.ObstacleMargin) {
           const segments = createRectangleSegments(pos.x, pos.y, width, height);
           this.obstacles.push({ id: id++, segments });
           segments.forEach(s => this.Lines.push(s));
@@ -604,7 +604,7 @@ class Model {
     }
 
     // Central obstacle
-    const centralSize = 60 + Math.random() * 40;
+    const centralSize = ComplexMapConfig.SymmetricCentralMinSize + Math.random() * ComplexMapConfig.SymmetricCentralRandomSizeRange;
     const centralSegments = createRectangleSegments(centerX - centralSize / 2, centerY - centralSize / 2, centralSize, centralSize);
     this.obstacles.push({ id: id++, segments: centralSegments });
     centralSegments.forEach(s => this.Lines.push(s));
@@ -615,10 +615,10 @@ class Model {
    */
   private generateCorridorsPattern(startId: number, mapSize: number): void {
     let id = startId;
-    const wallThickness = 25;
+    const wallThickness = ObstacleConfig.CorridorWallThickness;
 
     // Main cross corridors
-    const corridorWidth = 120;
+    const corridorWidth = ObstacleConfig.CorridorWidth;
     const centerX = mapSize / 2;
     const centerY = mapSize / 2;
 
@@ -626,37 +626,37 @@ class Model {
     const vLeftX = centerX - corridorWidth / 2;
     const vRightX = centerX + corridorWidth / 2;
 
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(vLeftX - wallThickness, 30, wallThickness, mapSize - 60) });
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(vLeftX - wallThickness, MapConfig.ObstacleMargin, wallThickness, mapSize - MapConfig.ObstacleMargin * 2) });
     this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
 
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(vRightX, 30, wallThickness, mapSize - 60) });
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(vRightX, MapConfig.ObstacleMargin, wallThickness, mapSize - MapConfig.ObstacleMargin * 2) });
     this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
 
     // Horizontal corridor walls
     const hTopY = centerY - corridorWidth / 2;
     const hBottomY = centerY + corridorWidth / 2;
 
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(30, hTopY - wallThickness, mapSize - 60, wallThickness) });
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(MapConfig.ObstacleMargin, hTopY - wallThickness, mapSize - MapConfig.ObstacleMargin * 2, wallThickness) });
     this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
 
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(30, hBottomY, mapSize - 60, wallThickness) });
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(MapConfig.ObstacleMargin, hBottomY, mapSize - MapConfig.ObstacleMargin * 2, wallThickness) });
     this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
 
     // Add some obstacles in the quadrants
-    const quadrantObstacles = 4;
+    const quadrantObstacles = ComplexMapConfig.CorridorsQuadrantObstacles;
     for (let i = 0; i < quadrantObstacles; i++) {
       const quadrant = i % 4;
       let qx, qy;
 
       switch (quadrant) {
-        case 0: qx = 80; qy = 80; break;
-        case 1: qx = mapSize - 150; qy = 80; break;
-        case 2: qx = 80; qy = mapSize - 150; break;
-        case 3: qx = mapSize - 150; qy = mapSize - 150; break;
-        default: qx = 80; qy = 80;
+        case 0: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition; break;
+        case 1: qx = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; qy = ComplexMapConfig.CorridorsQuadrantBasePosition; break;
+        case 2: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; break;
+        case 3: qx = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; qy = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; break;
+        default: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition;
       }
 
-      const segments = createRectangleSegments(qx, qy, 60 + Math.random() * 40, 60 + Math.random() * 40);
+      const segments = createRectangleSegments(qx, qy, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange);
       this.obstacles.push({ id: id++, segments });
       segments.forEach(s => this.Lines.push(s));
     }
