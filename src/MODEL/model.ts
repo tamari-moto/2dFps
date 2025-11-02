@@ -8,8 +8,8 @@ class Model {
   public player: node = new node;
   public emeny: node = new node;
   public Edges: Graph = new Graph();
-  private kakudo: number = 50;
-  private NodesInGridSize: number = 50;
+  private kakudo: number = 20;
+  private NodesInGridSize: number = 20;
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
 
