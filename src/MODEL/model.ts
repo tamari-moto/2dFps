@@ -45,28 +45,8 @@ class Model {
       if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
     }
 
-    // 障害物1
-    const obstacle1Segments = createRectangleSegments(10, 10, 100, 100);
-    this.obstacles.push({id: 1, segments: obstacle1Segments});
-    obstacle1Segments.forEach(element => {
-      this.Lines.push(element);
-    });
-
-    // 障害物2
-    const obstacle2Segments = createRectangleSegments(10, 150, 150, 100);
-    this.obstacles.push({id: 2, segments: obstacle2Segments});
-    obstacle2Segments.forEach(element => {
-      this.Lines.push(element);
-    });
-
-    // 障害物3
-    const obstacle3Segments = createRectangleSegments(150, 10, 100, 100);
-    this.obstacles.push({id: 3, segments: obstacle3Segments});
-    obstacle3Segments.forEach(element => {
-      this.Lines.push(element);
-    });
-
-    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+    // ランダムな障害物を生成
+    this.generateRandomObstaclesInternal();
 
 
   }
@@ -259,6 +239,85 @@ class Model {
    */
   public getObstacles(): ObstacleData[] {
     return [...this.obstacles];
+  }
+
+  /**
+   * Internal method to generate random obstacles without resetting edges.
+   * Used during initialization.
+   * @param count - Number of obstacles to generate (default: 3)
+   * @param minWidth - Minimum width of obstacles (default: 60)
+   * @param maxWidth - Maximum width of obstacles (default: 150)
+   * @param minHeight - Minimum height of obstacles (default: 60)
+   * @param maxHeight - Maximum height of obstacles (default: 150)
+   */
+  private generateRandomObstaclesInternal(
+    count: number = 3,
+    minWidth: number = 60,
+    maxWidth: number = 150,
+    minHeight: number = 60,
+    maxHeight: number = 150
+  ): void {
+    // Calculate map boundaries
+    const mapSize = (this.NodesInGridSize - 1) * 30;
+    const margin = 30; // Minimum distance from map edges
+
+    // Generate random obstacles
+    for (let i = 0; i < count; i++) {
+      const width = Math.floor(Math.random() * (maxWidth - minWidth + 1)) + minWidth;
+      const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+
+      // Ensure obstacles don't overlap with edges
+      const x = Math.floor(Math.random() * (mapSize - width - margin * 2)) + margin;
+      const y = Math.floor(Math.random() * (mapSize - height - margin * 2)) + margin;
+
+      const obstacleSegments = createRectangleSegments(x, y, width, height);
+      this.obstacles.push({ id: i + 1, segments: obstacleSegments });
+
+      obstacleSegments.forEach(element => {
+        this.Lines.push(element);
+      });
+    }
+
+    // Remove edges that intersect with obstacles
+    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+  }
+
+  /**
+   * Generates random obstacles on the map and resets edges.
+   * This method is called when regenerating obstacles during gameplay.
+   * @param count - Number of obstacles to generate (default: 3)
+   * @param minWidth - Minimum width of obstacles (default: 60)
+   * @param maxWidth - Maximum width of obstacles (default: 150)
+   * @param minHeight - Minimum height of obstacles (default: 60)
+   * @param maxHeight - Maximum height of obstacles (default: 150)
+   */
+  public generateRandomObstacles(
+    count: number = 3,
+    minWidth: number = 60,
+    maxWidth: number = 150,
+    minHeight: number = 60,
+    maxHeight: number = 150
+  ): void {
+    // Clear existing obstacles
+    this.Lines = [];
+    this.obstacles = [];
+
+    // Reset edges to original state
+    this.Edges = new Graph();
+    for (let i = 0; i < this.nodeList.length; i++) {
+      this.Edges.addVertex(i);
+    }
+
+    const size = this.NodesInGridSize;
+    for (const node of this.nodeList) {
+      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
+      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
+      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
+      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
+    }
+
+    // Generate random obstacles using internal method
+    this.generateRandomObstaclesInternal(count, minWidth, maxWidth, minHeight, maxHeight);
   }
 
 }

@@ -286,6 +286,31 @@ export class ThreeSetup {
   public getModel(): Model {
     return this.model;
   }
+
+  /**
+   * Regenerates obstacles randomly and updates the scene
+   */
+  public regenerateObstacles(): void {
+    // Remove existing obstacle line segments from scene
+    const linesToRemove: THREE.Line[] = [];
+    this.scene.traverse((object) => {
+      if (object instanceof THREE.Line) {
+        linesToRemove.push(object);
+      }
+    });
+    linesToRemove.forEach(line => this.scene.remove(line));
+
+    // Generate new random obstacles in the model
+    this.model.generateRandomObstacles();
+
+    // Add new obstacle line segments to scene
+    for (const line of this.model.Lines) {
+      this.API_setLineSegment(line.start.x, line.start.y, line.end.x, line.end.y);
+    }
+
+    // Update the view
+    this.API_Veiw();
+  }
 }
 
 export function setupThree(canvas: HTMLCanvasElement): ThreeSetup {
