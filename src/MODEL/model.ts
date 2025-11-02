@@ -8,7 +8,7 @@ class Model {
   public player: node = new node;
   public emeny: node = new node;
   public Edges: Graph = new Graph();
-  private kakudo: number = 20;
+  private kakudo: number = 60;
   private NodesInGridSize: number = 20;
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
@@ -196,6 +196,26 @@ class Model {
   }
 
   /**
+   * Checks if there is a clear line of sight between two nodes (no obstacles blocking).
+   * @param node1 - The first node.
+   * @param node2 - The second node.
+   * @returns True if there is a clear line of sight, false if blocked by obstacles.
+   */
+  public hasLineOfSight(node1: node, node2: node): boolean {
+    const p1 = { x: node1.x, y: node1.y };
+    const p2 = { x: node2.x, y: node2.y };
+
+    // Check if the line between nodes intersects with any obstacle segments
+    for (const segment of this.Lines) {
+      if (segment.intersects(p1, p2)) {
+        return false; // Line of sight is blocked
+      }
+    }
+
+    return true; // Clear line of sight
+  }
+
+  /**
    * Gets nodes that are connected to the center node and are at a specific angle and distance.
    * @param centerNode - The center node.
    * @param angle - The angle in degrees.
@@ -208,7 +228,7 @@ class Model {
       x: Math.cos(angle * Math.PI / 180),
       y: Math.sin(angle * Math.PI / 180)
     };
-  
+
     return connectedNodes.filter(node => {
       const nodeVector = {
         x: node.x - centerNode.x,
@@ -217,8 +237,46 @@ class Model {
       const nodeDistance = this.getNodeDistance(centerNode, node);
       const dotProduct = (nodeVector.x * targetVector.x + nodeVector.y * targetVector.y) / (nodeDistance * Math.sqrt(targetVector.x * targetVector.x + targetVector.y * targetVector.y));
       const nodeAngle = Math.acos(dotProduct) * (180 / Math.PI);
-  
+
       return nodeAngle < this.kakudo && nodeDistance <= distance;
+    });
+  }
+
+  /**
+   * Gets all nodes within angle and distance from center node, using line-of-sight check.
+   * This method checks visibility based on obstacles, not just graph connectivity.
+   * @param centerNode - The center node.
+   * @param angle - The angle in degrees.
+   * @param distance - The distance to search.
+   * @returns An array of nodes that are visible from the center node.
+   */
+  public getVisibleNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
+    const targetVector = {
+      x: Math.cos(angle * Math.PI / 180),
+      y: Math.sin(angle * Math.PI / 180)
+    };
+
+    return this.nodeList.filter(node => {
+      // Skip the center node itself
+      if (node.id === centerNode.id) return false;
+
+      const nodeVector = {
+        x: node.x - centerNode.x,
+        y: node.y - centerNode.y
+      };
+      const nodeDistance = this.getNodeDistance(centerNode, node);
+
+      // Check distance
+      if (nodeDistance > distance) return false;
+
+      // Check angle
+      const dotProduct = (nodeVector.x * targetVector.x + nodeVector.y * targetVector.y) / (nodeDistance * Math.sqrt(targetVector.x * targetVector.x + targetVector.y * targetVector.y));
+      const nodeAngle = Math.acos(Math.max(-1, Math.min(1, dotProduct))) * (180 / Math.PI);
+
+      if (nodeAngle >= this.kakudo) return false;
+
+      // Check line of sight
+      return this.hasLineOfSight(centerNode, node);
     });
   }
   /**
@@ -366,6 +424,254 @@ class Model {
 
     // Remove edges that intersect with obstacles
     removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+  }
+
+  /**
+   * Generates a complex map with various obstacle patterns.
+   * Patterns include: maze-like corridors, rooms, scattered obstacles, and strategic cover points.
+   */
+  public generateComplexMap(): void {
+    // Clear existing obstacles
+    this.Lines = [];
+    this.obstacles = [];
+
+    // Reset edges to original state
+    this.Edges = new Graph();
+    for (let i = 0; i < this.nodeList.length; i++) {
+      this.Edges.addVertex(i);
+    }
+
+    const size = this.NodesInGridSize;
+    for (const node of this.nodeList) {
+      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
+      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
+      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
+      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
+    }
+
+    const mapSize = (this.NodesInGridSize - 1) * 30;
+    let obstacleId = 1;
+
+    // Choose a random map pattern
+    const patterns = ['maze', 'rooms', 'scattered', 'symmetric', 'corridors'];
+    const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
+
+    switch (selectedPattern) {
+      case 'maze':
+        // Maze-like pattern with multiple walls
+        this.generateMazePattern(obstacleId, mapSize);
+        break;
+
+      case 'rooms':
+        // Multiple rooms with doorways
+        this.generateRoomsPattern(obstacleId, mapSize);
+        break;
+
+      case 'scattered':
+        // Scattered cover points
+        this.generateScatteredPattern(obstacleId, mapSize);
+        break;
+
+      case 'symmetric':
+        // Symmetric obstacle placement
+        this.generateSymmetricPattern(obstacleId, mapSize);
+        break;
+
+      case 'corridors':
+        // Long corridors with intersections
+        this.generateCorridorsPattern(obstacleId, mapSize);
+        break;
+    }
+
+    // Remove edges that intersect with obstacles
+    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+  }
+
+  /**
+   * Generates a maze-like pattern
+   */
+  private generateMazePattern(startId: number, mapSize: number): void {
+    let id = startId;
+    const wallThickness = 20;
+
+    // Horizontal walls
+    for (let i = 0; i < 4; i++) {
+      const y = 100 + i * 150;
+      const startX = 60 + Math.random() * 100;
+      const width = 200 + Math.random() * 150;
+
+      const segments = createRectangleSegments(startX, y, width, wallThickness);
+      this.obstacles.push({ id: id++, segments });
+      segments.forEach(s => this.Lines.push(s));
+    }
+
+    // Vertical walls
+    for (let i = 0; i < 4; i++) {
+      const x = 100 + i * 150;
+      const startY = 60 + Math.random() * 100;
+      const height = 200 + Math.random() * 150;
+
+      const segments = createRectangleSegments(x, startY, wallThickness, height);
+      this.obstacles.push({ id: id++, segments });
+      segments.forEach(s => this.Lines.push(s));
+    }
+  }
+
+  /**
+   * Generates rooms with doorways
+   */
+  private generateRoomsPattern(startId: number, mapSize: number): void {
+    let id = startId;
+    const roomCount = 3;
+
+    for (let i = 0; i < roomCount; i++) {
+      const roomX = 60 + (i % 2) * 250;
+      const roomY = 60 + Math.floor(i / 2) * 250;
+      const roomWidth = 180;
+      const roomHeight = 180;
+      const wallThickness = 15;
+      const doorWidth = 60;
+
+      // Top wall with doorway
+      const topLeftWidth = (roomWidth - doorWidth) / 2;
+      const topRightStart = roomX + topLeftWidth + doorWidth;
+      const topRightWidth = roomWidth - topLeftWidth - doorWidth;
+
+      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, roomY, topLeftWidth, wallThickness) });
+      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+      this.obstacles.push({ id: id++, segments: createRectangleSegments(topRightStart, roomY, topRightWidth, wallThickness) });
+      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+      // Right wall
+      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX + roomWidth - wallThickness, roomY, wallThickness, roomHeight) });
+      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+      // Bottom wall
+      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, roomY + roomHeight - wallThickness, roomWidth, wallThickness) });
+      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+      // Left wall with doorway
+      const leftTopHeight = (roomHeight - doorWidth) / 2;
+      const leftBottomStart = roomY + leftTopHeight + doorWidth;
+      const leftBottomHeight = roomHeight - leftTopHeight - doorWidth;
+
+      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, roomY, wallThickness, leftTopHeight) });
+      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, leftBottomStart, wallThickness, leftBottomHeight) });
+      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+    }
+  }
+
+  /**
+   * Generates scattered cover points
+   */
+  private generateScatteredPattern(startId: number, mapSize: number): void {
+    let id = startId;
+    const coverCount = 8 + Math.floor(Math.random() * 5);
+
+    for (let i = 0; i < coverCount; i++) {
+      const width = 40 + Math.random() * 80;
+      const height = 40 + Math.random() * 80;
+      const x = 60 + Math.random() * (mapSize - width - 120);
+      const y = 60 + Math.random() * (mapSize - height - 120);
+
+      const segments = createRectangleSegments(x, y, width, height);
+      this.obstacles.push({ id: id++, segments });
+      segments.forEach(s => this.Lines.push(s));
+    }
+  }
+
+  /**
+   * Generates symmetric obstacle placement
+   */
+  private generateSymmetricPattern(startId: number, mapSize: number): void {
+    let id = startId;
+    const centerX = mapSize / 2;
+    const centerY = mapSize / 2;
+    const obstacleCount = 4;
+
+    for (let i = 0; i < obstacleCount; i++) {
+      const width = 60 + Math.random() * 60;
+      const height = 60 + Math.random() * 60;
+      const offsetX = 80 + Math.random() * 120;
+      const offsetY = 80 + Math.random() * 120;
+
+      // Four symmetric positions
+      const positions = [
+        { x: centerX + offsetX, y: centerY + offsetY },
+        { x: centerX - offsetX - width, y: centerY + offsetY },
+        { x: centerX + offsetX, y: centerY - offsetY - height },
+        { x: centerX - offsetX - width, y: centerY - offsetY - height }
+      ];
+
+      positions.forEach(pos => {
+        if (pos.x >= 30 && pos.y >= 30 && pos.x + width <= mapSize - 30 && pos.y + height <= mapSize - 30) {
+          const segments = createRectangleSegments(pos.x, pos.y, width, height);
+          this.obstacles.push({ id: id++, segments });
+          segments.forEach(s => this.Lines.push(s));
+        }
+      });
+    }
+
+    // Central obstacle
+    const centralSize = 60 + Math.random() * 40;
+    const centralSegments = createRectangleSegments(centerX - centralSize / 2, centerY - centralSize / 2, centralSize, centralSize);
+    this.obstacles.push({ id: id++, segments: centralSegments });
+    centralSegments.forEach(s => this.Lines.push(s));
+  }
+
+  /**
+   * Generates corridors with intersections
+   */
+  private generateCorridorsPattern(startId: number, mapSize: number): void {
+    let id = startId;
+    const wallThickness = 25;
+
+    // Main cross corridors
+    const corridorWidth = 120;
+    const centerX = mapSize / 2;
+    const centerY = mapSize / 2;
+
+    // Vertical corridor walls
+    const vLeftX = centerX - corridorWidth / 2;
+    const vRightX = centerX + corridorWidth / 2;
+
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(vLeftX - wallThickness, 30, wallThickness, mapSize - 60) });
+    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(vRightX, 30, wallThickness, mapSize - 60) });
+    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+    // Horizontal corridor walls
+    const hTopY = centerY - corridorWidth / 2;
+    const hBottomY = centerY + corridorWidth / 2;
+
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(30, hTopY - wallThickness, mapSize - 60, wallThickness) });
+    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+    this.obstacles.push({ id: id++, segments: createRectangleSegments(30, hBottomY, mapSize - 60, wallThickness) });
+    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
+
+    // Add some obstacles in the quadrants
+    const quadrantObstacles = 4;
+    for (let i = 0; i < quadrantObstacles; i++) {
+      const quadrant = i % 4;
+      let qx, qy;
+
+      switch (quadrant) {
+        case 0: qx = 80; qy = 80; break;
+        case 1: qx = mapSize - 150; qy = 80; break;
+        case 2: qx = 80; qy = mapSize - 150; break;
+        case 3: qx = mapSize - 150; qy = mapSize - 150; break;
+        default: qx = 80; qy = 80;
+      }
+
+      const segments = createRectangleSegments(qx, qy, 60 + Math.random() * 40, 60 + Math.random() * 40);
+      this.obstacles.push({ id: id++, segments });
+      segments.forEach(s => this.Lines.push(s));
+    }
   }
 
 }

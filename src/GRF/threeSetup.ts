@@ -108,9 +108,9 @@ export class ThreeSetup {
     }
 
 
- 
 
-    for (const nodeA of this.model.getConnectedNodesAtAngle(this.model.player, this.player_Angle, 1000)) {
+
+    for (const nodeA of this.model.getVisibleNodesAtAngle(this.model.player, this.player_Angle, 1000)) {
       let mesh = this.meshList.find(mesh => this.meshid_to_nodeid.get(mesh.id) == nodeA.id);
       if (mesh !== undefined) {
         mesh.material.color.setHex(0xffffff);
@@ -227,7 +227,10 @@ export class ThreeSetup {
         const A =this.meshid_to_nodeid.get(mesh.id)
         const B =this.meshid_to_nodeid.get(this.player_next.id)
         if ((B !== undefined) && (A !== undefined)) {
-          if(this.model.areNodesConnected(this.model.nodeList[B], this.model.nodeList[A])){
+          // Check if target is visible from the player's next position
+          const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, 1000);
+          const isVisible = visibleNodes.some(n => n.id === A);
+          if (isVisible) {
             this.sm.transition(GameEvent.ShotPlayer);
             this.player_shot = mesh;
           }
@@ -260,12 +263,15 @@ export class ThreeSetup {
           this.player_select = this.player_next;
           this.player_next = this.Undefind_Mesh;
           this.player_shot = this.Undefind_Mesh;
-        } 
+        }
         else {
           const A =this.meshid_to_nodeid.get(mesh.id)
           const B =this.meshid_to_nodeid.get(this.player_next.id)
           if ((B !== undefined) && (A !== undefined)) {
-            if(this.model.areNodesConnected(this.model.nodeList[B], this.model.nodeList[A])){
+            // Check if target is visible from the player's next position
+            const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, 1000);
+            const isVisible = visibleNodes.some(n => n.id === A);
+            if (isVisible) {
               this.sm.transition(GameEvent.ShotPlayer);
               this.player_shot = mesh;
             }
@@ -328,6 +334,31 @@ export class ThreeSetup {
 
     // Import obstacles in the model
     this.model.importObstacles(obstaclesData);
+
+    // Add new obstacle line segments to scene
+    for (const line of this.model.Lines) {
+      this.API_setLineSegment(line.start.x, line.start.y, line.end.x, line.end.y);
+    }
+
+    // Update the view
+    this.API_Veiw();
+  }
+
+  /**
+   * Generates a complex map and updates the scene
+   */
+  public generateComplexMap(): void {
+    // Remove existing obstacle line segments from scene
+    const linesToRemove: THREE.Line[] = [];
+    this.scene.traverse((object) => {
+      if (object instanceof THREE.Line) {
+        linesToRemove.push(object);
+      }
+    });
+    linesToRemove.forEach(line => this.scene.remove(line));
+
+    // Generate complex map in the model
+    this.model.generateComplexMap();
 
     // Add new obstacle line segments to scene
     for (const line of this.model.Lines) {

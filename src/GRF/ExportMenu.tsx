@@ -23,6 +23,12 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
     }
   };
 
+  const handleComplexMap = () => {
+    if (threeSetup) {
+      threeSetup.generateComplexMap();
+    }
+  };
+
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -80,6 +86,12 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
     backgroundColor: '#2196F3',
   };
 
+  const complexMapButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    top: '160px',
+    backgroundColor: '#9C27B0',
+  };
+
   return (
     <>
       <button
@@ -95,6 +107,13 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
         aria-label="障害物をランダム生成"
       >
         障害物をランダム生成
+      </button>
+      <button
+        onClick={handleComplexMap}
+        style={complexMapButtonStyle}
+        aria-label="複雑なマップ生成"
+      >
+        複雑なマップ生成
       </button>
       <button
         onClick={handleImportClick}
