@@ -5,7 +5,7 @@ import ExportMenu from './ExportMenu';
 
 const GRF_main = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const threeSetupRef = React.useRef<ThreeSetup | null>(null);
+  const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const once = React.useRef(true);
 
   React.useEffect(() => {
@@ -14,14 +14,15 @@ const GRF_main = () => {
 
     const canvas = canvasRef.current;
     if (canvas !== null) {
-      threeSetupRef.current = setupThree(canvas);
+      const setup = setupThree(canvas);
+      setThreeSetup(setup);
     }
   }, []);
 
   return (
     <div>
       <canvas ref={canvasRef} />
-      <ExportMenu threeSetup={threeSetupRef.current} />
+      <ExportMenu threeSetup={threeSetup} />
     </div>
   );
 };
