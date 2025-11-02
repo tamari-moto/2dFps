@@ -7,6 +7,8 @@ interface ExportMenuProps {
 }
 
 const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const handleExportObstacles = () => {
     if (threeSetup) {
       const model = threeSetup.getModel();
@@ -19,6 +21,36 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
     if (threeSetup) {
       threeSetup.regenerateObstacles();
     }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !threeSetup) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content);
+
+        if (data.obstacles && Array.isArray(data.obstacles)) {
+          threeSetup.importObstacles(data.obstacles);
+        } else {
+          alert('無効なJSONファイル形式です。');
+        }
+      } catch (error) {
+        alert('JSONファイルの読み込みに失敗しました。');
+        console.error('Import error:', error);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset input value to allow re-importing the same file
+    event.target.value = '';
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -42,6 +74,12 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
     backgroundColor: '#FF9800',
   };
 
+  const importButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    top: '110px',
+    backgroundColor: '#2196F3',
+  };
+
   return (
     <>
       <button
@@ -58,6 +96,20 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
       >
         障害物をランダム生成
       </button>
+      <button
+        onClick={handleImportClick}
+        style={importButtonStyle}
+        aria-label="障害物をインポート"
+      >
+        障害物をインポート
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
     </>
   );
 };

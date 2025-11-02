@@ -320,6 +320,54 @@ class Model {
     this.generateRandomObstaclesInternal(count, minWidth, maxWidth, minHeight, maxHeight);
   }
 
+  /**
+   * Imports obstacles from obstacle data and resets edges.
+   * @param obstaclesData - Array of obstacle data to import
+   */
+  public importObstacles(obstaclesData: ObstacleData[]): void {
+    // Clear existing obstacles
+    this.Lines = [];
+    this.obstacles = [];
+
+    // Reset edges to original state
+    this.Edges = new Graph();
+    for (let i = 0; i < this.nodeList.length; i++) {
+      this.Edges.addVertex(i);
+    }
+
+    const size = this.NodesInGridSize;
+    for (const node of this.nodeList) {
+      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
+      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
+      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
+      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
+    }
+
+    // Import obstacles from data
+    for (const obstacleData of obstaclesData) {
+      const segments: LineSegment[] = [];
+
+      for (const segmentData of obstacleData.segments) {
+        const segment = new LineSegment(
+          segmentData.start.x,
+          segmentData.start.y,
+          segmentData.end.x,
+          segmentData.end.y
+        );
+        segments.push(segment);
+        this.Lines.push(segment);
+      }
+
+      this.obstacles.push({
+        id: obstacleData.id,
+        segments: segments
+      });
+    }
+
+    // Remove edges that intersect with obstacles
+    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+  }
+
 }
 
 export { Model };
