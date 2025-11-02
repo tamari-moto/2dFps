@@ -281,8 +281,13 @@ export class ThreeSetup {
     }
     this.API_Veiw();
   }
+
+  // モデルへのアクセスメソッド
+  public getModel(): Model {
+    return this.model;
+  }
 }
 
-export function setupThree(canvas: HTMLCanvasElement) {
-  new ThreeSetup(canvas);
+export function setupThree(canvas: HTMLCanvasElement): ThreeSetup {
+  return new ThreeSetup(canvas);
 }

@@ -1,6 +1,7 @@
 import { node } from './node';
 import { Graph } from './Graph';
 import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
+import type { ObstacleData } from './ObstacleExporter';
 
 class Model {
   public nodeList: node[] = [];
@@ -10,6 +11,7 @@ class Model {
   private kakudo: number = 50;
   private NodesInGridSize: number = 50;
   public Lines: LineSegment[] = [];
+  private obstacles: ObstacleData[] = [];
 
   constructor() {
     this.Init_model();
@@ -43,15 +45,27 @@ class Model {
       if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
     }
 
-    createRectangleSegments( 10, 10, 100, 100).forEach(element => {
+    // 障害物1
+    const obstacle1Segments = createRectangleSegments(10, 10, 100, 100);
+    this.obstacles.push({id: 1, segments: obstacle1Segments});
+    obstacle1Segments.forEach(element => {
       this.Lines.push(element);
     });
-    createRectangleSegments( 10, 150, 150, 100).forEach(element => {
+
+    // 障害物2
+    const obstacle2Segments = createRectangleSegments(10, 150, 150, 100);
+    this.obstacles.push({id: 2, segments: obstacle2Segments});
+    obstacle2Segments.forEach(element => {
       this.Lines.push(element);
     });
-    createRectangleSegments( 150, 10, 100, 100).forEach(element => {
+
+    // 障害物3
+    const obstacle3Segments = createRectangleSegments(150, 10, 100, 100);
+    this.obstacles.push({id: 3, segments: obstacle3Segments});
+    obstacle3Segments.forEach(element => {
       this.Lines.push(element);
     });
+
     removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
 
 
@@ -238,7 +252,15 @@ class Model {
   public areNodesConnected(node1: node, node2: node): boolean {
     return this.Edges.List[node1.id].includes(node2.id);
   }
-  
+
+  /**
+   * Gets the obstacles data
+   * @returns Array of obstacle data
+   */
+  public getObstacles(): ObstacleData[] {
+    return [...this.obstacles];
+  }
+
 }
 
 export { Model };
