@@ -300,6 +300,26 @@ class Model {
   }
 
   /**
+   * Resets the graph edges to the original grid state.
+   * Clears all existing edges and rebuilds the grid connectivity.
+   */
+  private resetGraphEdges(): void {
+    // Reset edges to original state
+    this.Edges = new Graph();
+    for (let i = 0; i < this.nodeList.length; i++) {
+      this.Edges.addVertex(i);
+    }
+
+    const size = this.NodesInGridSize;
+    for (const node of this.nodeList) {
+      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
+      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
+      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
+      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
+    }
+  }
+
+  /**
    * Internal method to generate random obstacles without resetting edges.
    * Used during initialization.
    * @param count - Number of obstacles to generate (default: 3)
@@ -361,18 +381,7 @@ class Model {
     this.obstacles = [];
 
     // Reset edges to original state
-    this.Edges = new Graph();
-    for (let i = 0; i < this.nodeList.length; i++) {
-      this.Edges.addVertex(i);
-    }
-
-    const size = this.NodesInGridSize;
-    for (const node of this.nodeList) {
-      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
-      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
-      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
-      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
-    }
+    this.resetGraphEdges();
 
     // Generate random obstacles using internal method
     this.generateRandomObstaclesInternal(count, minWidth, maxWidth, minHeight, maxHeight);
@@ -388,18 +397,7 @@ class Model {
     this.obstacles = [];
 
     // Reset edges to original state
-    this.Edges = new Graph();
-    for (let i = 0; i < this.nodeList.length; i++) {
-      this.Edges.addVertex(i);
-    }
-
-    const size = this.NodesInGridSize;
-    for (const node of this.nodeList) {
-      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
-      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
-      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
-      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
-    }
+    this.resetGraphEdges();
 
     // Import obstacles from data
     for (const obstacleData of obstaclesData) {
@@ -436,18 +434,7 @@ class Model {
     this.obstacles = [];
 
     // Reset edges to original state
-    this.Edges = new Graph();
-    for (let i = 0; i < this.nodeList.length; i++) {
-      this.Edges.addVertex(i);
-    }
-
-    const size = this.NodesInGridSize;
-    for (const node of this.nodeList) {
-      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
-      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
-      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
-      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
-    }
+    this.resetGraphEdges();
 
     const mapSize = (this.NodesInGridSize - 1) * 30;
     let obstacleId = 1;

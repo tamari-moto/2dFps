@@ -294,9 +294,10 @@ export class ThreeSetup {
   }
 
   /**
-   * Regenerates obstacles randomly and updates the scene
+   * Updates obstacle line segments in the scene.
+   * Removes old obstacle lines and adds new ones based on current model state.
    */
-  public regenerateObstacles(): void {
+  private updateObstaclesInScene(): void {
     // Remove existing obstacle line segments from scene
     const linesToRemove: THREE.Line[] = [];
     this.scene.traverse((object) => {
@@ -306,9 +307,6 @@ export class ThreeSetup {
     });
     linesToRemove.forEach(line => this.scene.remove(line));
 
-    // Generate new random obstacles in the model
-    this.model.generateRandomObstacles();
-
     // Add new obstacle line segments to scene
     for (const line of this.model.Lines) {
       this.API_setLineSegment(line.start.x, line.start.y, line.end.x, line.end.y);
@@ -316,6 +314,17 @@ export class ThreeSetup {
 
     // Update the view
     this.API_Veiw();
+  }
+
+  /**
+   * Regenerates obstacles randomly and updates the scene
+   */
+  public regenerateObstacles(): void {
+    // Generate new random obstacles in the model
+    this.model.generateRandomObstacles();
+
+    // Update the scene with new obstacles
+    this.updateObstaclesInScene();
   }
 
   /**
@@ -323,50 +332,22 @@ export class ThreeSetup {
    * @param obstaclesData - Array of obstacle data to import
    */
   public importObstacles(obstaclesData: import('../MODEL/ObstacleExporter').ObstacleData[]): void {
-    // Remove existing obstacle line segments from scene
-    const linesToRemove: THREE.Line[] = [];
-    this.scene.traverse((object) => {
-      if (object instanceof THREE.Line) {
-        linesToRemove.push(object);
-      }
-    });
-    linesToRemove.forEach(line => this.scene.remove(line));
-
     // Import obstacles in the model
     this.model.importObstacles(obstaclesData);
 
-    // Add new obstacle line segments to scene
-    for (const line of this.model.Lines) {
-      this.API_setLineSegment(line.start.x, line.start.y, line.end.x, line.end.y);
-    }
-
-    // Update the view
-    this.API_Veiw();
+    // Update the scene with new obstacles
+    this.updateObstaclesInScene();
   }
 
   /**
    * Generates a complex map and updates the scene
    */
   public generateComplexMap(): void {
-    // Remove existing obstacle line segments from scene
-    const linesToRemove: THREE.Line[] = [];
-    this.scene.traverse((object) => {
-      if (object instanceof THREE.Line) {
-        linesToRemove.push(object);
-      }
-    });
-    linesToRemove.forEach(line => this.scene.remove(line));
-
     // Generate complex map in the model
     this.model.generateComplexMap();
 
-    // Add new obstacle line segments to scene
-    for (const line of this.model.Lines) {
-      this.API_setLineSegment(line.start.x, line.start.y, line.end.x, line.end.y);
-    }
-
-    // Update the view
-    this.API_Veiw();
+    // Update the scene with new obstacles
+    this.updateObstaclesInScene();
   }
 }
 
