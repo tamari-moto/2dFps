@@ -3,6 +3,7 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
+import { ENTITY_IDS } from '../config/GameConstants';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
 import { Enemy } from './Enemy';
@@ -12,7 +13,7 @@ class Model {
   public players: Map<string, Player> = new Map();
   public enemies: Map<string, Enemy> = new Map();
   public Edges: Graph = new Graph();
-  private kakudo: number = PlayerConfig.ViewAngle;
+  private viewAngle: number = PlayerConfig.ViewAngle;
   private NodesInGridSize: number = MapConfig.NodesInGridSize;
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
@@ -42,12 +43,12 @@ class Model {
     this.connectNearNodes();
 
     // Initialize players
-    this.players.set('player1', new Player('player1', this.nodeList[0], 0xffff00)); // Yellow
-    this.players.set('player2', new Player('player2', this.nodeList[1], 0x00ff00)); // Green
+    this.players.set(ENTITY_IDS.PLAYER_1, new Player(ENTITY_IDS.PLAYER_1, this.nodeList[0], 0xffff00)); // Yellow
+    this.players.set(ENTITY_IDS.PLAYER_2, new Player(ENTITY_IDS.PLAYER_2, this.nodeList[1], 0x00ff00)); // Green
 
     // Initialize enemies
-    this.enemies.set('enemy1', new Enemy('enemy1', this.nodeList[2], 0xff0000)); // Red
-    this.enemies.set('enemy2', new Enemy('enemy2', this.nodeList[3], 0xff6600)); // Orange
+    this.enemies.set(ENTITY_IDS.ENEMY_1, new Enemy(ENTITY_IDS.ENEMY_1, this.nodeList[2], 0xff0000)); // Red
+    this.enemies.set(ENTITY_IDS.ENEMY_2, new Enemy(ENTITY_IDS.ENEMY_2, this.nodeList[3], 0xff6600)); // Orange
     for (const node of this.nodeList) {
       if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
       if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
@@ -168,7 +169,7 @@ class Model {
   public getNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
     return this.nodeList.filter(node => {
       const nodeAngle = this.getAngleBetweenNodes(centerNode, node);
-      return Math.abs(nodeAngle - angle) < this.kakudo && this.getNodeDistance(centerNode, node) <= distance;
+      return Math.abs(nodeAngle - angle) < this.viewAngle && this.getNodeDistance(centerNode, node) <= distance;
     });
   }
 
@@ -181,7 +182,7 @@ class Model {
   public getAngleBetweenNodes(node1: node, node2: node): number {
     const dx = node2.x - node1.x;
     const dy = node2.y - node1.y;
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI); // ラジアンを度に変換
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI); // Convert radians to degrees
     return angle;
   }
 
@@ -245,7 +246,7 @@ class Model {
       const dotProduct = (nodeVector.x * targetVector.x + nodeVector.y * targetVector.y) / (nodeDistance * Math.sqrt(targetVector.x * targetVector.x + targetVector.y * targetVector.y));
       const nodeAngle = Math.acos(dotProduct) * (180 / Math.PI);
 
-      return nodeAngle < this.kakudo && nodeDistance <= distance;
+      return nodeAngle < this.viewAngle && nodeDistance <= distance;
     });
   }
 
@@ -280,7 +281,7 @@ class Model {
       const dotProduct = (nodeVector.x * targetVector.x + nodeVector.y * targetVector.y) / (nodeDistance * Math.sqrt(targetVector.x * targetVector.x + targetVector.y * targetVector.y));
       const nodeAngle = Math.acos(Math.max(-1, Math.min(1, dotProduct))) * (180 / Math.PI);
 
-      if (nodeAngle >= this.kakudo) return false;
+      if (nodeAngle >= this.viewAngle) return false;
 
       // Check line of sight
       return this.hasLineOfSight(centerNode, node);

@@ -5,6 +5,7 @@ import { State, GameEvent } from './StateMachine';
 import { Model } from '../MODEL/model';
 import { gsap } from "gsap";
 import { PlayerConfig, EnemyConfig, NodeConfig, AnimationConfig, CameraConfig, ObstacleConfig } from '../config/GameConfig';
+import { ENTITY_IDS, KEYBOARD_KEYS, PLAYER_CONSTANTS, ENEMY_CONSTANTS } from '../config/GameConstants';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 
 export class ThreeSetup {
@@ -13,12 +14,12 @@ export class ThreeSetup {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
-  private oribitControls: OrbitControls;
+  private orbitControls: OrbitControls;
   private raycaster: THREE.Raycaster;
   private player_next: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   private player_shot: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   private player_select: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  private Undefind_Mesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
+  private undefinedMesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   private meshList: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>[];
   private playerMeshes: Map<string, THREE.Mesh>;
   private enemyMeshes: Map<string, THREE.Mesh>;
@@ -36,7 +37,7 @@ export class ThreeSetup {
     this.player_next= new THREE.Mesh(new THREE.CircleGeometry(), new THREE.MeshBasicMaterial());
     this.player_shot= new THREE.Mesh(new THREE.CircleGeometry(), new THREE.MeshBasicMaterial());
     this.player_select= new THREE.Mesh(new THREE.CircleGeometry(), new THREE.MeshBasicMaterial());
-    this.Undefind_Mesh = new THREE.Mesh(new THREE.CircleGeometry(), new THREE.MeshBasicMaterial());
+    this.undefinedMesh = new THREE.Mesh(new THREE.CircleGeometry(), new THREE.MeshBasicMaterial());
 
     const width = window.innerWidth; canvas.clientWidth;
     const height = window.innerHeight; canvas.clientHeight;
@@ -53,11 +54,11 @@ export class ThreeSetup {
     this.camera.position.set(0, 0, CameraConfig.InitialZPosition);
     this.camera.updateProjectionMatrix();
 
-    this.oribitControls = new OrbitControls(this.camera, canvas);
-    this.oribitControls.target = new Vector3(0, 0, 0);
-    this.oribitControls.minDistance = CameraConfig.MinDistance;
-    this.oribitControls.maxDistance = CameraConfig.MaxDistance;
-    this.oribitControls.enableRotate = CameraConfig.EnableRotate;
+    this.orbitControls = new OrbitControls(this.camera, canvas);
+    this.orbitControls.target = new Vector3(0, 0, 0);
+    this.orbitControls.minDistance = CameraConfig.MinDistance;
+    this.orbitControls.maxDistance = CameraConfig.MaxDistance;
+    this.orbitControls.enableRotate = CameraConfig.EnableRotate;
 
     this.raycaster = new THREE.Raycaster();
 
@@ -67,8 +68,8 @@ export class ThreeSetup {
     this.meshid_to_nodeid = new Map();
     this.nodeid_to_meshid = new Map();
     this.model = new Model();
-    this.activePlayerId = 'player1'; // Default to first player
-    this.activeEnemyId = 'enemy1'; // Default to first enemy
+    this.activePlayerId = PLAYER_CONSTANTS.DEFAULT_ACTIVE_PLAYER;
+    this.activeEnemyId = ENEMY_CONSTANTS.DEFAULT_ACTIVE_ENEMY;
     this.viewAngleVisualizer = new ViewAngleVisualizer(this.scene);
 
     this.API_Init();
@@ -102,10 +103,10 @@ export class ThreeSetup {
     for (const line of this.model.Lines) {
       this.API_setLineSegment(line.start.x, line.start.y, line.end.x, line.end.y);
     }
-    this.API_Veiw();
+    this.updateView();
   }
 
-  private API_Veiw() {
+  private updateView() {
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
@@ -121,9 +122,9 @@ export class ThreeSetup {
         });
         // Highlight active enemy with a different scale
         if (enemyId === this.activeEnemyId) {
-          mesh.scale.set(1.2, 1.2, 1.2);
+          mesh.scale.set(ENEMY_CONSTANTS.ACTIVE_SCALE, ENEMY_CONSTANTS.ACTIVE_SCALE, ENEMY_CONSTANTS.ACTIVE_SCALE);
         } else {
-          mesh.scale.set(1.0, 1.0, 1.0);
+          mesh.scale.set(ENEMY_CONSTANTS.NORMAL_SCALE, ENEMY_CONSTANTS.NORMAL_SCALE, ENEMY_CONSTANTS.NORMAL_SCALE);
         }
       }
     }
@@ -139,9 +140,9 @@ export class ThreeSetup {
         });
         // Highlight active player with a different brightness or scale
         if (playerId === this.activePlayerId) {
-          mesh.scale.set(1.2, 1.2, 1.2);
+          mesh.scale.set(PLAYER_CONSTANTS.ACTIVE_SCALE, PLAYER_CONSTANTS.ACTIVE_SCALE, PLAYER_CONSTANTS.ACTIVE_SCALE);
         } else {
-          mesh.scale.set(1.0, 1.0, 1.0);
+          mesh.scale.set(PLAYER_CONSTANTS.NORMAL_SCALE, PLAYER_CONSTANTS.NORMAL_SCALE, PLAYER_CONSTANTS.NORMAL_SCALE);
         }
       }
     }
@@ -237,7 +238,7 @@ export class ThreeSetup {
 
 
   private glRender() {
-    this.oribitControls.update();
+    this.orbitControls.update();
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(this.glRender.bind(this));
   }
@@ -258,32 +259,32 @@ export class ThreeSetup {
    */
   private onKeyDown(event: KeyboardEvent) {
     // Toggle view angle edges with 'V' key
-    if (event.key === 'v' || event.key === 'V') {
+    if (event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE || event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE_UPPER) {
       const isVisible = this.viewAngleVisualizer.toggle();
-      this.API_Veiw();
+      this.updateView();
       console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
     }
     // Switch between players with '1', '2', etc.
-    else if (event.key === '1') {
-      this.activePlayerId = 'player1';
+    else if (event.key === KEYBOARD_KEYS.SELECT_PLAYER_1) {
+      this.activePlayerId = ENTITY_IDS.PLAYER_1;
       console.log('Switched to Player 1 (Yellow)');
-      this.API_Veiw();
+      this.updateView();
     }
-    else if (event.key === '2') {
-      this.activePlayerId = 'player2';
+    else if (event.key === KEYBOARD_KEYS.SELECT_PLAYER_2) {
+      this.activePlayerId = ENTITY_IDS.PLAYER_2;
       console.log('Switched to Player 2 (Green)');
-      this.API_Veiw();
+      this.updateView();
     }
     // Switch between enemies with '3', '4', etc.
-    else if (event.key === '3') {
-      this.activeEnemyId = 'enemy1';
+    else if (event.key === KEYBOARD_KEYS.SELECT_ENEMY_1) {
+      this.activeEnemyId = ENTITY_IDS.ENEMY_1;
       console.log('Switched to Enemy 1 (Red)');
-      this.API_Veiw();
+      this.updateView();
     }
-    else if (event.key === '4') {
-      this.activeEnemyId = 'enemy2';
+    else if (event.key === KEYBOARD_KEYS.SELECT_ENEMY_2) {
+      this.activeEnemyId = ENTITY_IDS.ENEMY_2;
       console.log('Switched to Enemy 2 (Orange)');
-      this.API_Veiw();
+      this.updateView();
     }
   }
 
@@ -373,8 +374,8 @@ export class ThreeSetup {
           }
           sm.transition(GameEvent.SelectPlayer);
           this.player_select = this.player_next;
-          this.player_next = this.Undefind_Mesh;
-          this.player_shot = this.Undefind_Mesh;
+          this.player_next = this.undefinedMesh;
+          this.player_shot = this.undefinedMesh;
         }
         else {
           const A = this.meshid_to_nodeid.get(mesh.id)
@@ -392,11 +393,11 @@ export class ThreeSetup {
     }
     if (intersects.length == 0) {
       sm.transition(GameEvent.Cancel);
-      this.player_shot = this.Undefind_Mesh;
-      this.player_next = this.Undefind_Mesh;
+      this.player_shot = this.undefinedMesh;
+      this.player_next = this.undefinedMesh;
       sm.transition(GameEvent.SelectPlayer);
     }
-    this.API_Veiw();
+    this.updateView();
   }
 
   // モデルへのアクセスメソッド
@@ -424,7 +425,7 @@ export class ThreeSetup {
     }
 
     // Update the view
-    this.API_Veiw();
+    this.updateView();
   }
 
   /**

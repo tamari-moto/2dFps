@@ -1,31 +1,15 @@
 import { node } from './node';
+import { Entity, EntityType } from './entities/Entity';
 import { StateMachine } from '../GRF/StateMachine';
 
-export class Player {
-  id: string;
-  node: node;
-  angle: number;
-  color: number;
+/**
+ * Player entity with state machine for turn-based actions
+ */
+export class Player extends Entity {
   stateMachine: StateMachine;
 
   constructor(id: string, initialNode: node, color: number) {
-    this.id = id;
-    this.node = new node();
-    this.node.id = initialNode.id;
-    this.node.x = initialNode.x;
-    this.node.y = initialNode.y;
-    this.angle = 0;
-    this.color = color;
+    super(id, EntityType.PLAYER, initialNode, color, 0);
     this.stateMachine = new StateMachine();
-  }
-
-  setNode(newNode: node): void {
-    this.node.id = newNode.id;
-    this.node.x = newNode.x;
-    this.node.y = newNode.y;
-  }
-
-  setAngle(angle: number): void {
-    this.angle = angle;
   }
 }

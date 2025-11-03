@@ -1,22 +1,12 @@
 import { node } from './node';
+import { Entity, EntityType } from './entities/Entity';
 
-export class Enemy {
-  id: string;
-  node: node;
-  color: number;
-
+/**
+ * Enemy entity
+ * Currently has simple random movement AI
+ */
+export class Enemy extends Entity {
   constructor(id: string, initialNode: node, color: number) {
-    this.id = id;
-    this.node = new node();
-    this.node.id = initialNode.id;
-    this.node.x = initialNode.x;
-    this.node.y = initialNode.y;
-    this.color = color;
-  }
-
-  setNode(newNode: node): void {
-    this.node.id = newNode.id;
-    this.node.x = newNode.x;
-    this.node.y = newNode.y;
+    super(id, EntityType.ENEMY, initialNode, color, 0);
   }
 }

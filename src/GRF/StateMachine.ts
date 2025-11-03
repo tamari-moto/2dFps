@@ -1,3 +1,7 @@
+/**
+ * State machine for player turn management
+ */
+
 // 状態 (State) を Enum 型で定義
 export enum State {
   Idle = "Idle",
@@ -14,67 +18,222 @@ export enum GameEvent {
   Complete = "Complete",
   Cancel = "Cancel"
 }
-let test=false;
+
+/**
+ * Represents a state transition in the history
+ */
+export interface StateTransition {
+  from: State;
+  to: State;
+  event: GameEvent;
+  timestamp: number;
+}
+
+/**
+ * Configuration for a state including entry/exit hooks and valid transitions
+ */
+export interface StateConfig {
+  onEnter?: () => void;
+  onExit?: () => void;
+  validTransitions: Map<GameEvent, State>;
+}
+
+/**
+ * Type for event listeners
+ */
+type EventListener = (data?: any) => void;
+
 export class StateMachine {
   private state: State;
+  private states: Map<State, StateConfig>;
+  private history: StateTransition[] = [];
+  private listeners: Map<string, EventListener[]> = new Map();
+  private debugMode: boolean = false;
 
-  constructor() {
-    this.state = State.Idle; // 初期状態
+  constructor(initialState: State = State.Idle, debugMode: boolean = false) {
+    this.state = initialState;
+    this.debugMode = debugMode;
+    this.states = this.defineStates();
   }
 
-  // 現在の状態を取得
+  /**
+   * Defines the state machine configuration
+   */
+  private defineStates(): Map<State, StateConfig> {
+    return new Map([
+      [State.Idle, {
+        onEnter: () => this.emit('idle:enter'),
+        onExit: () => this.emit('idle:exit'),
+        validTransitions: new Map([
+          [GameEvent.SelectPlayer, State.Select],
+          [GameEvent.Cancel, State.Idle] // Can stay in Idle
+        ])
+      }],
+      [State.Select, {
+        onEnter: () => this.emit('select:enter'),
+        onExit: () => this.emit('select:exit'),
+        validTransitions: new Map([
+          [GameEvent.MovePlayer, State.Move],
+          [GameEvent.Cancel, State.Idle]
+        ])
+      }],
+      [State.Move, {
+        onEnter: () => this.emit('move:enter'),
+        onExit: () => this.emit('move:exit'),
+        validTransitions: new Map([
+          [GameEvent.ShotPlayer, State.Shot],
+          [GameEvent.Cancel, State.Idle]
+        ])
+      }],
+      [State.Shot, {
+        onEnter: () => this.emit('shot:enter'),
+        onExit: () => this.emit('shot:exit'),
+        validTransitions: new Map([
+          [GameEvent.Complete, State.Idle],
+          [GameEvent.ShotPlayer, State.Shot], // Can change shot target
+          [GameEvent.Cancel, State.Idle]
+        ])
+      }]
+    ]);
+  }
+
+  /**
+   * Gets the current state
+   */
   getState(): State {
     return this.state;
   }
 
-  // 状態遷移
+  /**
+   * Checks if a transition is valid without executing it
+   */
+  canTransition(event: GameEvent): boolean {
+    const currentStateConfig = this.states.get(this.state);
+    return currentStateConfig?.validTransitions.has(event) ?? false;
+  }
+
+  /**
+   * Performs a state transition
+   * @param event - The event triggering the transition
+   * @returns true if transition was successful, false otherwise
+   */
   transition(event: GameEvent): boolean {
-    if (event === GameEvent.Cancel) {
-      this.state = State.Idle; // Cancel イベントはどの状態からでも Idle に戻る
-      if(test)console.log("Transitioned to Idle (via Cancel)");
-      return true;
+    const currentStateConfig = this.states.get(this.state);
+    const nextState = currentStateConfig?.validTransitions.get(event);
+
+    if (!nextState) {
+      this.emit('transition:invalid', { event, currentState: this.state });
+      if (this.debugMode) {
+        console.error(`Invalid transition from ${this.state} with event "${event}"`);
+      }
+      return false;
     }
 
-    switch (this.state) {
-      case State.Idle:
-        if (event === GameEvent.SelectPlayer) {
-          this.state = State.Select;
-          if(test)console.log("Transitioned to Select");
-          return true;
-        }
-        break;
+    // Exit current state
+    currentStateConfig?.onExit?.();
 
-      case State.Select:
-        if (event === GameEvent.MovePlayer) {
-          this.state = State.Move;
-          if(test)console.log("Transitioned to Move");
-          return true;
-        }
-        break;
+    const previousState = this.state;
+    this.state = nextState;
 
-      case State.Move:
-        if (event === GameEvent.ShotPlayer) {
-          this.state = State.Shot;
-          if(test)console.log("Transitioned to Shot");
-          return true;
-        }
-        break;
+    // Record transition in history
+    this.history.push({
+      from: previousState,
+      to: nextState,
+      event,
+      timestamp: Date.now()
+    });
 
-      case State.Shot:
-        if (event === GameEvent.Complete) {
-          this.state = State.Idle;
-          if(test)console.log("Transitioned to Idle");
-          return true;
-        }
-        break;
+    // Enter new state
+    const nextStateConfig = this.states.get(nextState);
+    nextStateConfig?.onEnter?.();
 
-      default:
-        if(test)console.error("Unknown state");
+    this.emit('transition:success', {
+      from: previousState,
+      to: nextState,
+      event
+    });
+
+    if (this.debugMode) {
+      console.log(`Transitioned from ${previousState} to ${nextState} via ${event}`);
     }
 
-    // 遷移できなかった場合
-    if(test)console.error(`Invalid transition from ${this.state} with event "${event}"`);
-    return false;
+    return true;
+  }
+
+  /**
+   * Registers an event listener
+   * @param eventName - Name of the event to listen to
+   * @param handler - Handler function to call when event is emitted
+   */
+  on(eventName: string, handler: EventListener): void {
+    if (!this.listeners.has(eventName)) {
+      this.listeners.set(eventName, []);
+    }
+    this.listeners.get(eventName)!.push(handler);
+  }
+
+  /**
+   * Unregisters an event listener
+   * @param eventName - Name of the event
+   * @param handler - Handler function to remove
+   */
+  off(eventName: string, handler: EventListener): void {
+    const handlers = this.listeners.get(eventName);
+    if (handlers) {
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emits an event to all registered listeners
+   * @param eventName - Name of the event to emit
+   * @param data - Optional data to pass to listeners
+   */
+  private emit(eventName: string, data?: any): void {
+    const handlers = this.listeners.get(eventName);
+    if (handlers) {
+      handlers.forEach(handler => handler(data));
+    }
+  }
+
+  /**
+   * Gets the transition history
+   */
+  getHistory(): StateTransition[] {
+    return [...this.history];
+  }
+
+  /**
+   * Clears the transition history
+   */
+  clearHistory(): void {
+    this.history = [];
+  }
+
+  /**
+   * Resets the state machine to initial state
+   */
+  reset(): void {
+    const currentStateConfig = this.states.get(this.state);
+    currentStateConfig?.onExit?.();
+
+    this.state = State.Idle;
+    this.history = [];
+
+    const idleStateConfig = this.states.get(State.Idle);
+    idleStateConfig?.onEnter?.();
+
+    this.emit('reset');
+  }
+
+  /**
+   * Enables or disables debug mode
+   */
+  setDebugMode(enabled: boolean): void {
+    this.debugMode = enabled;
   }
 }
 
