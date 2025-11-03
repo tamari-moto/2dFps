@@ -5,6 +5,7 @@ import { StateMachine, State, GameEvent } from './StateMachine';
 import { Model } from '../MODEL/model';
 import { gsap } from "gsap";
 import { PlayerConfig, EnemyConfig, NodeConfig, AnimationConfig, CameraConfig, ObstacleConfig } from '../config/GameConfig';
+import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 
 export class ThreeSetup {
   private canvas: HTMLCanvasElement;
@@ -27,6 +28,7 @@ export class ThreeSetup {
   private player_Angle: number;
   private sm: StateMachine;
   private readonly model: Model;
+  private viewAngleVisualizer: ViewAngleVisualizer;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -67,11 +69,13 @@ export class ThreeSetup {
     this.nodeid_to_meshid = new Map();
     this.model = new Model();
     this.player_Angle = 0;
+    this.viewAngleVisualizer = new ViewAngleVisualizer(this.scene);
 
     this.API_Init();
     this.glRender();
     this.sm.transition(GameEvent.SelectPlayer);
     canvas.addEventListener('click', this.onCanvasClick.bind(this), false);
+    window.addEventListener('keydown', this.onKeyDown.bind(this), false);
   }
 
   private API_Init() {
@@ -108,6 +112,8 @@ export class ThreeSetup {
       this.player_shot.material.color.setHex(NodeConfig.ShotTargetColor);
     }
 
+    // Draw view angle edges using the visualizer
+    this.viewAngleVisualizer.draw(this.model.player, this.player_Angle);
 
 
 
@@ -199,6 +205,19 @@ export class ThreeSetup {
     let mouse = new THREE.Vector2(x, -y);
     this.raycaster.setFromCamera(mouse, this.camera);
     return this.raycaster.intersectObjects(this.meshList);
+  }
+
+  /**
+   * Handles keyboard input for toggling view angle edges
+   * @param event - Keyboard event
+   */
+  private onKeyDown(event: KeyboardEvent) {
+    // Toggle view angle edges with 'V' key
+    if (event.key === 'v' || event.key === 'V') {
+      const isVisible = this.viewAngleVisualizer.toggle();
+      this.API_Veiw();
+      console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
+    }
   }
 
   private onCanvasClick(mouseEvent: MouseEvent) {

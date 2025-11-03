@@ -243,6 +243,23 @@ export const CameraConfig = {
 } as const;
 
 /**
+ * View angle visualization configuration
+ */
+export const ViewAngleVisualizationConfig = {
+  /** Enable view angle edges visualization */
+  ShowViewAngleEdges: false,
+
+  /** Color for view angle edges (yellow) */
+  EdgeColor: 0xffff00,
+
+  /** Opacity for view angle edges */
+  EdgeOpacity: 0.6,
+
+  /** Line width for view angle edges */
+  EdgeLineWidth: 2,
+} as const;
+
+/**
  * Calculated values (derived from other config values)
  */
 export const CalculatedConfig = {
