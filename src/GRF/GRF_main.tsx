@@ -2,6 +2,7 @@ import * as React from 'react';
 import { setupThree } from './threeSetup';
 import type { ThreeSetup } from './threeSetup';
 import ExportMenu from './ExportMenu';
+import ConsoleLogger from './ConsoleLogger';
 
 const GRF_main = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -21,6 +22,7 @@ const GRF_main = () => {
 
   return (
     <div>
+      <ConsoleLogger />
       <canvas ref={canvasRef} />
       <ExportMenu threeSetup={threeSetup} />
     </div>
