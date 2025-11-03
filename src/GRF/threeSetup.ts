@@ -21,11 +21,12 @@ export class ThreeSetup {
   private Undefind_Mesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   private meshList: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>[];
   private playerMeshes: Map<string, THREE.Mesh>;
-  private emenycube: THREE.Mesh;
+  private enemyMeshes: Map<string, THREE.Mesh>;
 
   private meshid_to_nodeid: Map<number, number>;
   private nodeid_to_meshid: Map<number, number>;
   private activePlayerId: string;
+  private activeEnemyId: string;
   private readonly model: Model;
   private viewAngleVisualizer: ViewAngleVisualizer;
 
@@ -61,12 +62,13 @@ export class ThreeSetup {
     this.raycaster = new THREE.Raycaster();
 
     this.playerMeshes = new Map();
-    this.emenycube = this.API_setEmenyc();
+    this.enemyMeshes = new Map();
 
     this.meshid_to_nodeid = new Map();
     this.nodeid_to_meshid = new Map();
     this.model = new Model();
     this.activePlayerId = 'player1'; // Default to first player
+    this.activeEnemyId = 'enemy1'; // Default to first enemy
     this.viewAngleVisualizer = new ViewAngleVisualizer(this.scene);
 
     this.API_Init();
@@ -77,6 +79,12 @@ export class ThreeSetup {
       const mesh = this.API_setPlayer(player.color);
       this.playerMeshes.set(playerId, mesh);
       player.stateMachine.transition(GameEvent.SelectPlayer);
+    }
+
+    // Initialize enemy meshes
+    for (const [enemyId, enemy] of this.model.enemies) {
+      const mesh = this.API_setEnemy(enemy.color);
+      this.enemyMeshes.set(enemyId, mesh);
     }
 
     canvas.addEventListener('click', this.onCanvasClick.bind(this), false);
@@ -101,12 +109,24 @@ export class ThreeSetup {
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
-    this.emenycube.visible = false;
-    gsap.to(this.emenycube.position, {
-      x: this.model.emeny.x,
-      y: this.model.emeny.y,
-      duration: AnimationConfig.MovementDuration,
-    });
+    // Update all enemy positions and visibility
+    for (const [enemyId, enemy] of this.model.enemies) {
+      const mesh = this.enemyMeshes.get(enemyId);
+      if (mesh) {
+        mesh.visible = false;
+        gsap.to(mesh.position, {
+          x: enemy.node.x,
+          y: enemy.node.y,
+          duration: AnimationConfig.MovementDuration,
+        });
+        // Highlight active enemy with a different scale
+        if (enemyId === this.activeEnemyId) {
+          mesh.scale.set(1.2, 1.2, 1.2);
+        } else {
+          mesh.scale.set(1.0, 1.0, 1.0);
+        }
+      }
+    }
 
     // Update all player positions
     for (const [playerId, player] of this.model.players) {
@@ -142,8 +162,14 @@ export class ThreeSetup {
         mesh.material.color.setHex(NodeConfig.VisibleColor);
       }
 
-      if (this.model.emeny.id == nodeA.id) {
-        this.emenycube.visible = true;
+      // Check if any enemies are visible at this node
+      for (const [enemyId, enemy] of this.model.enemies) {
+        if (enemy.node.id === nodeA.id) {
+          const enemyMesh = this.enemyMeshes.get(enemyId);
+          if (enemyMesh) {
+            enemyMesh.visible = true;
+          }
+        }
       }
     }
 
@@ -201,10 +227,10 @@ export class ThreeSetup {
     return tmp;
   }
 
-  private API_setEmenyc() {
-    const geometry2 = new THREE.BoxGeometry(EnemyConfig.CubeSize, EnemyConfig.CubeSize, EnemyConfig.CubeSize);
-    const material2 = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const tmp = new THREE.Mesh(geometry2, material2);
+  private API_setEnemy(color: number = 0xff0000) {
+    const geometry = new THREE.BoxGeometry(EnemyConfig.CubeSize, EnemyConfig.CubeSize, EnemyConfig.CubeSize);
+    const material = new THREE.MeshBasicMaterial({ color: color });
+    const tmp = new THREE.Mesh(geometry, material);
     this.scene.add(tmp);
     return tmp;
   }
@@ -227,7 +253,7 @@ export class ThreeSetup {
   }
 
   /**
-   * Handles keyboard input for toggling view angle edges and switching players
+   * Handles keyboard input for toggling view angle edges and switching players/enemies
    * @param event - Keyboard event
    */
   private onKeyDown(event: KeyboardEvent) {
@@ -246,6 +272,17 @@ export class ThreeSetup {
     else if (event.key === '2') {
       this.activePlayerId = 'player2';
       console.log('Switched to Player 2 (Green)');
+      this.API_Veiw();
+    }
+    // Switch between enemies with '3', '4', etc.
+    else if (event.key === '3') {
+      this.activeEnemyId = 'enemy1';
+      console.log('Switched to Enemy 1 (Red)');
+      this.API_Veiw();
+    }
+    else if (event.key === '4') {
+      this.activeEnemyId = 'enemy2';
+      console.log('Switched to Enemy 2 (Orange)');
       this.API_Veiw();
     }
   }
@@ -299,15 +336,34 @@ export class ThreeSetup {
             this.model.setPlayerRef(this.activePlayerId, this.model.nodeList[tmp]);
           }
 
-          tmp = this.model.Edges.List[this.model.emeny.id][Math.floor(Math.random() * this.model.Edges.List[this.model.emeny.id].length)];
-          if (tmp !== undefined) {
-            this.model.setEmenyRef(this.model.nodeList[tmp]);
+          // Move all enemies randomly
+          for (const [enemyId, enemy] of this.model.enemies) {
+            const enemyEdges = this.model.Edges.List[enemy.node.id];
+            if (enemyEdges && enemyEdges.length > 0) {
+              const randomNodeId = enemyEdges[Math.floor(Math.random() * enemyEdges.length)];
+              this.model.setEnemyRef(enemyId, this.model.nodeList[randomNodeId]);
+            }
           }
 
-          if (this.meshid_to_nodeid.get(this.player_shot.id) == this.model.emeny.id) {
-            console.log(`${this.activePlayerId} WIN!`);
-          } else if (activePlayer.node == this.model.nodeList[this.model.Edges.List[this.model.emeny.id][Math.floor(Math.random() * this.model.Edges.List[this.model.emeny.id].length)]]) {
-            console.log(`${this.activePlayerId} LOSE!`);
+          // Check if any enemy was hit
+          const shotNodeId = this.meshid_to_nodeid.get(this.player_shot.id);
+          let enemyHit = false;
+          for (const [enemyId, enemy] of this.model.enemies) {
+            if (shotNodeId === enemy.node.id) {
+              console.log(`${this.activePlayerId} hit ${enemyId}!`);
+              enemyHit = true;
+              break;
+            }
+          }
+
+          if (!enemyHit) {
+            // Check if player is at an enemy's adjacent position (simple lose condition)
+            for (const [enemyId, enemy] of this.model.enemies) {
+              if (activePlayer.node.id === enemy.node.id) {
+                console.log(`${this.activePlayerId} LOSE to ${enemyId}!`);
+                break;
+              }
+            }
           }
 
           const player_next = this.meshid_to_nodeid.get(this.player_next.id)

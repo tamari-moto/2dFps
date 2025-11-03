@@ -5,11 +5,12 @@ import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
+import { Enemy } from './Enemy';
 
 class Model {
   public nodeList: node[] = [];
   public players: Map<string, Player> = new Map();
-  public emeny: node = new node;
+  public enemies: Map<string, Enemy> = new Map();
   public Edges: Graph = new Graph();
   private kakudo: number = PlayerConfig.ViewAngle;
   private NodesInGridSize: number = MapConfig.NodesInGridSize;
@@ -44,7 +45,9 @@ class Model {
     this.players.set('player1', new Player('player1', this.nodeList[0], 0xffff00)); // Yellow
     this.players.set('player2', new Player('player2', this.nodeList[1], 0x00ff00)); // Green
 
-    this.setEmenyRef(this.nodeList[2]);
+    // Initialize enemies
+    this.enemies.set('enemy1', new Enemy('enemy1', this.nodeList[2], 0xff0000)); // Red
+    this.enemies.set('enemy2', new Enemy('enemy2', this.nodeList[3], 0xff6600)); // Orange
     for (const node of this.nodeList) {
       if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
       if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
@@ -135,12 +138,23 @@ class Model {
 
   /**
    * Sets the enemy reference to a new node.
-   * @param newEmeny - The new enemy node.
+   * @param enemyId - The enemy ID.
+   * @param newNode - The new node.
    */
-  public setEmenyRef(newEmeny: node): void {
-    this.emeny.id = newEmeny.id;
-    this.emeny.x = newEmeny.x;
-    this.emeny.y = newEmeny.y;
+  public setEnemyRef(enemyId: string, newNode: node): void {
+    const enemy = this.enemies.get(enemyId);
+    if (enemy) {
+      enemy.setNode(newNode);
+    }
+  }
+
+  /**
+   * Gets an enemy by ID.
+   * @param enemyId - The enemy ID.
+   * @returns The enemy object or undefined.
+   */
+  public getEnemy(enemyId: string): Enemy | undefined {
+    return this.enemies.get(enemyId);
   }
 
 
