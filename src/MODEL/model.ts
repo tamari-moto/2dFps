@@ -1,8 +1,9 @@
 import { node } from './node';
 import { Graph } from './Graph';
-import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
+import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
-import { MapConfig, PlayerConfig, ObstacleConfig, ComplexMapConfig, CalculatedConfig } from '../config/GameConfig';
+import { MapConfig, PlayerConfig } from '../config/GameConfig';
+import { MapGenerator } from './MapGenerator';
 
 class Model {
   public nodeList: node[] = [];
@@ -53,21 +54,9 @@ class Model {
   }
 
   /**
-   * Connects all nodes to each other.
-   */
-  public connectAllNodes() {
-    for (let i = 0; i < this.nodeList.length; i++) {
-      for (let j = i + 1; j < this.nodeList.length; j++) {
-        this.Edges.addEdgeDirected(this.nodeList[i].id, this.nodeList[j].id);
-        this.Edges.addEdgeDirected(this.nodeList[j].id, this.nodeList[i].id);
-      }
-    }
-  }
-
-  /**
    * Connects nodes that are within a certain distance of each other.
    */
-  public connectNearNodes() {
+  private connectNearNodes() {
     for (let i = 0; i < this.nodeList.length; i++) {
       for (let j = i + 1; j < this.nodeList.length; j++) {
         if(this.getNodeDistance(this.nodeList[i], this.nodeList[j]) < PlayerConfig.MaxViewDistance) {
@@ -138,19 +127,6 @@ class Model {
     this.emeny.y = newEmeny.y;
   }
 
-  /**
-   * Connects nodes in a grid pattern.
-   * @param size - The size of the grid.
-   */
-  public connectNodesInGrid(size: number) {
-    for (let i = 0; i < size; i++) {
-      for (let j = 0; j < size; j++) {
-        let nodeId = i * size + j;
-        if (j + 1 < size) this.Edges.addEdgeDirected(nodeId, nodeId + 1); // 右のノードに接続
-        if (i + 1 < size) this.Edges.addEdgeDirected(nodeId, nodeId + size); // 下のノードに接続
-      }
-    }
-  }
 
   /**
    * Gets nodes at a specific angle and distance from the center node.
@@ -323,69 +299,42 @@ class Model {
   /**
    * Internal method to generate random obstacles without resetting edges.
    * Used during initialization.
-   * @param count - Number of obstacles to generate (default: 3)
-   * @param minWidth - Minimum width of obstacles (default: 60)
-   * @param maxWidth - Maximum width of obstacles (default: 150)
-   * @param minHeight - Minimum height of obstacles (default: 60)
-   * @param maxHeight - Maximum height of obstacles (default: 150)
    */
-  private generateRandomObstaclesInternal(
-    count: number = ObstacleConfig.DefaultCount,
-    minWidth: number = ObstacleConfig.MinWidth,
-    maxWidth: number = ObstacleConfig.MaxWidth,
-    minHeight: number = ObstacleConfig.MinHeight,
-    maxHeight: number = ObstacleConfig.MaxHeight
-  ): void {
-    // Calculate map boundaries
-    const mapSize = CalculatedConfig.MapSize;
-    const margin = MapConfig.ObstacleMargin; // Minimum distance from map edges
-
-    // Generate random obstacles
-    for (let i = 0; i < count; i++) {
-      const width = Math.floor(Math.random() * (maxWidth - minWidth + 1)) + minWidth;
-      const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
-
-      // Ensure obstacles don't overlap with edges
-      const x = Math.floor(Math.random() * (mapSize - width - margin * 2)) + margin;
-      const y = Math.floor(Math.random() * (mapSize - height - margin * 2)) + margin;
-
-      const obstacleSegments = createRectangleSegments(x, y, width, height);
-      this.obstacles.push({ id: i + 1, segments: obstacleSegments });
-
-      obstacleSegments.forEach(element => {
-        this.Lines.push(element);
-      });
-    }
+  private generateRandomObstaclesInternal(): void {
+    const result = MapGenerator.generateRandomObstacles();
+    this.obstacles = result.obstacles;
+    this.Lines = result.lines;
 
     // Remove edges that intersect with obstacles
-    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
   }
 
   /**
    * Generates random obstacles on the map and resets edges.
    * This method is called when regenerating obstacles during gameplay.
-   * @param count - Number of obstacles to generate (default: 3)
-   * @param minWidth - Minimum width of obstacles (default: 60)
-   * @param maxWidth - Maximum width of obstacles (default: 150)
-   * @param minHeight - Minimum height of obstacles (default: 60)
-   * @param maxHeight - Maximum height of obstacles (default: 150)
+   * @param count - Number of obstacles to generate
+   * @param minWidth - Minimum width of obstacles
+   * @param maxWidth - Maximum width of obstacles
+   * @param minHeight - Minimum height of obstacles
+   * @param maxHeight - Maximum height of obstacles
    */
   public generateRandomObstacles(
-    count: number = ObstacleConfig.DefaultCount,
-    minWidth: number = ObstacleConfig.MinWidth,
-    maxWidth: number = ObstacleConfig.MaxWidth,
-    minHeight: number = ObstacleConfig.MinHeight,
-    maxHeight: number = ObstacleConfig.MaxHeight
+    count?: number,
+    minWidth?: number,
+    maxWidth?: number,
+    minHeight?: number,
+    maxHeight?: number
   ): void {
-    // Clear existing obstacles
-    this.Lines = [];
-    this.obstacles = [];
-
     // Reset edges to original state
     this.resetGraphEdges();
 
-    // Generate random obstacles using internal method
-    this.generateRandomObstaclesInternal(count, minWidth, maxWidth, minHeight, maxHeight);
+    // Generate random obstacles using MapGenerator
+    const result = MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight);
+    this.obstacles = result.obstacles;
+    this.Lines = result.lines;
+
+    // Remove edges that intersect with obstacles
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
   }
 
   /**
@@ -393,36 +342,16 @@ class Model {
    * @param obstaclesData - Array of obstacle data to import
    */
   public importObstacles(obstaclesData: ObstacleData[]): void {
-    // Clear existing obstacles
-    this.Lines = [];
-    this.obstacles = [];
-
     // Reset edges to original state
     this.resetGraphEdges();
 
-    // Import obstacles from data
-    for (const obstacleData of obstaclesData) {
-      const segments: LineSegment[] = [];
-
-      for (const segmentData of obstacleData.segments) {
-        const segment = new LineSegment(
-          segmentData.start.x,
-          segmentData.start.y,
-          segmentData.end.x,
-          segmentData.end.y
-        );
-        segments.push(segment);
-        this.Lines.push(segment);
-      }
-
-      this.obstacles.push({
-        id: obstacleData.id,
-        segments: segments
-      });
-    }
+    // Import obstacles using MapGenerator
+    const result = MapGenerator.importObstacles(obstaclesData);
+    this.obstacles = result.obstacles;
+    this.Lines = result.lines;
 
     // Remove edges that intersect with obstacles
-    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
   }
 
   /**
@@ -430,236 +359,16 @@ class Model {
    * Patterns include: maze-like corridors, rooms, scattered obstacles, and strategic cover points.
    */
   public generateComplexMap(): void {
-    // Clear existing obstacles
-    this.Lines = [];
-    this.obstacles = [];
-
     // Reset edges to original state
     this.resetGraphEdges();
 
-    const mapSize = CalculatedConfig.MapSize;
-    let obstacleId = 1;
-
-    // Choose a random map pattern
-    const patterns = ['maze', 'rooms', 'scattered', 'symmetric', 'corridors'];
-    const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
-
-    switch (selectedPattern) {
-      case 'maze':
-        // Maze-like pattern with multiple walls
-        this.generateMazePattern(obstacleId, mapSize);
-        break;
-
-      case 'rooms':
-        // Multiple rooms with doorways
-        this.generateRoomsPattern(obstacleId, mapSize);
-        break;
-
-      case 'scattered':
-        // Scattered cover points
-        this.generateScatteredPattern(obstacleId, mapSize);
-        break;
-
-      case 'symmetric':
-        // Symmetric obstacle placement
-        this.generateSymmetricPattern(obstacleId, mapSize);
-        break;
-
-      case 'corridors':
-        // Long corridors with intersections
-        this.generateCorridorsPattern(obstacleId, mapSize);
-        break;
-    }
+    // Generate complex map using MapGenerator
+    const result = MapGenerator.generateComplexMap();
+    this.obstacles = result.obstacles;
+    this.Lines = result.lines;
 
     // Remove edges that intersect with obstacles
-    removeEdgesIfIntersected(this.Edges, this.nodeList, this.Lines);
-  }
-
-  /**
-   * Generates a maze-like pattern
-   */
-  private generateMazePattern(startId: number, mapSize: number): void {
-    let id = startId;
-    const wallThickness = ObstacleConfig.WallThickness;
-
-    // Horizontal walls
-    for (let i = 0; i < ComplexMapConfig.MazeHorizontalWalls; i++) {
-      const y = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
-      const startX = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
-      const width = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
-
-      const segments = createRectangleSegments(startX, y, width, wallThickness);
-      this.obstacles.push({ id: id++, segments });
-      segments.forEach(s => this.Lines.push(s));
-    }
-
-    // Vertical walls
-    for (let i = 0; i < ComplexMapConfig.MazeVerticalWalls; i++) {
-      const x = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
-      const startY = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
-      const height = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
-
-      const segments = createRectangleSegments(x, startY, wallThickness, height);
-      this.obstacles.push({ id: id++, segments });
-      segments.forEach(s => this.Lines.push(s));
-    }
-  }
-
-  /**
-   * Generates rooms with doorways
-   */
-  private generateRoomsPattern(startId: number, mapSize: number): void {
-    let id = startId;
-    const roomCount = ComplexMapConfig.RoomCount;
-
-    for (let i = 0; i < roomCount; i++) {
-      const roomX = ComplexMapConfig.RoomBaseOffset + (i % 2) * ComplexMapConfig.RoomSpacingMultiplier;
-      const roomY = ComplexMapConfig.RoomBaseOffset + Math.floor(i / 2) * ComplexMapConfig.RoomSpacingMultiplier;
-      const roomWidth = ComplexMapConfig.RoomWidth;
-      const roomHeight = ComplexMapConfig.RoomHeight;
-      const wallThickness = ObstacleConfig.RoomWallThickness;
-      const doorWidth = ObstacleConfig.RoomDoorWidth;
-
-      // Top wall with doorway
-      const topLeftWidth = (roomWidth - doorWidth) / 2;
-      const topRightStart = roomX + topLeftWidth + doorWidth;
-      const topRightWidth = roomWidth - topLeftWidth - doorWidth;
-
-      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, roomY, topLeftWidth, wallThickness) });
-      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-      this.obstacles.push({ id: id++, segments: createRectangleSegments(topRightStart, roomY, topRightWidth, wallThickness) });
-      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-      // Right wall
-      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX + roomWidth - wallThickness, roomY, wallThickness, roomHeight) });
-      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-      // Bottom wall
-      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, roomY + roomHeight - wallThickness, roomWidth, wallThickness) });
-      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-      // Left wall with doorway
-      const leftTopHeight = (roomHeight - doorWidth) / 2;
-      const leftBottomStart = roomY + leftTopHeight + doorWidth;
-      const leftBottomHeight = roomHeight - leftTopHeight - doorWidth;
-
-      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, roomY, wallThickness, leftTopHeight) });
-      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-      this.obstacles.push({ id: id++, segments: createRectangleSegments(roomX, leftBottomStart, wallThickness, leftBottomHeight) });
-      this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-    }
-  }
-
-  /**
-   * Generates scattered cover points
-   */
-  private generateScatteredPattern(startId: number, mapSize: number): void {
-    let id = startId;
-    const coverCount = ComplexMapConfig.ScatteredMinCount + Math.floor(Math.random() * ComplexMapConfig.ScatteredRandomCountRange);
-
-    for (let i = 0; i < coverCount; i++) {
-      const width = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
-      const height = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
-      const x = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - width - ComplexMapConfig.ScatteredSpacingBuffer);
-      const y = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - height - ComplexMapConfig.ScatteredSpacingBuffer);
-
-      const segments = createRectangleSegments(x, y, width, height);
-      this.obstacles.push({ id: id++, segments });
-      segments.forEach(s => this.Lines.push(s));
-    }
-  }
-
-  /**
-   * Generates symmetric obstacle placement
-   */
-  private generateSymmetricPattern(startId: number, mapSize: number): void {
-    let id = startId;
-    const centerX = mapSize / 2;
-    const centerY = mapSize / 2;
-    const obstacleCount = ComplexMapConfig.SymmetricObstacleCount;
-
-    for (let i = 0; i < obstacleCount; i++) {
-      const width = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
-      const height = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
-      const offsetX = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
-      const offsetY = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
-
-      // Four symmetric positions
-      const positions = [
-        { x: centerX + offsetX, y: centerY + offsetY },
-        { x: centerX - offsetX - width, y: centerY + offsetY },
-        { x: centerX + offsetX, y: centerY - offsetY - height },
-        { x: centerX - offsetX - width, y: centerY - offsetY - height }
-      ];
-
-      positions.forEach(pos => {
-        if (pos.x >= MapConfig.ObstacleMargin && pos.y >= MapConfig.ObstacleMargin && pos.x + width <= mapSize - MapConfig.ObstacleMargin && pos.y + height <= mapSize - MapConfig.ObstacleMargin) {
-          const segments = createRectangleSegments(pos.x, pos.y, width, height);
-          this.obstacles.push({ id: id++, segments });
-          segments.forEach(s => this.Lines.push(s));
-        }
-      });
-    }
-
-    // Central obstacle
-    const centralSize = ComplexMapConfig.SymmetricCentralMinSize + Math.random() * ComplexMapConfig.SymmetricCentralRandomSizeRange;
-    const centralSegments = createRectangleSegments(centerX - centralSize / 2, centerY - centralSize / 2, centralSize, centralSize);
-    this.obstacles.push({ id: id++, segments: centralSegments });
-    centralSegments.forEach(s => this.Lines.push(s));
-  }
-
-  /**
-   * Generates corridors with intersections
-   */
-  private generateCorridorsPattern(startId: number, mapSize: number): void {
-    let id = startId;
-    const wallThickness = ObstacleConfig.CorridorWallThickness;
-
-    // Main cross corridors
-    const corridorWidth = ObstacleConfig.CorridorWidth;
-    const centerX = mapSize / 2;
-    const centerY = mapSize / 2;
-
-    // Vertical corridor walls
-    const vLeftX = centerX - corridorWidth / 2;
-    const vRightX = centerX + corridorWidth / 2;
-
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(vLeftX - wallThickness, MapConfig.ObstacleMargin, wallThickness, mapSize - MapConfig.ObstacleMargin * 2) });
-    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(vRightX, MapConfig.ObstacleMargin, wallThickness, mapSize - MapConfig.ObstacleMargin * 2) });
-    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-    // Horizontal corridor walls
-    const hTopY = centerY - corridorWidth / 2;
-    const hBottomY = centerY + corridorWidth / 2;
-
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(MapConfig.ObstacleMargin, hTopY - wallThickness, mapSize - MapConfig.ObstacleMargin * 2, wallThickness) });
-    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-    this.obstacles.push({ id: id++, segments: createRectangleSegments(MapConfig.ObstacleMargin, hBottomY, mapSize - MapConfig.ObstacleMargin * 2, wallThickness) });
-    this.Lines.push(...this.obstacles[this.obstacles.length - 1].segments);
-
-    // Add some obstacles in the quadrants
-    const quadrantObstacles = ComplexMapConfig.CorridorsQuadrantObstacles;
-    for (let i = 0; i < quadrantObstacles; i++) {
-      const quadrant = i % 4;
-      let qx, qy;
-
-      switch (quadrant) {
-        case 0: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition; break;
-        case 1: qx = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; qy = ComplexMapConfig.CorridorsQuadrantBasePosition; break;
-        case 2: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; break;
-        case 3: qx = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; qy = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; break;
-        default: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition;
-      }
-
-      const segments = createRectangleSegments(qx, qy, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange);
-      this.obstacles.push({ id: id++, segments });
-      segments.forEach(s => this.Lines.push(s));
-    }
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
   }
 
 }

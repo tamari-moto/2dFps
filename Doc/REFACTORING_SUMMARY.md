@@ -174,9 +174,9 @@
 
 #### プライベート化の推奨
 以下のメソッドは外部から直接呼び出されていないため、`private`に変更可能:
-- `Model.connectNearNodes()`
-- `Model.connectNodesInGrid()` (未使用なので削除可能)
-- `Model.connectAllNodes()` (未使用なので削除可能)
+- ~~`Model.connectNearNodes()`~~ ✅ プライベート化完了
+- ~~`Model.connectNodesInGrid()`~~ ✅ 削除完了 (未使用)
+- ~~`Model.connectAllNodes()`~~ ✅ 削除完了 (未使用)
 
 ### メリット
 
@@ -196,7 +196,108 @@
    - 重複コード削除により52行削減
    - より簡潔で理解しやすいコードに
 
+### 4. マップ生成機能の分離 ✅
+
+#### 新規モジュール作成
+- **src/MODEL/MapGenerator.ts** - マップ生成ロジックを独立したモジュールに分離
+
+#### 実施内容
+
+##### MapGenerator クラスの作成
+すべてのマップ生成ロジックを静的メソッドとして実装:
+
+```typescript
+export class MapGenerator {
+  // ランダム障害物生成
+  static generateRandomObstacles(): { obstacles, lines }
+
+  // 複雑マップ生成 (5パターン)
+  static generateComplexMap(): { obstacles, lines, pattern }
+
+  // 障害物インポート
+  static importObstacles(data): { obstacles, lines }
+
+  // グラフへの適用
+  static applyObstaclesToGraph(edges, nodeList, lines): void
+
+  // 5つのマップパターン生成 (private)
+  private static generateMazePattern()
+  private static generateRoomsPattern()
+  private static generateScatteredPattern()
+  private static generateSymmetricPattern()
+  private static generateCorridorsPattern()
+}
+```
+
+##### Model.ts のリファクタリング
+マップ生成関連メソッドを MapGenerator を使用するように変更:
+
+**Before** (Model.ts 内に全ロジック):
+- `generateRandomObstaclesInternal()` - 60行
+- `generateRandomObstacles()` - 30行
+- `importObstacles()` - 30行
+- `generateComplexMap()` - 40行
+- `generateMazePattern()` - 25行
+- `generateRoomsPattern()` - 60行
+- `generateScatteredPattern()` - 20行
+- `generateSymmetricPattern()` - 35行
+- `generateCorridorsPattern()` - 50行
+
+**計**: 350行以上
+
+**After** (MapGenerator に委譲):
+- `generateRandomObstaclesInternal()` - 7行
+- `generateRandomObstacles()` - 11行
+- `importObstacles()` - 9行
+- `generateComplexMap()` - 9行
+
+**計**: 36行 (314行削減！)
+
+##### メソッド削除
+不要なメソッドを削除:
+- ~~`connectAllNodes()`~~ - 未使用のため削除
+- ~~`connectNodesInGrid()`~~ - 未使用のため削除
+
+##### アクセス修飾子の変更
+- `connectNearNodes()`: `public` → `private` (外部から呼ばれていない)
+
+#### メリット
+
+1. **関心の分離**
+   - Model クラスはゲーム状態管理に専念
+   - MapGenerator はマップ生成に専念
+   - 単一責任原則の遵守
+
+2. **再利用性向上**
+   - MapGenerator は他のプロジェクトでも使用可能
+   - 依存関係が明確になった
+
+3. **テスト容易性**
+   - マップ生成ロジックを独立してテスト可能
+   - モックやスタブが不要
+
+4. **保守性向上**
+   - Model.ts のサイズが 400行 → 86行に削減 (78%削減)
+   - マップ生成に関する変更はすべて MapGenerator で完結
+
+5. **拡張性向上**
+   - 新しいマップパターンの追加が容易
+   - 既存のゲームロジックに影響を与えない
+
+#### ファイル構成
+
+```
+src/MODEL/
+├── model.ts           (86行 - ゲーム状態管理に専念)
+├── MapGenerator.ts    (380行 - マップ生成ロジック)
+├── Graph.ts
+├── node.ts
+├── LineSegment.ts
+└── ObstacleExporter.ts
+```
+
 ## ビルド状態
 
 ✅ すべての変更後、ビルドは正常に動作
 ✅ 開発サーバーは問題なく起動 (http://localhost:5174/2dFps/)
+✅ MapGenerator 分離後もビルド成功
