@@ -4,10 +4,11 @@ import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
+import { Player } from './Player';
 
 class Model {
   public nodeList: node[] = [];
-  public player: node = new node;
+  public players: Map<string, Player> = new Map();
   public emeny: node = new node;
   public Edges: Graph = new Graph();
   private kakudo: number = PlayerConfig.ViewAngle;
@@ -38,7 +39,11 @@ class Model {
       }
     }
     this.connectNearNodes();
-    this.setPlayerRef(this.nodeList[0]);
+
+    // Initialize players
+    this.players.set('player1', new Player('player1', this.nodeList[0], 0xffff00)); // Yellow
+    this.players.set('player2', new Player('player2', this.nodeList[1], 0x00ff00)); // Green
+
     this.setEmenyRef(this.nodeList[2]);
     for (const node of this.nodeList) {
       if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
@@ -109,12 +114,23 @@ class Model {
 
   /**
    * Sets the player reference to a new node.
-   * @param newPlayer - The new player node.
+   * @param playerId - The player ID.
+   * @param newNode - The new node.
    */
-  public setPlayerRef(newPlayer: node): void {
-    this.player.id = newPlayer.id;
-    this.player.x = newPlayer.x;
-    this.player.y = newPlayer.y;
+  public setPlayerRef(playerId: string, newNode: node): void {
+    const player = this.players.get(playerId);
+    if (player) {
+      player.setNode(newNode);
+    }
+  }
+
+  /**
+   * Gets a player by ID.
+   * @param playerId - The player ID.
+   * @returns The player object or undefined.
+   */
+  public getPlayer(playerId: string): Player | undefined {
+    return this.players.get(playerId);
   }
 
   /**

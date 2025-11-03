@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three-stdlib";
 import { Vector3 } from "three";
-import { StateMachine, State, GameEvent } from './StateMachine';
+import { State, GameEvent } from './StateMachine';
 import { Model } from '../MODEL/model';
 import { gsap } from "gsap";
 import { PlayerConfig, EnemyConfig, NodeConfig, AnimationConfig, CameraConfig, ObstacleConfig } from '../config/GameConfig';
@@ -20,13 +20,12 @@ export class ThreeSetup {
   private player_select: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   private Undefind_Mesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
   private meshList: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>[];
-  private playercube: THREE.Mesh;
+  private playerMeshes: Map<string, THREE.Mesh>;
   private emenycube: THREE.Mesh;
 
   private meshid_to_nodeid: Map<number, number>;
   private nodeid_to_meshid: Map<number, number>;
-  private player_Angle: number;
-  private sm: StateMachine;
+  private activePlayerId: string;
   private readonly model: Model;
   private viewAngleVisualizer: ViewAngleVisualizer;
 
@@ -61,19 +60,25 @@ export class ThreeSetup {
 
     this.raycaster = new THREE.Raycaster();
 
-    this.playercube = this.API_setPlayer();
+    this.playerMeshes = new Map();
     this.emenycube = this.API_setEmenyc();
 
-    this.sm = new StateMachine();
     this.meshid_to_nodeid = new Map();
     this.nodeid_to_meshid = new Map();
     this.model = new Model();
-    this.player_Angle = 0;
+    this.activePlayerId = 'player1'; // Default to first player
     this.viewAngleVisualizer = new ViewAngleVisualizer(this.scene);
 
     this.API_Init();
     this.glRender();
-    this.sm.transition(GameEvent.SelectPlayer);
+
+    // Initialize player meshes
+    for (const [playerId, player] of this.model.players) {
+      const mesh = this.API_setPlayer(player.color);
+      this.playerMeshes.set(playerId, mesh);
+      player.stateMachine.transition(GameEvent.SelectPlayer);
+    }
+
     canvas.addEventListener('click', this.onCanvasClick.bind(this), false);
     window.addEventListener('keydown', this.onKeyDown.bind(this), false);
   }
@@ -93,17 +98,33 @@ export class ThreeSetup {
   }
 
   private API_Veiw() {
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (!activePlayer) return;
+
     this.emenycube.visible = false;
     gsap.to(this.emenycube.position, {
       x: this.model.emeny.x,
       y: this.model.emeny.y,
       duration: AnimationConfig.MovementDuration,
     });
-    gsap.to(this.playercube.position, {
-      x: this.model.player.x,
-      y: this.model.player.y,
-      duration: AnimationConfig.MovementDuration,
-    });
+
+    // Update all player positions
+    for (const [playerId, player] of this.model.players) {
+      const mesh = this.playerMeshes.get(playerId);
+      if (mesh) {
+        gsap.to(mesh.position, {
+          x: player.node.x,
+          y: player.node.y,
+          duration: AnimationConfig.MovementDuration,
+        });
+        // Highlight active player with a different brightness or scale
+        if (playerId === this.activePlayerId) {
+          mesh.scale.set(1.2, 1.2, 1.2);
+        } else {
+          mesh.scale.set(1.0, 1.0, 1.0);
+        }
+      }
+    }
 
     this.meshList.map((mesh) => {
       mesh.material.color.setHex(NodeConfig.DefaultColor);
@@ -113,11 +134,9 @@ export class ThreeSetup {
     }
 
     // Draw view angle edges using the visualizer
-    this.viewAngleVisualizer.draw(this.model.player, this.player_Angle);
+    this.viewAngleVisualizer.draw(activePlayer.node, activePlayer.angle);
 
-
-
-    for (const nodeA of this.model.getVisibleNodesAtAngle(this.model.player, this.player_Angle, PlayerConfig.MaxViewDistance)) {
+    for (const nodeA of this.model.getVisibleNodesAtAngle(activePlayer.node, activePlayer.angle, PlayerConfig.MaxViewDistance)) {
       let mesh = this.meshList.find(mesh => this.meshid_to_nodeid.get(mesh.id) == nodeA.id);
       if (mesh !== undefined) {
         mesh.material.color.setHex(NodeConfig.VisibleColor);
@@ -146,7 +165,7 @@ export class ThreeSetup {
           yoyo: true,
           repeat: 1,
           repeatDelay: AnimationConfig.ShotPulseRepeatDelay,
-          ease: AnimationConfig.ShotPulseEase, // プルンプルン跳ねる
+          ease: AnimationConfig.ShotPulseEase,
           overwrite: "auto",
         }
       );
@@ -174,9 +193,9 @@ export class ThreeSetup {
     this.scene.add(line);
   }
 
-  private API_setPlayer() {
+  private API_setPlayer(color: number = 0xffff00) {
     const geometry = new THREE.BoxGeometry(PlayerConfig.CubeSize, PlayerConfig.CubeSize, PlayerConfig.CubeSize);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    const material = new THREE.MeshBasicMaterial({ color: color });
     const tmp = new THREE.Mesh(geometry, material);
     this.scene.add(tmp);
     return tmp;
@@ -208,7 +227,7 @@ export class ThreeSetup {
   }
 
   /**
-   * Handles keyboard input for toggling view angle edges
+   * Handles keyboard input for toggling view angle edges and switching players
    * @param event - Keyboard event
    */
   private onKeyDown(event: KeyboardEvent) {
@@ -218,50 +237,66 @@ export class ThreeSetup {
       this.API_Veiw();
       console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
     }
+    // Switch between players with '1', '2', etc.
+    else if (event.key === '1') {
+      this.activePlayerId = 'player1';
+      console.log('Switched to Player 1 (Yellow)');
+      this.API_Veiw();
+    }
+    else if (event.key === '2') {
+      this.activePlayerId = 'player2';
+      console.log('Switched to Player 2 (Green)');
+      this.API_Veiw();
+    }
   }
 
   private onCanvasClick(mouseEvent: MouseEvent) {
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (!activePlayer) return;
+
+    const sm = activePlayer.stateMachine;
     const intersects = this.getIntersects(mouseEvent);
-    if (intersects.length > 0 ) {
+
+    if (intersects.length > 0) {
       let mesh = intersects[0].object as THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-      if (this.sm.getState() == State.Idle) {
-        if (this.model.player.id == this.meshid_to_nodeid.get(mesh.id)) {
-          this.sm.transition(GameEvent.SelectPlayer);
+
+      if (sm.getState() == State.Idle) {
+        if (activePlayer.node.id == this.meshid_to_nodeid.get(mesh.id)) {
+          sm.transition(GameEvent.SelectPlayer);
           this.player_select = mesh;
         }
       }
-      else if (this.sm.getState() == State.Select) {
-        if (this.model.player.id == this.meshid_to_nodeid.get(mesh.id)) {
-          this.sm.transition(GameEvent.MovePlayer);
-          this.player_next = mesh ;
+      else if (sm.getState() == State.Select) {
+        if (activePlayer.node.id == this.meshid_to_nodeid.get(mesh.id)) {
+          sm.transition(GameEvent.MovePlayer);
+          this.player_next = mesh;
         }
         const nodeId = this.meshid_to_nodeid.get(mesh.id);
         if (nodeId !== undefined) {
-          if(this.model.areNodesConnected(this.model.player, this.model.nodeList[nodeId])){
-            this.sm.transition(GameEvent.MovePlayer);
-            this.player_next = mesh ;
+          if (this.model.areNodesConnected(activePlayer.node, this.model.nodeList[nodeId])) {
+            sm.transition(GameEvent.MovePlayer);
+            this.player_next = mesh;
           }
         }
       }
-      else if (this.sm.getState() == State.Move) {
-        const A =this.meshid_to_nodeid.get(mesh.id)
-        const B =this.meshid_to_nodeid.get(this.player_next.id)
+      else if (sm.getState() == State.Move) {
+        const A = this.meshid_to_nodeid.get(mesh.id)
+        const B = this.meshid_to_nodeid.get(this.player_next.id)
         if ((B !== undefined) && (A !== undefined)) {
-          // Check if target is visible from the player's next position
-          const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, PlayerConfig.MaxViewDistance);
+          const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], activePlayer.angle, PlayerConfig.MaxViewDistance);
           const isVisible = visibleNodes.some(n => n.id === A);
           if (isVisible) {
-            this.sm.transition(GameEvent.ShotPlayer);
+            sm.transition(GameEvent.ShotPlayer);
             this.player_shot = mesh;
           }
         }
       }
-      else if (this.sm.getState() == State.Shot) {
+      else if (sm.getState() == State.Shot) {
         if (this.player_shot.id == mesh.id) {
-          this.sm.transition(GameEvent.Complete);
+          sm.transition(GameEvent.Complete);
           let tmp = this.meshid_to_nodeid.get(this.player_next.id)
           if (tmp !== undefined) {
-            this.model.setPlayerRef(this.model.nodeList[tmp]);
+            this.model.setPlayerRef(this.activePlayerId, this.model.nodeList[tmp]);
           }
 
           tmp = this.model.Edges.List[this.model.emeny.id][Math.floor(Math.random() * this.model.Edges.List[this.model.emeny.id].length)];
@@ -270,29 +305,29 @@ export class ThreeSetup {
           }
 
           if (this.meshid_to_nodeid.get(this.player_shot.id) == this.model.emeny.id) {
-            console.log("WIN");
-          } else if (this.model.player == this.model.nodeList[this.model.Edges.List[this.model.emeny.id][Math.floor(Math.random() * this.model.Edges.List[this.model.emeny.id].length)]]) {
-            console.log("LOSE");
+            console.log(`${this.activePlayerId} WIN!`);
+          } else if (activePlayer.node == this.model.nodeList[this.model.Edges.List[this.model.emeny.id][Math.floor(Math.random() * this.model.Edges.List[this.model.emeny.id].length)]]) {
+            console.log(`${this.activePlayerId} LOSE!`);
           }
+
           const player_next = this.meshid_to_nodeid.get(this.player_next.id)
           const tmpplayer_shot = this.meshid_to_nodeid.get(this.player_shot.id)
-          if (player_next !== undefined&&tmpplayer_shot !== undefined) {
-            this.player_Angle = this.model.getAngleBetweenNodes(this.model.nodeList[player_next],this.model.nodeList[tmpplayer_shot]);
+          if (player_next !== undefined && tmpplayer_shot !== undefined) {
+            activePlayer.setAngle(this.model.getAngleBetweenNodes(this.model.nodeList[player_next], this.model.nodeList[tmpplayer_shot]));
           }
-          this.sm.transition(GameEvent.SelectPlayer);
+          sm.transition(GameEvent.SelectPlayer);
           this.player_select = this.player_next;
           this.player_next = this.Undefind_Mesh;
           this.player_shot = this.Undefind_Mesh;
         }
         else {
-          const A =this.meshid_to_nodeid.get(mesh.id)
-          const B =this.meshid_to_nodeid.get(this.player_next.id)
+          const A = this.meshid_to_nodeid.get(mesh.id)
+          const B = this.meshid_to_nodeid.get(this.player_next.id)
           if ((B !== undefined) && (A !== undefined)) {
-            // Check if target is visible from the player's next position
-            const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], this.player_Angle, PlayerConfig.MaxViewDistance);
+            const visibleNodes = this.model.getVisibleNodesAtAngle(this.model.nodeList[B], activePlayer.angle, PlayerConfig.MaxViewDistance);
             const isVisible = visibleNodes.some(n => n.id === A);
             if (isVisible) {
-              this.sm.transition(GameEvent.ShotPlayer);
+              sm.transition(GameEvent.ShotPlayer);
               this.player_shot = mesh;
             }
           }
@@ -300,10 +335,10 @@ export class ThreeSetup {
       }
     }
     if (intersects.length == 0) {
-      this.sm.transition(GameEvent.Cancel);
+      sm.transition(GameEvent.Cancel);
       this.player_shot = this.Undefind_Mesh;
       this.player_next = this.Undefind_Mesh;
-      this.sm.transition(GameEvent.SelectPlayer);
+      sm.transition(GameEvent.SelectPlayer);
     }
     this.API_Veiw();
   }
