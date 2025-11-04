@@ -112,14 +112,14 @@ export class VisualizationSync {
     // Reset all node colors
     this.resetNodeColors();
 
-    // Update special node colors
-    this.updateSpecialNodes();
-
     // Draw view angle visualization
     this.viewAngleVisualizer.draw(activePlayer.node, activePlayer.angle);
 
     // Update visible nodes and enemy visibility
     this.updateVisibleNodes(activePlayer);
+
+    // Update special node colors (must be after updateVisibleNodes to prevent override)
+    this.updateSpecialNodes();
   }
 
   /**
