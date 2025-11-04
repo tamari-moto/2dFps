@@ -6,6 +6,7 @@ import { MeshFactory } from './MeshFactory';
 import { SceneManager } from './SceneManager';
 import { NodeConfig, AnimationConfig, PlayerConfig } from '../../config/GameConfig';
 import { PLAYER_CONSTANTS, ENEMY_CONSTANTS } from '../../config/GameConstants';
+import { Player } from '../../MODEL/Player';
 
 /**
  * Synchronizes game model state with Three.js visualization
@@ -210,7 +211,7 @@ export class VisualizationSync {
   /**
    * Updates visible nodes and enemy visibility based on player's view
    */
-  private updateVisibleNodes(activePlayer: any): void {
+  private updateVisibleNodes(activePlayer: Player): void {
     const visibleNodes = this.model.getVisibleNodesAtAngle(
       activePlayer.node,
       activePlayer.angle,

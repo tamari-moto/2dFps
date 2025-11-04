@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { Model } from '../../MODEL/model';
-import { State, GameEvent } from '../StateMachine';
+import { State, GameEvent, StateMachine } from '../StateMachine';
 import { VisualizationSync } from '../rendering/VisualizationSync';
 import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
 import { PlayerConfig } from '../../config/GameConfig';
+import { Player } from '../../MODEL/Player';
+import { node } from '../../MODEL/node';
 
 /**
  * Controls game logic and state transitions
@@ -69,7 +71,7 @@ export class GameController {
   /**
    * Handles clicks in Idle state
    */
-  private handleIdleStateClick(activePlayer: any, clickedNode: any, sm: any): void {
+  private handleIdleStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.SelectPlayer);
       const mesh = this.findMeshByNodeId(clickedNode.id);
@@ -82,7 +84,7 @@ export class GameController {
   /**
    * Handles clicks in Select state
    */
-  private handleSelectStateClick(activePlayer: any, clickedNode: any, sm: any): void {
+  private handleSelectStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.MovePlayer);
       const mesh = this.findMeshByNodeId(clickedNode.id);
@@ -101,7 +103,7 @@ export class GameController {
   /**
    * Handles clicks in Move state
    */
-  private handleMoveStateClick(activePlayer: any, clickedNode: any, sm: any): void {
+  private handleMoveStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
     const nextMesh = this.visualizationSync.getPlayerNextMesh();
     const nextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
 
@@ -127,7 +129,7 @@ export class GameController {
   /**
    * Handles clicks in Shot state
    */
-  private handleShotStateClick(activePlayer: any, clickedNode: any, sm: any): void {
+  private handleShotStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
     const shotMesh = this.visualizationSync.getPlayerShotMesh();
     const shotNodeId = this.getMeshToNodeMap().get(shotMesh.id);
 
@@ -162,7 +164,7 @@ export class GameController {
   /**
    * Executes a complete turn (move, shoot, enemy response)
    */
-  private executeTurn(activePlayer: any, sm: any): void {
+  private executeTurn(activePlayer: Player, sm: StateMachine): void {
     sm.transition(GameEvent.Complete);
 
     // Move player

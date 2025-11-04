@@ -12,6 +12,7 @@ export class SceneManager {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private orbitControls: OrbitControls;
+  private boundHandleResize: () => void;
 
   constructor(canvas: HTMLCanvasElement) {
     // Setup renderer
@@ -39,8 +40,9 @@ export class SceneManager {
     this.orbitControls.maxDistance = CameraConfig.MaxDistance;
     this.orbitControls.enableRotate = CameraConfig.EnableRotate;
 
-    // Handle window resize
-    window.addEventListener('resize', this.handleResize.bind(this));
+    // Handle window resize - store bound function to enable proper cleanup
+    this.boundHandleResize = this.handleResize.bind(this);
+    window.addEventListener('resize', this.boundHandleResize);
   }
 
   /**
@@ -115,7 +117,7 @@ export class SceneManager {
    * Cleans up resources
    */
   dispose(): void {
-    window.removeEventListener('resize', this.handleResize.bind(this));
+    window.removeEventListener('resize', this.boundHandleResize);
     this.orbitControls.dispose();
     this.renderer.dispose();
   }

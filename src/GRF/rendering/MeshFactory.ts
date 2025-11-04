@@ -18,31 +18,27 @@ export class MeshFactory {
   }
 
   /**
+   * Creates an actor (player or enemy) cube mesh
+   * @private Internal helper method for creating cube-based actors
+   */
+  private static createActorCube(size: number, color: number): THREE.Mesh {
+    const geometry = new THREE.BoxGeometry(size, size, size);
+    const material = new THREE.MeshBasicMaterial({ color });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  /**
    * Creates a player mesh
    */
   static createPlayer(color: number = 0xffff00): THREE.Mesh {
-    const geometry = new THREE.BoxGeometry(
-      PlayerConfig.CubeSize,
-      PlayerConfig.CubeSize,
-      PlayerConfig.CubeSize
-    );
-    const material = new THREE.MeshBasicMaterial({ color });
-    const mesh = new THREE.Mesh(geometry, material);
-    return mesh;
+    return this.createActorCube(PlayerConfig.CubeSize, color);
   }
 
   /**
    * Creates an enemy mesh
    */
   static createEnemy(color: number = 0xff0000): THREE.Mesh {
-    const geometry = new THREE.BoxGeometry(
-      EnemyConfig.CubeSize,
-      EnemyConfig.CubeSize,
-      EnemyConfig.CubeSize
-    );
-    const material = new THREE.MeshBasicMaterial({ color });
-    const mesh = new THREE.Mesh(geometry, material);
-    return mesh;
+    return this.createActorCube(EnemyConfig.CubeSize, color);
   }
 
   /**
