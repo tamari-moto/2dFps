@@ -6,6 +6,7 @@ import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
 import { PlayerConfig } from '../../config/GameConfig';
 import { Player } from '../../MODEL/Player';
 import { node } from '../../MODEL/node';
+import { EnemyAI, AIBehavior } from '../../AI/EnemyAI';
 
 /**
  * Controls game logic and state transitions
@@ -16,6 +17,7 @@ export class GameController {
   private visualizationSync: VisualizationSync;
   private eventBus: GameEventBus;
   private activePlayerId: string;
+  private enemyAI: EnemyAI;
 
   constructor(
     model: Model,
@@ -27,6 +29,8 @@ export class GameController {
     this.visualizationSync = visualizationSync;
     this.eventBus = eventBus;
     this.activePlayerId = activePlayerId;
+    // Use PATROL as default for better performance, can be changed via setAIBehavior()
+    this.enemyAI = new EnemyAI(model, AIBehavior.DEFENSIVE);
 
     this.setupEventListeners();
   }
@@ -174,13 +178,10 @@ export class GameController {
       this.model.setPlayerRef(this.activePlayerId, this.model.nodeList[nextNodeId]);
     }
 
-    // Move all enemies randomly
-    this.moveEnemiesRandomly();
-
-    // Check hit
+    // Check player's shot
     const shotMesh = this.visualizationSync.getPlayerShotMesh();
     const shotNodeId = this.getMeshToNodeMap().get(shotMesh.id);
-    this.checkCombatResults(shotNodeId);
+    this.checkPlayerShot(shotNodeId);
 
     // Update player angle
     const playerNextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
@@ -193,6 +194,12 @@ export class GameController {
       activePlayer.setAngle(newAngle);
     }
 
+    // Execute AI turns for all enemies
+    this.executeEnemyTurns();
+
+    // Check combat results
+    this.checkCombatResults();
+
     // Reset state
     sm.transition(GameEvent.SelectPlayer);
     this.visualizationSync.setPlayerSelectMesh(nextMesh);
@@ -201,42 +208,61 @@ export class GameController {
   }
 
   /**
-   * Moves all enemies to random adjacent positions
+   * Executes AI turns for all enemies
    */
-  private moveEnemiesRandomly(): void {
+  private executeEnemyTurns(): void {
     for (const [enemyId, enemy] of this.model.enemies) {
-      const enemyEdges = this.model.Edges.List[enemy.node.id];
-      if (enemyEdges && enemyEdges.length > 0) {
-        const randomNodeId = enemyEdges[Math.floor(Math.random() * enemyEdges.length)];
-        this.model.setEnemyRef(enemyId, this.model.nodeList[randomNodeId]);
+      const decision = this.enemyAI.makeDecision(enemy, this.model.players);
+
+      // Move enemy
+      if (decision.moveToNode && decision.moveToNode.id !== enemy.node.id) {
+        this.model.setEnemyRef(enemyId, decision.moveToNode);
+      }
+
+      // Update enemy angle
+      enemy.setAngle(decision.targetAngle);
+
+      // Enemy shoots
+      if (decision.shootAtNode) {
+        // Check if any player was hit
+        for (const [playerId, player] of this.model.players) {
+          if (player.node.id === decision.shootAtNode.id) {
+            console.log(`${enemyId} HIT ${playerId}!`);
+            // TODO: Implement player health/death system
+          }
+        }
       }
     }
   }
 
   /**
-   * Checks combat results (hits and losses)
+   * Checks if player's shot hit an enemy
    */
-  private checkCombatResults(shotNodeId: number | undefined): void {
-    let enemyHit = false;
+  private checkPlayerShot(shotNodeId: number | undefined): boolean {
+    if (shotNodeId === undefined) return false;
 
-    // Check if any enemy was hit
     for (const [enemyId, enemy] of this.model.enemies) {
       if (shotNodeId === enemy.node.id) {
-        console.log(`${this.activePlayerId} hit ${enemyId}!`);
-        enemyHit = true;
-        break;
+        console.log(`${this.activePlayerId} HIT ${enemyId}!`);
+        // TODO: Implement enemy health/death system
+        return true;
       }
     }
 
-    if (!enemyHit) {
-      // Check if player is at same position as enemy (lose condition)
-      const activePlayer = this.model.getPlayer(this.activePlayerId);
-      if (activePlayer) {
-        for (const [enemyId, enemy] of this.model.enemies) {
-          if (activePlayer.node.id === enemy.node.id) {
-            console.log(`${this.activePlayerId} LOSE to ${enemyId}!`);
-            break;
-          }
+    console.log(`${this.activePlayerId} missed!`);
+    return false;
+  }
+
+  /**
+   * Checks combat results (collision detection)
+   */
+  private checkCombatResults(): void {
+    // Check if any player is at same position as enemy (lose condition)
+    for (const [playerId, player] of this.model.players) {
+      for (const [enemyId, enemy] of this.model.enemies) {
+        if (player.node.id === enemy.node.id) {
+          console.log(`${playerId} encountered ${enemyId} at node ${player.node.id}!`);
+          // TODO: Implement proper collision resolution
         }
       }
     }
@@ -319,5 +345,20 @@ export class GameController {
   generateComplexMap(): void {
     this.model.generateComplexMap();
     this.visualizationSync.updateObstacles();
+  }
+
+  /**
+   * Sets AI behavior type
+   */
+  setAIBehavior(behavior: AIBehavior): void {
+    this.enemyAI.setBehavior(behavior);
+    console.log(`AI behavior set to: ${behavior}`);
+  }
+
+  /**
+   * Gets current AI behavior type
+   */
+  getAIBehavior(): AIBehavior {
+    return this.enemyAI.getBehavior();
   }
 }

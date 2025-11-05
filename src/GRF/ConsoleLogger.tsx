@@ -9,7 +9,7 @@ interface LogEntry {
 
 const ConsoleLogger: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [nextId, setNextId] = useState(0);
+  const nextIdRef = React.useRef(0);
 
   // Override global console methods
   useEffect(() => {
@@ -20,11 +20,14 @@ const ConsoleLogger: React.FC = () => {
 
     const addLog = (message: string, type: 'log' | 'info' | 'warn' | 'error') => {
       const timestamp = new Date().toLocaleTimeString();
+      const currentId = nextIdRef.current;
+      nextIdRef.current += 1;
+
       setLogs(prev => {
         const updated = [
           ...prev,
           {
-            id: nextId,
+            id: currentId,
             message: String(message),
             timestamp,
             type
@@ -33,7 +36,6 @@ const ConsoleLogger: React.FC = () => {
         // Keep only the latest 10 entries
         return updated.slice(-10);
       });
-      setNextId(id => id + 1);
     };
 
     console.log = (...args: any[]) => {
@@ -62,7 +64,7 @@ const ConsoleLogger: React.FC = () => {
       console.error = originalError;
       console.info = originalInfo;
     };
-  }, [nextId]);
+  }, []); // Empty dependency array - only run once on mount
 
   const getLogColor = (type: string) => {
     switch (type) {
