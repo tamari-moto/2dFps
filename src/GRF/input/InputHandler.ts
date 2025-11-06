@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
-import { KEYBOARD_KEYS, ENTITY_IDS } from '../../config/GameConstants';
+import { KEYBOARD_KEYS } from '../../config/GameConstants';
 
 /**
  * Handles all user input (mouse and keyboard)
@@ -13,13 +13,17 @@ export class InputHandler {
   private meshList: THREE.Mesh[];
   private meshToNodeMap: Map<number, number>;
   private eventBus: GameEventBus;
+  private playerIds: string[];
+  private enemyIds: string[];
 
   constructor(
     canvas: HTMLCanvasElement,
     camera: THREE.PerspectiveCamera,
     meshList: THREE.Mesh[],
     meshToNodeMap: Map<number, number>,
-    eventBus: GameEventBus
+    eventBus: GameEventBus,
+    playerIds: string[],
+    enemyIds: string[]
   ) {
     this.canvas = canvas;
     this.camera = camera;
@@ -27,6 +31,8 @@ export class InputHandler {
     this.meshToNodeMap = meshToNodeMap;
     this.eventBus = eventBus;
     this.raycaster = new THREE.Raycaster();
+    this.playerIds = playerIds;
+    this.enemyIds = enemyIds;
 
     this.setupEventListeners();
   }
@@ -71,29 +77,25 @@ export class InputHandler {
         event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE_UPPER) {
       this.eventBus.emit(GameEventType.VIEW_ANGLE_TOGGLED, { isVisible: true });
     }
-    // Handle player selection
-    else if (event.key === KEYBOARD_KEYS.SELECT_PLAYER_1) {
-      this.eventBus.emit(GameEventType.PLAYER_SWITCHED, {
-        previousPlayerId: '',
-        currentPlayerId: ENTITY_IDS.PLAYER_1,
-      });
-    }
-    else if (event.key === KEYBOARD_KEYS.SELECT_PLAYER_2) {
-      this.eventBus.emit(GameEventType.PLAYER_SWITCHED, {
-        previousPlayerId: '',
-        currentPlayerId: ENTITY_IDS.PLAYER_2,
-      });
-    }
-    // Handle enemy selection
-    else if (event.key === KEYBOARD_KEYS.SELECT_ENEMY_1) {
-      this.eventBus.emit(GameEventType.ENEMY_SWITCHED, {
-        enemyId: ENTITY_IDS.ENEMY_1,
-      } as any);
-    }
-    else if (event.key === KEYBOARD_KEYS.SELECT_ENEMY_2) {
-      this.eventBus.emit(GameEventType.ENEMY_SWITCHED, {
-        enemyId: ENTITY_IDS.ENEMY_2,
-      } as any);
+    // Handle dynamic player selection (keys 1-9)
+    else if (event.key >= '1' && event.key <= '9') {
+      const keyNumber = parseInt(event.key, 10);
+      const playerIndex = keyNumber - 1;
+      const enemyIndex = keyNumber - 1 - this.playerIds.length;
+
+      // Check if this key corresponds to a player
+      if (playerIndex < this.playerIds.length) {
+        this.eventBus.emit(GameEventType.PLAYER_SWITCHED, {
+          previousPlayerId: '',
+          currentPlayerId: this.playerIds[playerIndex],
+        });
+      }
+      // Check if this key corresponds to an enemy
+      else if (enemyIndex >= 0 && enemyIndex < this.enemyIds.length) {
+        this.eventBus.emit(GameEventType.ENEMY_SWITCHED, {
+          enemyId: this.enemyIds[enemyIndex],
+        } as any);
+      }
     }
   }
 

@@ -4,6 +4,26 @@
  */
 
 /**
+ * Number of players in the game
+ */
+export const PLAYER_COUNT = 4;
+
+/**
+ * Number of enemies in the game
+ */
+export const ENEMY_COUNT = 2;
+
+/**
+ * Generate a player ID from an index
+ */
+export const createPlayerId = (index: number): string => `player${index + 1}`;
+
+/**
+ * Generate an enemy ID from an index
+ */
+export const createEnemyId = (index: number): string => `enemy${index + 1}`;
+
+/**
  * Entity ID constants for players and enemies
  */
 export const ENTITY_IDS = {

@@ -38,12 +38,16 @@ export class ThreeSetup {
     );
 
     // Initialize input handling
+    const playerIds = Array.from(this.model.players.keys());
+    const enemyIds = Array.from(this.model.enemies.keys());
     this.inputHandler = new InputHandler(
       canvas,
       this.sceneManager.getCamera(),
       this.visualizationSync.getMeshList(),
       this.visualizationSync.getMeshToNodeMap(),
-      this.eventBus
+      this.eventBus,
+      playerIds,
+      enemyIds
     );
 
     // Initialize game controller
