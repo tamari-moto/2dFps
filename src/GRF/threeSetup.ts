@@ -33,13 +33,11 @@ export class ThreeSetup {
     this.visualizationSync = new VisualizationSync(
       this.sceneManager,
       this.model,
-      ENTITY_IDS.PLAYER_1,
-      ENTITY_IDS.ENEMY_1
+      ENTITY_IDS.PLAYER_1
     );
 
     // Initialize input handling
     const playerIds = Array.from(this.model.players.keys());
-    const enemyIds = Array.from(this.model.enemies.keys());
     this.inputHandler = new InputHandler(
       canvas,
       this.sceneManager.getCamera(),
@@ -47,7 +45,7 @@ export class ThreeSetup {
       this.visualizationSync.getMeshToNodeMap(),
       this.eventBus,
       playerIds,
-      enemyIds
+      []
     );
 
     // Initialize game controller

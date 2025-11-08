@@ -3,15 +3,13 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { PLAYER_COUNT, ENEMY_COUNT, createPlayerId, createEnemyId } from '../config/GameConstants';
+import { PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
-import { Enemy } from './Enemy';
 
 class Model {
   public nodeList: node[] = [];
   public players: Map<string, Player> = new Map();
-  public enemies: Map<string, Enemy> = new Map();
   public Edges: Graph = new Graph();
   private viewAngle: number = PlayerConfig.ViewAngle;
   private NodesInGridSize: number = MapConfig.NodesInGridSize;
@@ -49,13 +47,6 @@ class Model {
       this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i]));
     }
 
-    // Initialize enemies dynamically
-    const enemyColors = this.generateEnemyColors(ENEMY_COUNT);
-    for (let i = 0; i < ENEMY_COUNT && i < this.nodeList.length; i++) {
-      const enemyId = createEnemyId(i);
-      const nodeIndex = PLAYER_COUNT + i; // Place enemies after players
-      this.enemies.set(enemyId, new Enemy(enemyId, this.nodeList[nodeIndex], enemyColors[i]));
-    }
     for (const node of this.nodeList) {
       if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
       if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
@@ -143,28 +134,6 @@ class Model {
   public getPlayer(playerId: string): Player | undefined {
     return this.players.get(playerId);
   }
-
-  /**
-   * Sets the enemy reference to a new node.
-   * @param enemyId - The enemy ID.
-   * @param newNode - The new node.
-   */
-  public setEnemyRef(enemyId: string, newNode: node): void {
-    const enemy = this.enemies.get(enemyId);
-    if (enemy) {
-      enemy.setNode(newNode);
-    }
-  }
-
-  /**
-   * Gets an enemy by ID.
-   * @param enemyId - The enemy ID.
-   * @returns The enemy object or undefined.
-   */
-  public getEnemy(enemyId: string): Enemy | undefined {
-    return this.enemies.get(enemyId);
-  }
-
 
   /**
    * Gets nodes at a specific angle and distance from the center node.
@@ -419,20 +388,6 @@ class Model {
     for (let i = 0; i < count; i++) {
       const hue = (i / count) * 360;
       colors.push(this.hslToHex(hue, 100, 50));
-    }
-    return colors;
-  }
-
-  /**
-   * Generates evenly distributed colors for enemies using HSL color space
-   * @param count - Number of colors to generate
-   * @returns Array of hex color values
-   */
-  private generateEnemyColors(count: number): number[] {
-    const colors: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const hue = (i / count) * 360 + 30; // Offset by 30 degrees from player colors
-      colors.push(this.hslToHex(hue, 100, 40)); // Darker than player colors
     }
     return colors;
   }

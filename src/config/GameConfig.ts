@@ -33,14 +33,6 @@ export const PlayerConfig = {
 } as const;
 
 /**
- * Enemy configuration
- */
-export const EnemyConfig = {
-  /** Enemy cube size */
-  CubeSize: 10,
-} as const;
-
-/**
  * Node/Circle visualization configuration
  */
 export const NodeConfig = {

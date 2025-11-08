@@ -6,12 +6,7 @@
 /**
  * Number of players in the game
  */
-export const PLAYER_COUNT = 4;
-
-/**
- * Number of enemies in the game
- */
-export const ENEMY_COUNT = 2;
+export const PLAYER_COUNT = 10;
 
 /**
  * Generate a player ID from an index
@@ -19,18 +14,11 @@ export const ENEMY_COUNT = 2;
 export const createPlayerId = (index: number): string => `player${index + 1}`;
 
 /**
- * Generate an enemy ID from an index
- */
-export const createEnemyId = (index: number): string => `enemy${index + 1}`;
-
-/**
- * Entity ID constants for players and enemies
+ * Entity ID constants for players
  */
 export const ENTITY_IDS = {
   PLAYER_1: 'player1',
   PLAYER_2: 'player2',
-  ENEMY_1: 'enemy1',
-  ENEMY_2: 'enemy2',
 } as const;
 
 /**
@@ -46,8 +34,6 @@ export const KEYBOARD_KEYS = {
   TOGGLE_VIEW_ANGLE_UPPER: 'V',
   SELECT_PLAYER_1: '1',
   SELECT_PLAYER_2: '2',
-  SELECT_ENEMY_1: '3',
-  SELECT_ENEMY_2: '4',
 } as const;
 
 /**
@@ -55,15 +41,6 @@ export const KEYBOARD_KEYS = {
  */
 export const PLAYER_CONSTANTS = {
   DEFAULT_ACTIVE_PLAYER: ENTITY_IDS.PLAYER_1,
-  ACTIVE_SCALE: 1.2,
-  NORMAL_SCALE: 1.0,
-} as const;
-
-/**
- * Enemy-related constants
- */
-export const ENEMY_CONSTANTS = {
-  DEFAULT_ACTIVE_ENEMY: ENTITY_IDS.ENEMY_1,
   ACTIVE_SCALE: 1.2,
   NORMAL_SCALE: 1.0,
 } as const;

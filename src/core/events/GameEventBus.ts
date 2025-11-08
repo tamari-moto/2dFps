@@ -10,12 +10,6 @@ export enum GameEventType {
   PLAYER_SHOT = 'player:shot',
   PLAYER_ANGLE_CHANGED = 'player:angle_changed',
 
-  // Enemy events
-  ENEMY_MOVED = 'enemy:moved',
-  ENEMY_SELECTED = 'enemy:selected',
-  ENEMY_HIT = 'enemy:hit',
-  ENEMY_SWITCHED = 'enemy:switched',
-
   // Combat events
   COMBAT_RESOLVED = 'combat:resolved',
   HIT_DETECTED = 'hit:detected',
@@ -71,16 +65,6 @@ export interface GameEventData {
   [GameEventType.PLAYER_ANGLE_CHANGED]: {
     playerId: string;
     angle: number;
-  };
-  [GameEventType.ENEMY_MOVED]: {
-    enemyId: string;
-    from: { x: number; y: number; id: number };
-    to: { x: number; y: number; id: number };
-  };
-  [GameEventType.ENEMY_HIT]: {
-    enemyId: string;
-    playerId: string;
-    nodeId: number;
   };
   [GameEventType.NODE_CLICKED]: {
     nodeId: number;

@@ -5,7 +5,7 @@ import { ViewAngleVisualizer } from '../ViewAngleVisualizer';
 import { MeshFactory } from './MeshFactory';
 import { SceneManager } from './SceneManager';
 import { NodeConfig, AnimationConfig, PlayerConfig } from '../../config/GameConfig';
-import { PLAYER_CONSTANTS, ENEMY_CONSTANTS } from '../../config/GameConstants';
+import { PLAYER_CONSTANTS } from '../../config/GameConstants';
 import { Player } from '../../MODEL/Player';
 
 /**
@@ -20,7 +20,6 @@ export class VisualizationSync {
   // Mesh collections
   private meshList: THREE.Mesh[] = [];
   private playerMeshes: Map<string, THREE.Mesh> = new Map();
-  private enemyMeshes: Map<string, THREE.Mesh> = new Map();
 
   // Mapping between meshes and nodes
   private meshToNodeMap: Map<number, number> = new Map();
@@ -34,18 +33,15 @@ export class VisualizationSync {
 
   // Active selections
   private activePlayerId: string;
-  private activeEnemyId: string;
 
   constructor(
     sceneManager: SceneManager,
     model: Model,
-    activePlayerId: string,
-    activeEnemyId: string
+    activePlayerId: string
   ) {
     this.sceneManager = sceneManager;
     this.model = model;
     this.activePlayerId = activePlayerId;
-    this.activeEnemyId = activeEnemyId;
 
     this.viewAngleVisualizer = new ViewAngleVisualizer(sceneManager.getScene());
 
@@ -88,13 +84,6 @@ export class VisualizationSync {
       this.sceneManager.addToScene(mesh);
       this.playerMeshes.set(playerId, mesh);
     }
-
-    // Create enemy meshes
-    for (const [enemyId, enemy] of this.model.enemies) {
-      const mesh = MeshFactory.createEnemy(enemy.color);
-      this.sceneManager.addToScene(mesh);
-      this.enemyMeshes.set(enemyId, mesh);
-    }
   }
 
   /**
@@ -103,9 +92,6 @@ export class VisualizationSync {
   updateView(): void {
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
-
-    // Update enemy positions and visibility
-    this.updateEnemies();
 
     // Update player positions
     this.updatePlayers();
@@ -116,34 +102,11 @@ export class VisualizationSync {
     // Draw view angle visualization
     this.viewAngleVisualizer.draw(activePlayer.node, activePlayer.angle);
 
-    // Update visible nodes and enemy visibility
+    // Update visible nodes
     this.updateVisibleNodes(activePlayer);
 
     // Update special node colors (must be after updateVisibleNodes to prevent override)
     this.updateSpecialNodes();
-  }
-
-  /**
-   * Updates enemy mesh positions and scales
-   */
-  private updateEnemies(): void {
-    for (const [enemyId, enemy] of this.model.enemies) {
-      const mesh = this.enemyMeshes.get(enemyId);
-      if (mesh) {
-        mesh.visible = false;
-        gsap.to(mesh.position, {
-          x: enemy.node.x,
-          y: enemy.node.y,
-          duration: AnimationConfig.MovementDuration,
-        });
-
-        // Highlight active enemy
-        const scale = enemyId === this.activeEnemyId
-          ? ENEMY_CONSTANTS.ACTIVE_SCALE
-          : ENEMY_CONSTANTS.NORMAL_SCALE;
-        mesh.scale.set(scale, scale, scale);
-      }
-    }
   }
 
   /**
@@ -225,16 +188,6 @@ export class VisualizationSync {
       if (mesh) {
         MeshFactory.setMeshColor(mesh, NodeConfig.VisibleColor);
       }
-
-      // Check if any enemies are visible at this node
-      for (const [enemyId, enemy] of this.model.enemies) {
-        if (enemy.node.id === node.id) {
-          const enemyMesh = this.enemyMeshes.get(enemyId);
-          if (enemyMesh) {
-            enemyMesh.visible = true;
-          }
-        }
-      }
     }
   }
 
@@ -280,14 +233,6 @@ export class VisualizationSync {
    */
   setActivePlayer(playerId: string): void {
     this.activePlayerId = playerId;
-    this.updateView();
-  }
-
-  /**
-   * Sets the active enemy
-   */
-  setActiveEnemy(enemyId: string): void {
-    this.activeEnemyId = enemyId;
     this.updateView();
   }
 

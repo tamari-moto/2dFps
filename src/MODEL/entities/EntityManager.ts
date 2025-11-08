@@ -1,9 +1,8 @@
 import { Entity, EntityType } from './Entity';
 import { Player } from '../Player';
-import { Enemy } from '../Enemy';
 
 /**
- * Manages all game entities (players and enemies)
+ * Manages all game entities (players)
  * Provides centralized access to entity collections
  */
 export class EntityManager {
@@ -54,26 +53,11 @@ export class EntityManager {
   }
 
   /**
-   * Gets all enemies
-   */
-  getAllEnemies(): Enemy[] {
-    return this.getEntitiesByType(EntityType.ENEMY) as Enemy[];
-  }
-
-  /**
    * Gets a player by ID
    */
   getPlayer(id: string): Player | undefined {
     const entity = this.entities.get(id);
     return entity?.type === EntityType.PLAYER ? (entity as Player) : undefined;
-  }
-
-  /**
-   * Gets an enemy by ID
-   */
-  getEnemy(id: string): Enemy | undefined {
-    const entity = this.entities.get(id);
-    return entity?.type === EntityType.ENEMY ? (entity as Enemy) : undefined;
   }
 
   /**

@@ -6,18 +6,15 @@ import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
 import { PlayerConfig } from '../../config/GameConfig';
 import { Player } from '../../MODEL/Player';
 import { node } from '../../MODEL/node';
-import { EnemyAI, AIBehavior } from '../../AI/EnemyAI';
-
 /**
  * Controls game logic and state transitions
- * Handles player actions, enemy AI, and combat resolution
+ * Handles player actions and combat resolution
  */
 export class GameController {
   private model: Model;
   private visualizationSync: VisualizationSync;
   private eventBus: GameEventBus;
   private activePlayerId: string;
-  private enemyAI: EnemyAI;
 
   constructor(
     model: Model,
@@ -29,8 +26,6 @@ export class GameController {
     this.visualizationSync = visualizationSync;
     this.eventBus = eventBus;
     this.activePlayerId = activePlayerId;
-    // Use PATROL as default for better performance, can be changed via setAIBehavior()
-    this.enemyAI = new EnemyAI(model, AIBehavior.DEFENSIVE);
 
     this.setupEventListeners();
   }
@@ -194,12 +189,6 @@ export class GameController {
       activePlayer.setAngle(newAngle);
     }
 
-    // Execute AI turns for all enemies
-    this.executeEnemyTurns();
-
-    // Check combat results
-    this.checkCombatResults();
-
     // Reset state
     sm.transition(GameEvent.SelectPlayer);
     this.visualizationSync.setPlayerSelectMesh(nextMesh);
@@ -208,64 +197,13 @@ export class GameController {
   }
 
   /**
-   * Executes AI turns for all enemies
-   */
-  private executeEnemyTurns(): void {
-    for (const [enemyId, enemy] of this.model.enemies) {
-      const decision = this.enemyAI.makeDecision(enemy, this.model.players);
-
-      // Move enemy
-      if (decision.moveToNode && decision.moveToNode.id !== enemy.node.id) {
-        this.model.setEnemyRef(enemyId, decision.moveToNode);
-      }
-
-      // Update enemy angle
-      enemy.setAngle(decision.targetAngle);
-
-      // Enemy shoots
-      if (decision.shootAtNode) {
-        // Check if any player was hit
-        for (const [playerId, player] of this.model.players) {
-          if (player.node.id === decision.shootAtNode.id) {
-            console.log(`${enemyId} HIT ${playerId}!`);
-            // TODO: Implement player health/death system
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Checks if player's shot hit an enemy
+   * Checks if player's shot hit a target
    */
   private checkPlayerShot(shotNodeId: number | undefined): boolean {
     if (shotNodeId === undefined) return false;
 
-    for (const [enemyId, enemy] of this.model.enemies) {
-      if (shotNodeId === enemy.node.id) {
-        console.log(`${this.activePlayerId} HIT ${enemyId}!`);
-        // TODO: Implement enemy health/death system
-        return true;
-      }
-    }
-
-    console.log(`${this.activePlayerId} missed!`);
-    return false;
-  }
-
-  /**
-   * Checks combat results (collision detection)
-   */
-  private checkCombatResults(): void {
-    // Check if any player is at same position as enemy (lose condition)
-    for (const [playerId, player] of this.model.players) {
-      for (const [enemyId, enemy] of this.model.enemies) {
-        if (player.node.id === enemy.node.id) {
-          console.log(`${playerId} encountered ${enemyId} at node ${player.node.id}!`);
-          // TODO: Implement proper collision resolution
-        }
-      }
-    }
+    console.log(`${this.activePlayerId} shot at node ${shotNodeId}!`);
+    return true;
   }
 
   /**
@@ -345,20 +283,5 @@ export class GameController {
   generateComplexMap(): void {
     this.model.generateComplexMap();
     this.visualizationSync.updateObstacles();
-  }
-
-  /**
-   * Sets AI behavior type
-   */
-  setAIBehavior(behavior: AIBehavior): void {
-    this.enemyAI.setBehavior(behavior);
-    console.log(`AI behavior set to: ${behavior}`);
-  }
-
-  /**
-   * Gets current AI behavior type
-   */
-  getAIBehavior(): AIBehavior {
-    return this.enemyAI.getBehavior();
   }
 }
