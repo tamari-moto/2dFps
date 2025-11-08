@@ -44,8 +44,7 @@ export class ThreeSetup {
       this.visualizationSync.getMeshList(),
       this.visualizationSync.getMeshToNodeMap(),
       this.eventBus,
-      playerIds,
-      []
+      playerIds
     );
 
     // Initialize game controller

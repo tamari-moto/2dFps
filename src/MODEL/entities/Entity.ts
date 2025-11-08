@@ -5,11 +5,10 @@ import { node } from '../node';
  */
 export enum EntityType {
   PLAYER = 'player',
-  ENEMY = 'enemy',
 }
 
 /**
- * Base class for all game entities (players and enemies)
+ * Base class for all game entities (players)
  * Provides common functionality for position, color, and angle management
  */
 export abstract class Entity {

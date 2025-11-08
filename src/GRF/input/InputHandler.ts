@@ -14,7 +14,6 @@ export class InputHandler {
   private meshToNodeMap: Map<number, number>;
   private eventBus: GameEventBus;
   private playerIds: string[];
-  private enemyIds: string[];
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -22,8 +21,7 @@ export class InputHandler {
     meshList: THREE.Mesh[],
     meshToNodeMap: Map<number, number>,
     eventBus: GameEventBus,
-    playerIds: string[],
-    enemyIds: string[]
+    playerIds: string[]
   ) {
     this.canvas = canvas;
     this.camera = camera;
@@ -32,7 +30,6 @@ export class InputHandler {
     this.eventBus = eventBus;
     this.raycaster = new THREE.Raycaster();
     this.playerIds = playerIds;
-    this.enemyIds = enemyIds;
 
     this.setupEventListeners();
   }
@@ -81,7 +78,6 @@ export class InputHandler {
     else if (event.key >= '1' && event.key <= '9') {
       const keyNumber = parseInt(event.key, 10);
       const playerIndex = keyNumber - 1;
-      const enemyIndex = keyNumber - 1 - this.playerIds.length;
 
       // Check if this key corresponds to a player
       if (playerIndex < this.playerIds.length) {
@@ -89,12 +85,6 @@ export class InputHandler {
           previousPlayerId: '',
           currentPlayerId: this.playerIds[playerIndex],
         });
-      }
-      // Check if this key corresponds to an enemy
-      else if (enemyIndex >= 0 && enemyIndex < this.enemyIds.length) {
-        this.eventBus.emit(GameEventType.ENEMY_SWITCHED, {
-          enemyId: this.enemyIds[enemyIndex],
-        } as any);
       }
     }
   }
