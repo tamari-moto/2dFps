@@ -237,6 +237,74 @@ export class VisualizationSync {
   }
 
   /**
+   * Shows hit effect on a player
+   */
+  showHitEffect(playerId: string): void {
+    const mesh = this.playerMeshes.get(playerId);
+    if (!mesh) return;
+
+    // Flash red
+    const originalColor = (mesh.material as THREE.MeshBasicMaterial).color.getHex();
+    MeshFactory.setMeshColor(mesh, 0xff0000);
+
+    // Scale up and down
+    gsap.timeline()
+      .to(mesh.scale, {
+        x: 1.5,
+        y: 1.5,
+        z: 1.5,
+        duration: 0.1,
+        ease: 'power2.out',
+      })
+      .to(mesh.scale, {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+        duration: 0.2,
+        ease: 'elastic.out(1, 0.3)',
+      });
+
+    // Restore color after flash
+    setTimeout(() => {
+      const player = this.model.getPlayer(playerId);
+      if (player) {
+        MeshFactory.setMeshColor(mesh, player.color);
+      }
+    }, 300);
+  }
+
+  /**
+   * Hides a player's mesh (when eliminated)
+   */
+  hidePlayer(playerId: string): void {
+    const mesh = this.playerMeshes.get(playerId);
+    if (!mesh) return;
+
+    // Fade out and shrink animation
+    gsap.timeline()
+      .to(mesh.scale, {
+        x: 0,
+        y: 0,
+        z: 0,
+        duration: 0.5,
+        ease: 'power2.in',
+      })
+      .call(() => {
+        mesh.visible = false;
+      });
+
+    // Make material transparent
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    gsap.to(material, {
+      opacity: 0,
+      duration: 0.5,
+      onStart: () => {
+        material.transparent = true;
+      },
+    });
+  }
+
+  /**
    * Gets the mesh list for raycasting
    */
   getMeshList(): THREE.Mesh[] {

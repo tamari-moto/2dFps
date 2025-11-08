@@ -38,6 +38,7 @@ export class GameController {
     this.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.handleCanvasEmptyClick.bind(this));
     this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
     this.eventBus.on(GameEventType.VIEW_ANGLE_TOGGLED, this.handleViewAngleToggle.bind(this));
+    this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
   }
 
   /**
@@ -197,13 +198,33 @@ export class GameController {
   }
 
   /**
-   * Checks if player's shot hit a target
+   * Checks if player's shot hit another player
    */
   private checkPlayerShot(shotNodeId: number | undefined): boolean {
     if (shotNodeId === undefined) return false;
 
-    console.log(`${this.activePlayerId} shot at node ${shotNodeId}!`);
-    return true;
+    // Check if any other player is at the shot node
+    for (const [playerId, player] of this.model.players) {
+      // Skip the active player (can't hit yourself)
+      if (playerId === this.activePlayerId) continue;
+
+      if (shotNodeId === player.node.id) {
+        console.log(`🎯 ${this.activePlayerId} HIT ${playerId}!`);
+        this.eventBus.emit(GameEventType.HIT_DETECTED, {
+          attackerId: this.activePlayerId,
+          targetId: playerId,
+          nodeId: shotNodeId,
+        } as any);
+        return true;
+      }
+    }
+
+    console.log(`❌ ${this.activePlayerId} missed!`);
+    this.eventBus.emit(GameEventType.MISS_DETECTED, {
+      attackerId: this.activePlayerId,
+      nodeId: shotNodeId,
+    } as any);
+    return false;
   }
 
   /**
@@ -236,6 +257,45 @@ export class GameController {
   private handleViewAngleToggle(): void {
     const isVisible = this.visualizationSync.toggleViewAngle();
     console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
+  }
+
+  /**
+   * Handles hit detection events
+   */
+  private handleHitDetected(data: { attackerId: string; targetId: string; nodeId: number }): void {
+    console.log(`💥 ${data.attackerId} hit ${data.targetId} at node ${data.nodeId}!`);
+
+    // Apply damage to the target player
+    const targetPlayer = this.model.getPlayer(data.targetId);
+    if (targetPlayer) {
+      targetPlayer.takeDamage(34); // One-shot kill (100 / 3 = ~33.3, so 34 damage means 3 shots to kill)
+
+      console.log(`${data.targetId} HP: ${targetPlayer.health}/${targetPlayer.maxHealth}`);
+
+      // Show visual feedback
+      this.visualizationSync.showHitEffect(data.targetId);
+
+      // Check if player was eliminated
+      if (!targetPlayer.isAlive) {
+        this.handlePlayerElimination(data.targetId);
+      }
+    }
+  }
+
+  /**
+   * Handles player elimination
+   */
+  private handlePlayerElimination(playerId: string): void {
+    console.log(`⚰️ ${playerId} has been eliminated!`);
+
+    // Hide the eliminated player's mesh
+    this.visualizationSync.hidePlayer(playerId);
+
+    // Check for game over (only one player remaining)
+    const alivePlayers = Array.from(this.model.players.values()).filter(p => p.isAlive);
+    if (alivePlayers.length === 1) {
+      console.log(`🏆 ${alivePlayers[0].id} wins!`);
+    }
   }
 
   /**

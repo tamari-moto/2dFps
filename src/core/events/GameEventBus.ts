@@ -66,6 +66,15 @@ export interface GameEventData {
     playerId: string;
     angle: number;
   };
+  [GameEventType.HIT_DETECTED]: {
+    attackerId: string;
+    targetId: string;
+    nodeId: number;
+  };
+  [GameEventType.MISS_DETECTED]: {
+    attackerId: string;
+    nodeId: number;
+  };
   [GameEventType.NODE_CLICKED]: {
     nodeId: number;
     position: { x: number; y: number };
