@@ -46,6 +46,17 @@ export class ColyseusAdapter implements INetworkAdapter {
       });
     });
 
+    // Server error messages (NOT_YOUR_TURN, INVALID_ACTION, etc.)
+    this.room.onMessage('error', (data: { code: string }) => {
+      console.warn('[ColyseusAdapter] server error:', data.code);
+    });
+
+    // Game lifecycle messages
+    this.room.onMessage('game_started', (_data: { firstTurnPlayerId: string }) => {});
+    this.room.onMessage('game_over', (_data: { winnerId: string | null }) => {});
+    this.room.onMessage('obstacles_ready', (_data: { rects: number[] }) => {});
+    this.room.onMessage('player_left', (_data: { playerId: string }) => {});
+
     // Turn result from server
     this.room.onMessage('turn_result', (data: TurnResult) => {
       this.turnResultCallback?.(data);
