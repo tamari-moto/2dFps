@@ -348,4 +348,14 @@ export class VisualizationSync {
   getPlayerShotMesh(): THREE.Mesh {
     return this.playerShotMesh;
   }
+
+  /**
+   * Adds a mesh for a player that joined after initialization (online mode).
+   */
+  addPlayerMesh(playerId: string, color: number): void {
+    if (this.playerMeshes.has(playerId)) return;
+    const mesh = MeshFactory.createPlayer(color);
+    this.sceneManager.addToScene(mesh);
+    this.playerMeshes.set(playerId, mesh);
+  }
 }

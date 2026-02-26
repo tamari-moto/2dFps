@@ -5,6 +5,7 @@ import { GameController } from './game/GameController';
 import { GameEventBus, gameEventBus } from '../core/events/GameEventBus';
 import type { ObstacleData } from '../MODEL/ObstacleExporter';
 import type { Model } from '../MODEL/model';
+import { Player } from '../MODEL/Player';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import { LocalAdapter } from '../network/LocalAdapter';
 
@@ -101,6 +102,20 @@ export class ThreeSetup {
    */
   generateComplexMap(): void {
     this.gameController.generateComplexMap();
+  }
+
+  /**
+   * Adds a player to the model and scene (called when a remote player joins).
+   */
+  addPlayer(playerId: string, nodeId: number, color: number): void {
+    const model = this.gameController.getModel();
+    if (model.players.has(playerId)) return;
+    const startNode = model.nodeList[nodeId];
+    if (!startNode) return;
+    const p = new Player(playerId, startNode, color);
+    model.players.set(playerId, p);
+    this.visualizationSync.addPlayerMesh(playerId, color);
+    this.visualizationSync.updateView();
   }
 
   /**

@@ -24,6 +24,15 @@ const GRF_main = () => {
     const setup = setupThree(canvas, adapter);
     setThreeSetup(setup);
     setAppState('playing');
+
+    // Online mode: when another player joins later, add them to the local model + scene.
+    if (adapter instanceof ColyseusAdapter) {
+      const room = adapter.getRoom();
+      adapter.onPlayerJoined((playerId: string) => {
+        const sp = room.state.players.get(playerId);
+        if (sp) setup.addPlayer(playerId, sp.nodeId, sp.color);
+      });
+    }
   }, []);
 
   const handleOffline = React.useCallback(() => {

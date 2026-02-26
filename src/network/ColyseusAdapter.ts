@@ -1,5 +1,6 @@
 import * as Colyseus from 'colyseus.js';
 import { Model } from '../MODEL/model';
+import { Player } from '../MODEL/Player';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult } from './types';
 
@@ -81,17 +82,22 @@ export class ColyseusAdapter implements INetworkAdapter {
    */
   initializeModel(): Model {
     this.model = new Model();
-    // Apply player states from server
-    this.room.state.players.forEach((serverPlayer: {
+
+    // Replace the local-play default players with the server's player set.
+    this.model.players.clear();
+    this.room.state.players.forEach((sp: {
       id: string; nodeId: number; angle: number; health: number;
       isAlive: boolean; color: number;
     }, playerId: string) => {
-      const player = this.model.players.get(playerId);
-      if (player) {
-        player.setNode(this.model.nodeList[serverPlayer.nodeId]);
-        player.setAngle(serverPlayer.angle);
-      }
+      const startNode = this.model.nodeList[sp.nodeId];
+      if (!startNode) return;
+      const p = new Player(playerId, startNode, sp.color);
+      p.setAngle(sp.angle);
+      p.health = sp.health;
+      p.isAlive = sp.isAlive;
+      this.model.players.set(playerId, p);
     });
+
     return this.model;
   }
 
