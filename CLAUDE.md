@@ -2,9 +2,11 @@
 
 ## プロジェクト概要
 
-グリッドベースの2D戦術FPSゲーム。Three.js による WebGL レンダリングと、グラフベース経路探索を組み合わせた React + TypeScript アプリケーション。
+グリッドベースの2D戦術FPSゲーム。Three.js による WebGL レンダリングと、グラフベース経路探索を組み合わせた React + TypeScript アプリケーション。オフライン（ローカル）またはオンライン（Colyseus サーバー）の両モードに対応。
 
 ## コマンド
+
+### フロントエンド
 
 ```bash
 npm run dev      # 開発サーバー起動 (http://localhost:5173/2dFps/)
@@ -13,14 +15,24 @@ npm run lint     # ESLint
 npm run deploy   # gh-pages へデプロイ
 ```
 
+### サーバー (`server/` ディレクトリで実行)
+
+```bash
+npm run build    # TypeScript コンパイル (dist/ へ出力)
+npm start        # サーバー起動 (ws://localhost:2567)
+npm run dev      # ts-node で直接実行（開発用）
+```
+
 ## アーキテクチャ
 
 ### レイヤー構造
 
 ```
-Config 層  → src/config/
-Model 層   → src/MODEL/
-View 層    → src/GRF/
+Config 層    → src/config/
+Model 層     → src/MODEL/
+View 層      → src/GRF/
+Network 層   → src/network/
+Server       → server/src/
 ```
 
 ### ディレクトリ構成
@@ -43,7 +55,8 @@ src/
 │       ├── Entity.ts
 │       └── EntityManager.ts
 ├── GRF/
-│   ├── GRF_main.tsx            # ルート React コンポーネント
+│   ├── GRF_main.tsx            # ルート React コンポーネント（AppState 管理）
+│   ├── LobbyUI.tsx             # ロビー画面（オフライン/オンライン選択）
 │   ├── threeSetup.ts           # Three.js 統合・インタラクション制御
 │   ├── StateMachine.ts         # ゲーム状態機械
 │   ├── ViewAngleVisualizer.ts  # 視野角の可視化
@@ -57,10 +70,43 @@ src/
 │       ├── MeshFactory.ts      # Three.js メッシュ生成
 │       ├── SceneManager.ts     # シーン管理
 │       └── VisualizationSync.ts # モデル↔描画の同期
+├── network/
+│   ├── INetworkAdapter.ts      # アダプターインターフェース
+│   ├── LocalAdapter.ts         # オフライン用（プロセス内処理）
+│   ├── ColyseusAdapter.ts      # オンライン用（colyseus.js@0.15.x）
+│   └── types.ts                # TurnAction, TurnResult 等
 └── schema/
+
+server/
+├── package.json                # colyseus@0.15.57, commonjs モジュール
+├── tsconfig.json               # module: commonjs, experimentalDecorators
+└── src/
+    ├── index.ts                # Express + Colyseus サーバーエントリ
+    ├── rooms/
+    │   └── GameRoom.ts         # ゲームルーム（最大10人）
+    ├── schema/
+    │   └── GameState.ts        # @colyseus/schema 定義
+    └── logic/
+        └── ServerGameLogic.ts  # サーバー権威ゲームロジック
 ```
 
 ## 主要な設計パターン
+
+### AppState（GRF_main.tsx）
+
+```
+lobby → connecting → playing
+         ↓(失敗)
+        lobby
+```
+
+### ネットワークアダプター
+
+```typescript
+INetworkAdapter
+├── LocalAdapter   // オフライン: プロセス内でゲームロジックを実行
+└── ColyseusAdapter // オンライン: WebSocket で Colyseus サーバーに接続
+```
 
 ### 状態機械 (StateMachine.ts)
 
@@ -98,6 +144,16 @@ nodeToMeshMap: Map<number, number>  // node.id → THREE.Mesh.id
 | GSAP 3.12 | アニメーション (移動、点滅) |
 | React 19 | UI コンポーネント |
 | Vite 6.2 | ビルドツール・HMR |
+| colyseus.js 0.15.28 | ブラウザ用 Colyseus クライアント |
+| colyseus 0.15.57 | サーバー側 Colyseus フレームワーク |
+| @colyseus/schema 2.x | スキーマ同期（experimentalDecorators 使用） |
+
+## バージョン固定の注意点
+
+- **サーバーとクライアントは必ず同じ Colyseus メジャー.マイナーを使うこと**
+  - サーバー: `colyseus@0.15.x`
+  - クライアント: `colyseus.js@0.15.x`（`@colyseus/sdk` は 0.17.x 用なので使わない）
+- `@colyseus/schema@4.x`（Colyseus 0.17.x 同梱）は TC39 標準デコレーターが必要で Node.js 20 + TS 5.8 では動かない。0.15.x の `@colyseus/schema@2.x` + `experimentalDecorators` を使うこと
 
 ## デプロイ
 

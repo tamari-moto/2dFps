@@ -1,4 +1,4 @@
-import * as Colyseus from '@colyseus/sdk';
+import * as Colyseus from 'colyseus.js';
 import { Model } from '../MODEL/model';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult } from './types';
