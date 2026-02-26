@@ -1,6 +1,6 @@
 import { Room, Client } from 'colyseus';
-import { GameState, PlayerState } from '../schema/GameState.js';
-import { ServerGameLogic } from '../logic/ServerGameLogic.js';
+import { GameState, PlayerState } from '../schema/GameState';
+import { ServerGameLogic } from '../logic/ServerGameLogic';
 
 interface TurnActionMessage {
   playerId: string;
@@ -18,7 +18,7 @@ interface ObstacleRectMessage {
  * - The first player to join becomes the host and sends obstacle data.
  * - The game starts when ≥ 2 players are in the room.
  */
-export class GameRoom extends Room<{ state: GameState }> {
+export class GameRoom extends Room<GameState> {
   maxClients = 10;
   private logic!: ServerGameLogic;
   /** Maps Colyseus sessionId → game playerId */
@@ -100,7 +100,7 @@ export class GameRoom extends Room<{ state: GameState }> {
     }
   }
 
-  onLeave(client: Client, _code?: number): void {
+  onLeave(client: Client, _consented?: boolean): void {
     const playerId = this.sessionToPlayer.get(client.sessionId);
     if (!playerId) return;
 

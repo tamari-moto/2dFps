@@ -2,16 +2,15 @@
   "name": "2dfps-server",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "node --loader ts-node/esm src/index.ts",
+    "dev": "ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@colyseus/monitor": "^0.17.7",
-    "@colyseus/schema": "^4.0.15",
-    "colyseus": "^0.17.8",
+    "@colyseus/monitor": "^0.15.8",
+    "@colyseus/schema": "^2.0.37",
+    "colyseus": "^0.15.57",
     "cors": "^2.8.5",
     "express": "^4.21.2"
   },

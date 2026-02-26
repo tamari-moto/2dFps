@@ -115,6 +115,6 @@ export class ThreeSetup {
 /**
  * Factory function to create and initialize the Three.js setup
  */
-export function setupThree(canvas: HTMLCanvasElement): ThreeSetup {
-  return new ThreeSetup(canvas);
+export function setupThree(canvas: HTMLCanvasElement, adapter?: INetworkAdapter): ThreeSetup {
+  return new ThreeSetup(canvas, adapter);
 }

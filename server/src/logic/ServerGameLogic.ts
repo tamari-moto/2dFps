@@ -1,4 +1,4 @@
-import { GameState } from '../schema/GameState.js';
+import { GameState } from '../schema/GameState';
 
 // ---- Shared constants (mirrors src/config/GameConfig.ts) ----
 const GRID_SIZE = 20;
