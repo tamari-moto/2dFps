@@ -75,9 +75,7 @@ export class GameController {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.SelectPlayer);
       const mesh = this.findMeshByNodeId(clickedNode.id);
-      if (mesh) {
-        this.visualizationSync.setPlayerSelectMesh(mesh);
-      }
+      if (mesh) this.visualizationSync.setPlayerSelectMesh(mesh);
     }
   }
 
@@ -85,18 +83,11 @@ export class GameController {
    * Handles clicks in Select state
    */
   private handleSelectStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
-    if (activePlayer.node.id === clickedNode.id) {
+    const canMove = activePlayer.node.id === clickedNode.id ||
+                    this.model.areNodesConnected(activePlayer.node, clickedNode);
+    if (canMove) {
       sm.transition(GameEvent.MovePlayer);
-      const mesh = this.findMeshByNodeId(clickedNode.id);
-      if (mesh) {
-        this.visualizationSync.setPlayerNextMesh(mesh);
-      }
-    } else if (this.model.areNodesConnected(activePlayer.node, clickedNode)) {
-      sm.transition(GameEvent.MovePlayer);
-      const mesh = this.findMeshByNodeId(clickedNode.id);
-      if (mesh) {
-        this.visualizationSync.setPlayerNextMesh(mesh);
-      }
+      this.applyNextMesh(clickedNode.id);
     }
   }
 
@@ -104,61 +95,41 @@ export class GameController {
    * Handles clicks in Move state
    */
   private handleMoveStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
-    const nextMesh = this.visualizationSync.getPlayerNextMesh();
-    const nextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
-
-    if (nextNodeId !== undefined) {
-      const nextNode = this.model.nodeList[nextNodeId];
-      const visibleNodes = this.model.getVisibleNodesAtAngle(
-        nextNode,
-        activePlayer.angle,
-        PlayerConfig.MaxViewDistance
-      );
-
-      const isVisible = visibleNodes.some(n => n.id === clickedNode.id);
-      if (isVisible) {
-        sm.transition(GameEvent.ShotPlayer);
-        const mesh = this.findMeshByNodeId(clickedNode.id);
-        if (mesh) {
-          this.visualizationSync.setPlayerShotMesh(mesh);
-        }
-      }
-    }
+    if (this.tryShotTarget(activePlayer, clickedNode, sm)) return;
   }
 
   /**
    * Handles clicks in Shot state
    */
   private handleShotStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
-    const shotMesh = this.visualizationSync.getPlayerShotMesh();
-    const shotNodeId = this.getMeshToNodeMap().get(shotMesh.id);
+    const shotNodeId = this.getMeshToNodeMap().get(this.visualizationSync.getPlayerShotMesh().id);
 
     if (shotNodeId === clickedNode.id) {
-      // Execute shot
       this.executeTurn(activePlayer, sm);
     } else {
-      // Change shot target
-      const nextMesh = this.visualizationSync.getPlayerNextMesh();
-      const nextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
-
-      if (nextNodeId !== undefined) {
-        const nextNode = this.model.nodeList[nextNodeId];
-        const visibleNodes = this.model.getVisibleNodesAtAngle(
-          nextNode,
-          activePlayer.angle,
-          PlayerConfig.MaxViewDistance
-        );
-
-        const isVisible = visibleNodes.some(n => n.id === clickedNode.id);
-        if (isVisible) {
-          sm.transition(GameEvent.ShotPlayer);
-          const mesh = this.findMeshByNodeId(clickedNode.id);
-          if (mesh) {
-            this.visualizationSync.setPlayerShotMesh(mesh);
-          }
-        }
-      }
+      this.tryShotTarget(activePlayer, clickedNode, sm);
     }
+  }
+
+  /**
+   * Checks if a node is visible from the next move position and sets it as the shot target.
+   * Returns true if the shot target was successfully set.
+   */
+  private tryShotTarget(activePlayer: Player, clickedNode: node, sm: StateMachine): boolean {
+    const nextNodeId = this.getMeshToNodeMap().get(this.visualizationSync.getPlayerNextMesh().id);
+    if (nextNodeId === undefined) return false;
+
+    const nextNode = this.model.nodeList[nextNodeId];
+    const isVisible = this.model
+      .getVisibleNodesAtAngle(nextNode, activePlayer.angle, PlayerConfig.MaxViewDistance)
+      .some(n => n.id === clickedNode.id);
+
+    if (isVisible) {
+      sm.transition(GameEvent.ShotPlayer);
+      this.applyShotMesh(clickedNode.id);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -296,6 +267,22 @@ export class GameController {
     if (alivePlayers.length === 1) {
       console.log(`🏆 ${alivePlayers[0].id} wins!`);
     }
+  }
+
+  /**
+   * Sets the next move mesh by node ID
+   */
+  private applyNextMesh(nodeId: number): void {
+    const mesh = this.findMeshByNodeId(nodeId);
+    if (mesh) this.visualizationSync.setPlayerNextMesh(mesh);
+  }
+
+  /**
+   * Sets the shot target mesh by node ID
+   */
+  private applyShotMesh(nodeId: number): void {
+    const mesh = this.findMeshByNodeId(nodeId);
+    if (mesh) this.visualizationSync.setPlayerShotMesh(mesh);
   }
 
   /**

@@ -200,6 +200,24 @@ class Model {
   }
 
   /**
+   * Calculates the angle (in degrees) between a direction vector and a node relative to a center node.
+   * Uses dot product formula; clamps to [-1, 1] to guard against floating-point errors.
+   */
+  private getAngleFromDirection(
+    centerNode: node,
+    targetNode: node,
+    dirX: number,
+    dirY: number
+  ): number {
+    const dx = targetNode.x - centerNode.x;
+    const dy = targetNode.y - centerNode.y;
+    const nodeDistance = this.getNodeDistance(centerNode, targetNode);
+    if (nodeDistance === 0) return 0;
+    const dot = (dx * dirX + dy * dirY) / nodeDistance;
+    return Math.acos(Math.max(-1, Math.min(1, dot))) * (180 / Math.PI);
+  }
+
+  /**
    * Gets nodes that are connected to the center node and are at a specific angle and distance.
    * @param centerNode - The center node.
    * @param angle - The angle in degrees.
@@ -208,20 +226,12 @@ class Model {
    */
   public getConnectedNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
     const connectedNodes = this.getConnectedNodes(centerNode);
-    const targetVector = {
-      x: Math.cos(angle * Math.PI / 180),
-      y: Math.sin(angle * Math.PI / 180)
-    };
+    const dirX = Math.cos(angle * Math.PI / 180);
+    const dirY = Math.sin(angle * Math.PI / 180);
 
     return connectedNodes.filter(node => {
-      const nodeVector = {
-        x: node.x - centerNode.x,
-        y: node.y - centerNode.y
-      };
       const nodeDistance = this.getNodeDistance(centerNode, node);
-      const dotProduct = (nodeVector.x * targetVector.x + nodeVector.y * targetVector.y) / (nodeDistance * Math.sqrt(targetVector.x * targetVector.x + targetVector.y * targetVector.y));
-      const nodeAngle = Math.acos(dotProduct) * (180 / Math.PI);
-
+      const nodeAngle = this.getAngleFromDirection(centerNode, node, dirX, dirY);
       return nodeAngle < this.viewAngle && nodeDistance <= distance;
     });
   }
@@ -235,31 +245,18 @@ class Model {
    * @returns An array of nodes that are visible from the center node.
    */
   public getVisibleNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
-    const targetVector = {
-      x: Math.cos(angle * Math.PI / 180),
-      y: Math.sin(angle * Math.PI / 180)
-    };
+    const dirX = Math.cos(angle * Math.PI / 180);
+    const dirY = Math.sin(angle * Math.PI / 180);
 
     return this.nodeList.filter(node => {
-      // Skip the center node itself
       if (node.id === centerNode.id) return false;
 
-      const nodeVector = {
-        x: node.x - centerNode.x,
-        y: node.y - centerNode.y
-      };
       const nodeDistance = this.getNodeDistance(centerNode, node);
-
-      // Check distance
       if (nodeDistance > distance) return false;
 
-      // Check angle
-      const dotProduct = (nodeVector.x * targetVector.x + nodeVector.y * targetVector.y) / (nodeDistance * Math.sqrt(targetVector.x * targetVector.x + targetVector.y * targetVector.y));
-      const nodeAngle = Math.acos(Math.max(-1, Math.min(1, dotProduct))) * (180 / Math.PI);
-
+      const nodeAngle = this.getAngleFromDirection(centerNode, node, dirX, dirY);
       if (nodeAngle >= this.viewAngle) return false;
 
-      // Check line of sight
       return this.hasLineOfSight(centerNode, node);
     });
   }
@@ -317,13 +314,18 @@ class Model {
   }
 
   /**
+   * Applies a generated obstacle layout: resets edges, stores results, removes blocked edges.
+   */
+  private applyObstacleLayout(result: { obstacles: ObstacleData[]; lines: LineSegment[] }): void {
+    this.resetGraphEdges();
+    this.obstacles = result.obstacles;
+    this.Lines = result.lines;
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+  }
+
+  /**
    * Generates random obstacles on the map and resets edges.
    * This method is called when regenerating obstacles during gameplay.
-   * @param count - Number of obstacles to generate
-   * @param minWidth - Minimum width of obstacles
-   * @param maxWidth - Maximum width of obstacles
-   * @param minHeight - Minimum height of obstacles
-   * @param maxHeight - Maximum height of obstacles
    */
   public generateRandomObstacles(
     count?: number,
@@ -332,16 +334,7 @@ class Model {
     minHeight?: number,
     maxHeight?: number
   ): void {
-    // Reset edges to original state
-    this.resetGraphEdges();
-
-    // Generate random obstacles using MapGenerator
-    const result = MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight);
-    this.obstacles = result.obstacles;
-    this.Lines = result.lines;
-
-    // Remove edges that intersect with obstacles
-    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    this.applyObstacleLayout(MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight));
   }
 
   /**
@@ -349,16 +342,7 @@ class Model {
    * @param obstaclesData - Array of obstacle data to import
    */
   public importObstacles(obstaclesData: ObstacleData[]): void {
-    // Reset edges to original state
-    this.resetGraphEdges();
-
-    // Import obstacles using MapGenerator
-    const result = MapGenerator.importObstacles(obstaclesData);
-    this.obstacles = result.obstacles;
-    this.Lines = result.lines;
-
-    // Remove edges that intersect with obstacles
-    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    this.applyObstacleLayout(MapGenerator.importObstacles(obstaclesData));
   }
 
   /**
@@ -366,16 +350,7 @@ class Model {
    * Patterns include: maze-like corridors, rooms, scattered obstacles, and strategic cover points.
    */
   public generateComplexMap(): void {
-    // Reset edges to original state
-    this.resetGraphEdges();
-
-    // Generate complex map using MapGenerator
-    const result = MapGenerator.generateComplexMap();
-    this.obstacles = result.obstacles;
-    this.Lines = result.lines;
-
-    // Remove edges that intersect with obstacles
-    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    this.applyObstacleLayout(MapGenerator.generateComplexMap());
   }
 
   /**
