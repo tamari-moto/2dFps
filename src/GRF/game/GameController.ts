@@ -6,6 +6,9 @@ import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
 import { PlayerConfig } from '../../config/GameConfig';
 import { Player } from '../../MODEL/Player';
 import { node } from '../../MODEL/node';
+import { INetworkAdapter } from '../../network/INetworkAdapter';
+import type { TurnResult } from '../../network/types';
+
 /**
  * Controls game logic and state transitions
  * Handles player actions and combat resolution
@@ -15,18 +18,22 @@ export class GameController {
   private visualizationSync: VisualizationSync;
   private eventBus: GameEventBus;
   private activePlayerId: string;
+  private networkAdapter: INetworkAdapter;
 
   constructor(
     model: Model,
     visualizationSync: VisualizationSync,
     eventBus: GameEventBus,
-    activePlayerId: string
+    activePlayerId: string,
+    networkAdapter: INetworkAdapter
   ) {
     this.model = model;
     this.visualizationSync = visualizationSync;
     this.eventBus = eventBus;
     this.activePlayerId = activePlayerId;
+    this.networkAdapter = networkAdapter;
 
+    this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.setupEventListeners();
   }
 
@@ -105,7 +112,7 @@ export class GameController {
     const shotNodeId = this.getMeshToNodeMap().get(this.visualizationSync.getPlayerShotMesh().id);
 
     if (shotNodeId === clickedNode.id) {
-      this.executeTurn(activePlayer, sm);
+      this.executeTurn(sm);
     } else {
       this.tryShotTarget(activePlayer, clickedNode, sm);
     }
@@ -133,69 +140,61 @@ export class GameController {
   }
 
   /**
-   * Executes a complete turn (move, shoot, enemy response)
+   * Executes a complete turn by delegating to the network adapter.
+   * LocalAdapter runs the logic in-process; ColyseusAdapter sends it to the server.
    */
-  private executeTurn(activePlayer: Player, sm: StateMachine): void {
+  private executeTurn(sm: StateMachine): void {
     sm.transition(GameEvent.Complete);
 
-    // Move player
     const nextMesh = this.visualizationSync.getPlayerNextMesh();
-    const nextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
-    if (nextNodeId !== undefined) {
-      this.model.setPlayerRef(this.activePlayerId, this.model.nodeList[nextNodeId]);
-    }
-
-    // Check player's shot
     const shotMesh = this.visualizationSync.getPlayerShotMesh();
+    const nextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
     const shotNodeId = this.getMeshToNodeMap().get(shotMesh.id);
-    this.checkPlayerShot(shotNodeId);
 
-    // Update player angle
-    const playerNextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
-    const playerShotNodeId = this.getMeshToNodeMap().get(shotMesh.id);
-    if (playerNextNodeId !== undefined && playerShotNodeId !== undefined) {
-      const newAngle = this.model.getAngleBetweenNodes(
-        this.model.nodeList[playerNextNodeId],
-        this.model.nodeList[playerShotNodeId]
-      );
-      activePlayer.setAngle(newAngle);
-    }
+    if (nextNodeId === undefined) return;
 
-    // Reset state
+    // Reset visual state immediately
     sm.transition(GameEvent.SelectPlayer);
     this.visualizationSync.setPlayerSelectMesh(nextMesh);
     this.visualizationSync.setPlayerNextMesh(this.visualizationSync.getUndefinedMesh());
     this.visualizationSync.setPlayerShotMesh(this.visualizationSync.getUndefinedMesh());
+
+    // Delegate logic to adapter; result is applied via applyTurnResult callback
+    this.networkAdapter.sendTurnAction({
+      playerId: this.activePlayerId,
+      moveToNodeId: nextNodeId,
+      shotAtNodeId: shotNodeId,
+    });
   }
 
   /**
-   * Checks if player's shot hit another player
+   * Applies a turn result received from the network adapter.
+   * Called by LocalAdapter synchronously, or by ColyseusAdapter after server response.
    */
-  private checkPlayerShot(shotNodeId: number | undefined): boolean {
-    if (shotNodeId === undefined) return false;
-
-    // Check if any other player is at the shot node
-    for (const [playerId, player] of this.model.players) {
-      // Skip the active player (can't hit yourself)
-      if (playerId === this.activePlayerId) continue;
-
-      if (shotNodeId === player.node.id) {
-        console.log(`🎯 ${this.activePlayerId} HIT ${playerId}!`);
-        this.eventBus.emit(GameEventType.HIT_DETECTED, {
-          attackerId: this.activePlayerId,
-          targetId: playerId,
-          nodeId: shotNodeId,
-        } as any);
-        return true;
-      }
+  private applyTurnResult(result: TurnResult): void {
+    // Update moving player's position and angle (already done inside LocalAdapter,
+    // but we keep this for ColyseusAdapter where the model is updated here)
+    const movingPlayer = this.model.getPlayer(result.movingPlayerId);
+    if (movingPlayer) {
+      this.model.setPlayerRef(result.movingPlayerId, this.model.nodeList[result.newNodeId]);
+      movingPlayer.setAngle(result.newAngle);
     }
 
-    console.log(`❌ ${this.activePlayerId} missed!`);
-    this.eventBus.emit(GameEventType.MISS_DETECTED, {
-      attackerId: this.activePlayerId,
-      nodeId: shotNodeId,
-    } as any);
-    return false;
+    // Apply hit results
+    for (const hit of result.hits) {
+      console.log(`🎯 ${result.movingPlayerId} HIT ${hit.targetId}!`);
+      this.eventBus.emit(GameEventType.HIT_DETECTED, {
+        attackerId: result.movingPlayerId,
+        targetId: hit.targetId,
+        nodeId: result.newNodeId,
+      });
+    }
+
+    if (result.hits.length === 0 && result.nextTurnPlayerId !== '') {
+      console.log(`❌ ${result.movingPlayerId} missed!`);
+    }
+
+    this.visualizationSync.updateView();
   }
 
   /**
@@ -231,22 +230,17 @@ export class GameController {
   }
 
   /**
-   * Handles hit detection events
+   * Handles hit detection events (damage already applied by the adapter).
+   * Responsible for visual feedback only.
    */
   private handleHitDetected(data: { attackerId: string; targetId: string; nodeId: number }): void {
     console.log(`💥 ${data.attackerId} hit ${data.targetId} at node ${data.nodeId}!`);
 
-    // Apply damage to the target player
     const targetPlayer = this.model.getPlayer(data.targetId);
     if (targetPlayer) {
-      targetPlayer.takeDamage(34); // One-shot kill (100 / 3 = ~33.3, so 34 damage means 3 shots to kill)
-
       console.log(`${data.targetId} HP: ${targetPlayer.health}/${targetPlayer.maxHealth}`);
-
-      // Show visual feedback
       this.visualizationSync.showHitEffect(data.targetId);
 
-      // Check if player was eliminated
       if (!targetPlayer.isAlive) {
         this.handlePlayerElimination(data.targetId);
       }

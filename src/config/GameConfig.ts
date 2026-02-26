@@ -30,6 +30,9 @@ export const PlayerConfig = {
 
   /** Player cube size */
   CubeSize: 10,
+
+  /** Damage dealt per shot (3 shots to eliminate a player with 100 HP) */
+  DamagePerShot: 34,
 } as const;
 
 /**

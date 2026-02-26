@@ -3,7 +3,7 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
+import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
 
@@ -17,13 +17,15 @@ class Model {
   private obstacles: ObstacleData[] = [];
 
   constructor() {
-    this.Init_model();
+    this.initGrid();
+    this.initLocalPlayers();
   }
 
   /**
-   * Initializes the model by creating nodes and edges.
+   * Initializes the grid: nodes, edges, and obstacles.
+   * Called by the constructor and by LocalAdapter.
    */
-  public Init_model() {
+  public initGrid(): void {
     const size = this.NodesInGridSize;
     let count = 0;
     for (let i = 0; i < size; i++) {
@@ -40,13 +42,6 @@ class Model {
     }
     this.connectNearNodes();
 
-    // Initialize players dynamically
-    const playerColors = this.generatePlayerColors(PLAYER_COUNT);
-    for (let i = 0; i < PLAYER_COUNT && i < this.nodeList.length; i++) {
-      const playerId = createPlayerId(i);
-      this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i]));
-    }
-
     for (const node of this.nodeList) {
       if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
       if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
@@ -56,8 +51,18 @@ class Model {
 
     // ランダムな障害物を生成
     this.generateRandomObstaclesInternal();
+  }
 
-
+  /**
+   * Initializes local players (used in local-play mode).
+   * In online mode this is replaced by applyServerState().
+   */
+  public initLocalPlayers(): void {
+    const playerColors = this.generatePlayerColors(LOCAL_PLAYER_COUNT);
+    for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
+      const playerId = createPlayerId(i);
+      this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i]));
+    }
   }
 
   /**

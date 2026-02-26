@@ -1,11 +1,12 @@
-import { Model } from '../MODEL/model';
 import { SceneManager } from './rendering/SceneManager';
 import { VisualizationSync } from './rendering/VisualizationSync';
 import { InputHandler } from './input/InputHandler';
 import { GameController } from './game/GameController';
 import { GameEventBus, gameEventBus } from '../core/events/GameEventBus';
-import { ENTITY_IDS } from '../config/GameConstants';
 import type { ObstacleData } from '../MODEL/ObstacleExporter';
+import type { Model } from '../MODEL/model';
+import { INetworkAdapter } from '../network/INetworkAdapter';
+import { LocalAdapter } from '../network/LocalAdapter';
 
 /**
  * Main setup class for the Three.js-based 2D FPS game
@@ -17,27 +18,26 @@ export class ThreeSetup {
   private inputHandler: InputHandler;
   private gameController: GameController;
   private eventBus: GameEventBus;
-  private model: Model;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, adapter: INetworkAdapter = new LocalAdapter()) {
     // Initialize event bus
     this.eventBus = gameEventBus;
 
     // Initialize scene management
     this.sceneManager = new SceneManager(canvas);
 
-    // Initialize game model
-    this.model = new Model();
+    // Initialize game model via adapter
+    const model = adapter.initializeModel();
 
     // Initialize visualization synchronization
     this.visualizationSync = new VisualizationSync(
       this.sceneManager,
-      this.model,
-      ENTITY_IDS.PLAYER_1
+      model,
+      adapter.getMyPlayerId()
     );
 
     // Initialize input handling
-    const playerIds = Array.from(this.model.players.keys());
+    const playerIds = Array.from(model.players.keys());
     this.inputHandler = new InputHandler(
       canvas,
       this.sceneManager.getCamera(),
@@ -49,10 +49,11 @@ export class ThreeSetup {
 
     // Initialize game controller
     this.gameController = new GameController(
-      this.model,
+      model,
       this.visualizationSync,
       this.eventBus,
-      ENTITY_IDS.PLAYER_1
+      adapter.getMyPlayerId(),
+      adapter
     );
 
     // Start render loop

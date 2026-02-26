@@ -39,6 +39,16 @@ export enum GameEventType {
   GAME_PAUSED = 'game:paused',
   GAME_RESUMED = 'game:resumed',
   GAME_OVER = 'game:over',
+
+  // Network events (Phase 2+: used by ColyseusAdapter)
+  NETWORK_CONNECTED = 'network:connected',
+  NETWORK_DISCONNECTED = 'network:disconnected',
+  NETWORK_ERROR = 'network:error',
+  TURN_ASSIGNED = 'network:turn_assigned',
+  TURN_RESULT_RECEIVED = 'network:turn_result',
+  PLAYER_JOINED = 'network:player_joined',
+  PLAYER_LEFT = 'network:player_left',
+  ROOM_STATE_CHANGED = 'network:room_state',
 }
 
 /**
