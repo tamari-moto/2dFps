@@ -244,7 +244,7 @@ export class VisualizationSync {
     if (!mesh) return;
 
     // Flash red
-    const originalColor = (mesh.material as THREE.MeshBasicMaterial).color.getHex();
+    // const originalColor = (mesh.material as THREE.MeshBasicMaterial).color.getHex();
     MeshFactory.setMeshColor(mesh, 0xff0000);
 
     // Scale up and down
