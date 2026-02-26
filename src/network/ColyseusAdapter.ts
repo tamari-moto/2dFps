@@ -40,12 +40,42 @@ export class ColyseusAdapter implements INetworkAdapter {
       this.room = await this.client.joinOrCreate('game_room');
     }
 
-    // Wait for player assignment message from server
+    // Wait for player_assigned message, then verify the player exists in state.
+    // In colyseus.js@0.15.x the initial state patch fires synchronously during
+    // joinOrCreate, so onAdd for the local player may already have fired before
+    // we can register it.  We therefore: (1) wait for the message, (2) check
+    // state.players synchronously, and (3) fall back to onAdd if not yet present.
     await new Promise<void>(resolve => {
-      this.room.onMessage('player_assigned', (data: { playerId: string }) => {
-        this.myPlayerId = data.playerId;
+      let resolved = false;
+
+      const tryResolveWithId = (assignedId: string) => {
+        if (resolved) return;
+        this.myPlayerId = assignedId;
+        resolved = true;
         resolve();
+      };
+
+      this.room.onMessage('player_assigned', (data: { playerId: string }) => {
+        const assignedId = data.playerId;
+        // Check if this player is already in the state (sync patch arrived first)
+        if (this.room.state.players.has(assignedId)) {
+          tryResolveWithId(assignedId);
+        } else {
+          // State patch not yet applied – wait for it via onAdd
+          this.room.state.players.onAdd((_player: unknown, playerId: string) => {
+            if (playerId === assignedId) {
+              tryResolveWithId(assignedId);
+            }
+          });
+        }
       });
+    });
+
+    // Forward future player arrivals to the joined callback.
+    this.room.state.players.onAdd((_player: unknown, playerId: string) => {
+      if (playerId !== this.myPlayerId) {
+        this.playerJoinedCallback?.(playerId);
+      }
     });
 
     // Server error messages (NOT_YOUR_TURN, INVALID_ACTION, etc.)
@@ -64,13 +94,6 @@ export class ColyseusAdapter implements INetworkAdapter {
     // Turn result from server
     this.room.onMessage('turn_result', (data: TurnResult) => {
       this.turnResultCallback?.(data);
-    });
-
-    // Other player joined
-    this.room.state.players.onAdd((_player: unknown, playerId: string) => {
-      if (playerId !== this.myPlayerId) {
-        this.playerJoinedCallback?.(playerId);
-      }
     });
 
     // Other player left
