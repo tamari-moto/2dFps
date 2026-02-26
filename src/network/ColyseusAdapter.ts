@@ -21,6 +21,7 @@ export class ColyseusAdapter implements INetworkAdapter {
   private turnResultCallback?: (result: TurnResult) => void;
   private playerJoinedCallback?: (playerId: string) => void;
   private playerLeftCallback?: (playerId: string) => void;
+  private gameStartedCallback?: (firstTurnPlayerId: string) => void;
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
     this.client = new Colyseus.Client(serverUrl);
@@ -53,7 +54,9 @@ export class ColyseusAdapter implements INetworkAdapter {
     });
 
     // Game lifecycle messages
-    this.room.onMessage('game_started', (_data: { firstTurnPlayerId: string }) => {});
+    this.room.onMessage('game_started', (data: { firstTurnPlayerId: string }) => {
+      this.gameStartedCallback?.(data.firstTurnPlayerId);
+    });
     this.room.onMessage('game_over', (_data: { winnerId: string | null }) => {});
     this.room.onMessage('obstacles_ready', (_data: { rects: number[] }) => {});
     this.room.onMessage('player_left', (_data: { playerId: string }) => {});
@@ -127,6 +130,10 @@ export class ColyseusAdapter implements INetworkAdapter {
 
   onPlayerLeft(callback: (playerId: string) => void): void {
     this.playerLeftCallback = callback;
+  }
+
+  onGameStarted(callback: (firstTurnPlayerId: string) => void): void {
+    this.gameStartedCallback = callback;
   }
 
   disconnect(): void {

@@ -34,4 +34,7 @@ export interface INetworkAdapter {
 
   /** Register a callback invoked when a player leaves */
   onPlayerLeft(callback: (playerId: string) => void): void;
+
+  /** Register a callback invoked when the game starts (≥2 players ready) */
+  onGameStarted(callback: (firstTurnPlayerId: string) => void): void;
 }

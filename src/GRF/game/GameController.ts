@@ -34,6 +34,7 @@ export class GameController {
     this.networkAdapter = networkAdapter;
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
+    this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
     this.setupEventListeners();
   }
 
@@ -167,6 +168,22 @@ export class GameController {
       moveToNodeId: nextNodeId,
       shotAtNodeId: shotNodeId,
     });
+  }
+
+  /**
+   * Called when the game starts (≥2 players connected).
+   * Updates the active player to whoever goes first.
+   */
+  private handleGameStarted(firstTurnPlayerId: string): void {
+    this.activePlayerId = firstTurnPlayerId;
+    this.visualizationSync.setActivePlayer(firstTurnPlayerId);
+    const myId = this.networkAdapter.getMyPlayerId();
+    if (firstTurnPlayerId === myId) {
+      console.log(`▶ Game started! Your turn first. (${myId})`);
+    } else {
+      console.log(`⏳ Game started! Waiting for ${firstTurnPlayerId}...`);
+    }
+    this.visualizationSync.updateView();
   }
 
   /**

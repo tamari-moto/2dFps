@@ -40,6 +40,9 @@ export class LocalAdapter implements INetworkAdapter {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onPlayerLeft(_callback: (playerId: string) => void): void { /* no-op in local mode */ }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onGameStarted(_callback: (firstTurnPlayerId: string) => void): void { /* no-op in local mode */ }
+
   /**
    * Executes a turn synchronously (ported from GameController.executeTurn /
    * checkPlayerShot) and immediately fires the turnResult callback.
