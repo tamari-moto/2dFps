@@ -52,6 +52,8 @@ export class GameController {
    * Handles node click events
    */
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
+    if (!this.networkAdapter.isMyTurn()) return;
+
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
@@ -192,6 +194,19 @@ export class GameController {
 
     if (result.hits.length === 0 && result.nextTurnPlayerId !== '') {
       console.log(`❌ ${result.movingPlayerId} missed!`);
+    }
+
+    // In online mode: update activePlayerId to match whose turn it now is.
+    // (In local mode isMyTurn() always returns true so this is a no-op for clicks.)
+    if (result.nextTurnPlayerId) {
+      this.activePlayerId = result.nextTurnPlayerId;
+      this.visualizationSync.setActivePlayer(result.nextTurnPlayerId);
+      const myId = this.networkAdapter.getMyPlayerId();
+      if (result.nextTurnPlayerId === myId) {
+        console.log(`▶ Your turn! (${myId})`);
+      } else {
+        console.log(`⏳ Waiting for ${result.nextTurnPlayerId}...`);
+      }
     }
 
     this.visualizationSync.updateView();
