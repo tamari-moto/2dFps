@@ -125,9 +125,7 @@ Idle → Select → Move → Shot → Idle
 ├── document/
 │   ├── SETUP.md               環境構築・セットアップガイド
 │   ├── FOLDER_STRUCTURE.md    フォルダ構成の詳細ガイド
-│   ├── DATA_FLOW.md           アーキテクチャ・データフロー詳細
-│   ├── REFACTORING_SUMMARY.md リファクタリング履歴
-│   └── block_diagram.md       ブロック図
+│   └── DATA_FLOW.md           アーキテクチャ・データフロー詳細
 ├── CLAUDE.md              AI 開発用の設計メモ
 └── README.md
 ```
@@ -139,8 +137,6 @@ Idle → Select → Move → Shot → Idle
 | [document/SETUP.md](document/SETUP.md) | 環境構築・セットアップガイド |
 | [document/FOLDER_STRUCTURE.md](document/FOLDER_STRUCTURE.md) | フォルダ構成の詳細ガイド |
 | [document/DATA_FLOW.md](document/DATA_FLOW.md) | アーキテクチャ・データフロー詳細 |
-| [document/REFACTORING_SUMMARY.md](document/REFACTORING_SUMMARY.md) | リファクタリング履歴・設計変更記録 |
-| [document/block_diagram.md](document/block_diagram.md) | システム構成ブロック図 |
 | [CLAUDE.md](CLAUDE.md) | AI 開発者向け設計メモ |
 
 ## スクリプト一覧
