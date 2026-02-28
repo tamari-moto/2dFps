@@ -18,6 +18,7 @@ npm run deploy   # gh-pages へデプロイ
 ### サーバー (`server/` ディレクトリで実行)
 
 ```bash
+npm install      # 初回・依存パッケージ更新時
 npm run build    # TypeScript コンパイル (dist/ へ出力)
 npm start        # サーバー起動 (ws://localhost:2567)
 npm run dev      # ts-node で直接実行（開発用）
@@ -78,7 +79,7 @@ src/
 └── schema/
 
 server/
-├── package.json                # colyseus@0.15.57, commonjs モジュール
+├── package.json                # colyseus@0.15.57, express@4.18, TS 5.4
 ├── tsconfig.json               # module: commonjs, experimentalDecorators
 └── src/
     ├── index.ts                # Express + Colyseus サーバーエントリ
@@ -104,7 +105,7 @@ lobby → connecting → playing
 
 ```typescript
 INetworkAdapter
-├── LocalAdapter   // オフライン: プロセス内でゲームロジックを実行
+├── LocalAdapter    // オフライン: プロセス内でゲームロジックを実行
 └── ColyseusAdapter // オンライン: WebSocket で Colyseus サーバーに接続
 ```
 
@@ -130,6 +131,31 @@ nodeToMeshMap: Map<number, number>  // node.id → THREE.Mesh.id
 → GSAP アニメーション → renderer.render()
 ```
 
+### サーバースキーマ (GameState.ts)
+
+```typescript
+PlayerState: { id, nodeId, angle, health, isAlive, color }
+GameState:   { players: MapSchema<PlayerState>, currentTurnPlayerId, gameStarted }
+```
+
+### サーバーメッセージプロトコル
+
+| 方向 | メッセージ | データ |
+|------|-----------|--------|
+| S→C | `player_assigned` | `{ playerId }` |
+| S→C | `game_started` | `{ firstTurnPlayerId }` |
+| S→C | `turn_result` | `TurnResult` |
+| S→C | `game_over` | `{ winnerId }` |
+| S→C | `player_left` | `{ playerId }` |
+| S→C | `error` | `{ code }` |
+| C→S | `turn_action` | `{ playerId, moveToNodeId, shotAtNodeId? }` |
+
+### ColyseusAdapter の注意点
+
+- `game_started` はコールバック登録前に届く場合がある → `pendingGameStarted` でキャッシュして後で発火
+- `onAdd` は `initializePlayers` の状態デルタより先に発火する場合がある → `Promise.resolve()` で1マイクロタスク遅延
+- `MapSchema.forEach` の順序は保証されない → `playerOrder` 配列（挿入順）でターン管理
+
 ## コーディング規約
 
 - **マジックナンバー禁止**: 数値定数は必ず `src/config/GameConfig.ts` に追加する
@@ -154,6 +180,7 @@ nodeToMeshMap: Map<number, number>  // node.id → THREE.Mesh.id
   - サーバー: `colyseus@0.15.x`
   - クライアント: `colyseus.js@0.15.x`（`@colyseus/sdk` は 0.17.x 用なので使わない）
 - `@colyseus/schema@4.x`（Colyseus 0.17.x 同梱）は TC39 標準デコレーターが必要で Node.js 20 + TS 5.8 では動かない。0.15.x の `@colyseus/schema@2.x` + `experimentalDecorators` を使うこと
+- サーバー側 TypeScript は 5.4.x を使うこと（5.8.x はデコレーター仕様変更の影響あり）
 
 ## デプロイ
 
