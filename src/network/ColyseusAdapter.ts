@@ -22,6 +22,7 @@ export class ColyseusAdapter implements INetworkAdapter {
   private playerJoinedCallback?: (playerId: string) => void;
   private playerLeftCallback?: (playerId: string) => void;
   private gameStartedCallback?: (firstTurnPlayerId: string) => void;
+  private pendingGameStarted?: string; // cached firstTurnPlayerId if game_started arrived early
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
     this.client = new Colyseus.Client(serverUrl);
@@ -39,6 +40,50 @@ export class ColyseusAdapter implements INetworkAdapter {
     } else {
       this.room = await this.client.joinOrCreate('game_room');
     }
+
+    // Register all message handlers immediately after join, before awaiting anything.
+    // This ensures no messages are missed while waiting for player_assigned.
+
+    // Server error messages (NOT_YOUR_TURN, INVALID_ACTION, etc.)
+    this.room.onMessage('error', (data: { code: string }) => {
+      console.warn('[ColyseusAdapter] server error:', data.code);
+    });
+
+    // Game lifecycle messages
+    this.room.onMessage('game_started', (data: { firstTurnPlayerId: string }) => {
+      if (this.gameStartedCallback) {
+        this.gameStartedCallback(data.firstTurnPlayerId);
+      } else {
+        // Callback not yet registered (startGame hasn't been called yet) — cache it
+        this.pendingGameStarted = data.firstTurnPlayerId;
+      }
+    });
+    this.room.onMessage('game_over', (_data: { winnerId: string | null }) => {});
+    this.room.onMessage('obstacles_ready', (_data: { rects: number[] }) => {});
+    this.room.onMessage('player_left', (_data: { playerId: string }) => {});
+
+    // Turn result from server
+    this.room.onMessage('turn_result', (data: TurnResult) => {
+      this.turnResultCallback?.(data);
+    });
+
+    // Forward future player arrivals to the joined callback.
+    // Note: onAdd fires for every player including the local one during state sync.
+    // We skip the local player; the callback receives the playerId for remote players.
+    this.room.state.players.onAdd((_player: unknown, playerId: string) => {
+      if (playerId === this.myPlayerId) return;
+      // player is the live PlayerState reference — changes will be reflected in it.
+      // Delay one microtask so that initializePlayers() on the server has time to
+      // push its state delta (nodeId, color) before we read them.
+      Promise.resolve().then(() => {
+        this.playerJoinedCallback?.(playerId);
+      });
+    });
+
+    // Other player left
+    this.room.state.players.onRemove((_player: unknown, playerId: string) => {
+      this.playerLeftCallback?.(playerId);
+    });
 
     // Wait for player_assigned message, then verify the player exists in state.
     // In colyseus.js@0.15.x the initial state patch fires synchronously during
@@ -69,36 +114,6 @@ export class ColyseusAdapter implements INetworkAdapter {
           });
         }
       });
-    });
-
-    // Forward future player arrivals to the joined callback.
-    this.room.state.players.onAdd((_player: unknown, playerId: string) => {
-      if (playerId !== this.myPlayerId) {
-        this.playerJoinedCallback?.(playerId);
-      }
-    });
-
-    // Server error messages (NOT_YOUR_TURN, INVALID_ACTION, etc.)
-    this.room.onMessage('error', (data: { code: string }) => {
-      console.warn('[ColyseusAdapter] server error:', data.code);
-    });
-
-    // Game lifecycle messages
-    this.room.onMessage('game_started', (data: { firstTurnPlayerId: string }) => {
-      this.gameStartedCallback?.(data.firstTurnPlayerId);
-    });
-    this.room.onMessage('game_over', (_data: { winnerId: string | null }) => {});
-    this.room.onMessage('obstacles_ready', (_data: { rects: number[] }) => {});
-    this.room.onMessage('player_left', (_data: { playerId: string }) => {});
-
-    // Turn result from server
-    this.room.onMessage('turn_result', (data: TurnResult) => {
-      this.turnResultCallback?.(data);
-    });
-
-    // Other player left
-    this.room.state.players.onRemove((_player: unknown, playerId: string) => {
-      this.playerLeftCallback?.(playerId);
     });
   }
 
@@ -157,6 +172,11 @@ export class ColyseusAdapter implements INetworkAdapter {
 
   onGameStarted(callback: (firstTurnPlayerId: string) => void): void {
     this.gameStartedCallback = callback;
+    // Fire immediately if game_started arrived before this callback was registered
+    if (this.pendingGameStarted !== undefined) {
+      callback(this.pendingGameStarted);
+      this.pendingGameStarted = undefined;
+    }
   }
 
   disconnect(): void {
