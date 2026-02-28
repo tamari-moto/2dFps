@@ -49,20 +49,3 @@ export function exportObstaclesToJSON(obstacles: ObstacleData[]): string {
   return JSON.stringify(obstacleData, null, 2);
 }
 
-/**
- * Downloads obstacles as a JSON file
- * @param obstacles - Array of obstacle data
- * @param filename - Name of the file to download (default: 'obstacles.json')
- */
-export function downloadObstaclesJSON(obstacles: ObstacleData[], filename: string = 'obstacles.json'): void {
-  const jsonData = exportObstaclesToJSON(obstacles);
-  const blob = new Blob([jsonData], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}

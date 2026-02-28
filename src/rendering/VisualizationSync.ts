@@ -7,6 +7,7 @@ import { SceneManager } from './SceneManager';
 import { NodeConfig, AnimationConfig, PlayerConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConstants';
 import { Player } from '../model/Player';
+import { GameEventBus, GameEventType } from '../core/GameEventBus';
 
 /**
  * Synchronizes game model state with Three.js visualization
@@ -37,7 +38,8 @@ export class VisualizationSync {
   constructor(
     sceneManager: SceneManager,
     model: Model,
-    activePlayerId: string
+    activePlayerId: string,
+    eventBus: GameEventBus
   ) {
     this.sceneManager = sceneManager;
     this.model = model;
@@ -52,6 +54,55 @@ export class VisualizationSync {
     this.undefinedMesh = MeshFactory.createUndefinedMesh();
 
     this.initializeVisualization();
+    this.subscribeToEvents(eventBus);
+  }
+
+  /**
+   * Subscribes to visualization command events from GameController
+   */
+  private subscribeToEvents(eventBus: GameEventBus): void {
+    eventBus.on(GameEventType.VIS_UPDATE_VIEW, () => this.updateView());
+    eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
+      this.activePlayerId = data.playerId;
+      this.updateView();
+    });
+    eventBus.on(GameEventType.VIS_SET_SELECT_MESH, (data: { nodeId: number }) => {
+      const mesh = this.findMeshByNodeId(data.nodeId);
+      if (mesh) this.playerSelectMesh = mesh;
+    });
+    eventBus.on(GameEventType.VIS_SET_NEXT_MESH, (data: { nodeId: number }) => {
+      const mesh = this.findMeshByNodeId(data.nodeId);
+      if (mesh) this.playerNextMesh = mesh;
+    });
+    eventBus.on(GameEventType.VIS_SET_SHOT_MESH, (data: { nodeId: number }) => {
+      const mesh = this.findMeshByNodeId(data.nodeId);
+      if (mesh) this.playerShotMesh = mesh;
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_NEXT_MESH, () => {
+      this.playerNextMesh = this.undefinedMesh;
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_SHOT_MESH, () => {
+      this.playerShotMesh = this.undefinedMesh;
+    });
+    eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
+      this.showHitEffect(data.playerId);
+    });
+    eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
+      this.hidePlayer(data.playerId);
+    });
+    eventBus.on(GameEventType.VIS_TOGGLE_VIEW_ANGLE, () => {
+      const isVisible = this.viewAngleVisualizer.toggle();
+      this.updateView();
+      console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
+    });
+    eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
+  }
+
+  /**
+   * Finds a mesh by node ID
+   */
+  private findMeshByNodeId(nodeId: number): THREE.Mesh | undefined {
+    return this.meshList.find(m => this.meshToNodeMap.get(m.id) === nodeId);
   }
 
   /**
@@ -220,23 +271,6 @@ export class VisualizationSync {
   }
 
   /**
-   * Toggles view angle visualization
-   */
-  toggleViewAngle(): boolean {
-    const isVisible = this.viewAngleVisualizer.toggle();
-    this.updateView();
-    return isVisible;
-  }
-
-  /**
-   * Sets the active player
-   */
-  setActivePlayer(playerId: string): void {
-    this.activePlayerId = playerId;
-    this.updateView();
-  }
-
-  /**
    * Shows hit effect on a player
    */
   showHitEffect(playerId: string): void {
@@ -316,37 +350,6 @@ export class VisualizationSync {
    */
   getMeshToNodeMap(): Map<number, number> {
     return this.meshToNodeMap;
-  }
-
-  /**
-   * Sets special meshes for game state
-   */
-  setPlayerSelectMesh(mesh: THREE.Mesh): void {
-    this.playerSelectMesh = mesh;
-  }
-
-  setPlayerNextMesh(mesh: THREE.Mesh): void {
-    this.playerNextMesh = mesh;
-  }
-
-  setPlayerShotMesh(mesh: THREE.Mesh): void {
-    this.playerShotMesh = mesh;
-  }
-
-  getUndefinedMesh(): THREE.Mesh {
-    return this.undefinedMesh;
-  }
-
-  getPlayerSelectMesh(): THREE.Mesh {
-    return this.playerSelectMesh;
-  }
-
-  getPlayerNextMesh(): THREE.Mesh {
-    return this.playerNextMesh;
-  }
-
-  getPlayerShotMesh(): THREE.Mesh {
-    return this.playerShotMesh;
   }
 
   /**

@@ -1,19 +1,16 @@
 import { node } from './node';
 import { Entity, EntityType } from './entities/Entity';
-import { StateMachine } from '../logic/StateMachine';
 
 /**
- * Player entity with state machine for turn-based actions
+ * Player entity with health and alive state
  */
 export class Player extends Entity {
-  stateMachine: StateMachine;
   health: number;
   maxHealth: number;
   isAlive: boolean;
 
   constructor(id: string, initialNode: node, color: number, maxHealth: number = 100) {
     super(id, EntityType.PLAYER, initialNode, color, 0);
-    this.stateMachine = new StateMachine();
     this.maxHealth = maxHealth;
     this.health = maxHealth;
     this.isAlive = true;

@@ -2,7 +2,7 @@ import { SceneManager } from './SceneManager';
 import { VisualizationSync } from './VisualizationSync';
 import { InputHandler } from '../input/InputHandler';
 import { GameController } from '../logic/GameController';
-import { GameEventBus, gameEventBus } from '../core/GameEventBus';
+import { GameEventBus, GameEventType, gameEventBus } from '../core/GameEventBus';
 import type { ObstacleData } from '../model/ObstacleExporter';
 import type { Model } from '../model/model';
 import { Player } from '../model/Player';
@@ -34,7 +34,8 @@ export class ThreeSetup {
     this.visualizationSync = new VisualizationSync(
       this.sceneManager,
       model,
-      adapter.getMyPlayerId()
+      adapter.getMyPlayerId(),
+      this.eventBus
     );
 
     // Initialize input handling
@@ -51,7 +52,6 @@ export class ThreeSetup {
     // Initialize game controller
     this.gameController = new GameController(
       model,
-      this.visualizationSync,
       this.eventBus,
       adapter.getMyPlayerId(),
       adapter
@@ -115,7 +115,7 @@ export class ThreeSetup {
     const p = new Player(playerId, startNode, color);
     model.players.set(playerId, p);
     this.visualizationSync.addPlayerMesh(playerId, color);
-    this.visualizationSync.updateView();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
 
   /**

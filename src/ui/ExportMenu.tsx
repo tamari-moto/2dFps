@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ThreeSetup } from '../rendering/threeSetup';
-import { downloadObstaclesJSON } from '../model/ObstacleExporter';
+import { exportObstaclesToJSON } from '../model/ObstacleExporter';
 
 interface ExportMenuProps {
   threeSetup: ThreeSetup | null;
@@ -10,11 +10,18 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleExportObstacles = () => {
-    if (threeSetup) {
-      const model = threeSetup.getModel();
-      const obstacles = model.getObstacles();
-      downloadObstaclesJSON(obstacles);
-    }
+    if (!threeSetup) return;
+    const obstacles = threeSetup.getModel().getObstacles();
+    const jsonData = exportObstaclesToJSON(obstacles);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'obstacles.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleRandomizeObstacles = () => {
