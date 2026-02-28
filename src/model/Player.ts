@@ -1,6 +1,6 @@
 import { node } from './node';
 import { Entity, EntityType } from './entities/Entity';
-import { StateMachine } from '../GRF/StateMachine';
+import { StateMachine } from '../logic/StateMachine';
 
 /**
  * Player entity with state machine for turn-based actions

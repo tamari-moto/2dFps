@@ -1,11 +1,11 @@
-import { SceneManager } from './rendering/SceneManager';
-import { VisualizationSync } from './rendering/VisualizationSync';
-import { InputHandler } from './input/InputHandler';
-import { GameController } from './game/GameController';
-import { GameEventBus, gameEventBus } from '../core/events/GameEventBus';
-import type { ObstacleData } from '../MODEL/ObstacleExporter';
-import type { Model } from '../MODEL/model';
-import { Player } from '../MODEL/Player';
+import { SceneManager } from './SceneManager';
+import { VisualizationSync } from './VisualizationSync';
+import { InputHandler } from '../input/InputHandler';
+import { GameController } from '../logic/GameController';
+import { GameEventBus, gameEventBus } from '../core/GameEventBus';
+import type { ObstacleData } from '../model/ObstacleExporter';
+import type { Model } from '../model/model';
+import { Player } from '../model/Player';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import { LocalAdapter } from '../network/LocalAdapter';
 

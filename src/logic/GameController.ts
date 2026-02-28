@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { Model } from '../../MODEL/model';
-import { State, GameEvent, StateMachine } from '../StateMachine';
+import { Model } from '../model/model';
+import { State, GameEvent, StateMachine } from './StateMachine';
 import { VisualizationSync } from '../rendering/VisualizationSync';
-import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
-import { PlayerConfig } from '../../config/GameConfig';
-import { Player } from '../../MODEL/Player';
-import { node } from '../../MODEL/node';
-import { INetworkAdapter } from '../../network/INetworkAdapter';
-import type { TurnResult } from '../../network/types';
+import { GameEventBus, GameEventType } from '../core/GameEventBus';
+import { PlayerConfig } from '../config/GameConfig';
+import { Player } from '../model/Player';
+import { node } from '../model/node';
+import { INetworkAdapter } from '../network/INetworkAdapter';
+import type { TurnResult } from '../schema/types';
 
 /**
  * Controls game logic and state transitions

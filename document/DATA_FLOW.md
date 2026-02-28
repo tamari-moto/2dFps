@@ -20,18 +20,18 @@
 ```
 ┌─────────────────────────────────────────────────┐
 │           エントリポイント層                      │
-│  index.html → main.tsx → GRF_main.tsx          │
+│  index.html → main.tsx → ui/GRF_main.tsx       │
 └──────────────────┬──────────────────────────────┘
                    ↓
 ┌─────────────────────────────────────────────────┐
-│              View 層 (GRF)                       │
-│  - ThreeSetup (レンダリング・入力処理)            │
+│         UI 層 (ui/) + Rendering 層 (rendering/) │
+│  - threeSetup (レンダリング・入力処理)             │
 │  - ExportMenu (UI コントロール)                   │
-│  - StateMachine (状態管理)                       │
+│  - logic/StateMachine (状態管理)                 │
 └──────────────────┬──────────────────────────────┘
                    ↓
 ┌─────────────────────────────────────────────────┐
-│            Model 層 (MODEL)                      │
+│            Model 層 (model/)                     │
 │  - Model (ゲームロジック)                         │
 │  - Graph (グラフデータ構造)                       │
 │  - LineSegment (幾何演算)                        │
@@ -39,7 +39,7 @@
 └──────────────────┬──────────────────────────────┘
                    ↓
 ┌─────────────────────────────────────────────────┐
-│          Configuration 層                        │
+│          Configuration 層 (config/)              │
 │  - GameConfig (集約された設定)                    │
 └─────────────────────────────────────────────────┘
 ```
@@ -249,7 +249,7 @@ class ThreeSetup {
 
 ### 視野計算 (getVisibleNodesAtAngle)
 
-`src/MODEL/model.ts:254` に実装されている視野角計算アルゴリズム。
+`src/model/model.ts` に実装されている視野角計算アルゴリズム。
 
 ```typescript
 getVisibleNodesAtAngle(
@@ -418,9 +418,9 @@ gsap.to(mesh.material.color, {
 └─────────────┘     └──────────────┘     └─────────────┘
 ```
 
-- **Model**: ゲームロジック、データ管理 (`src/MODEL/model.ts`)
-- **View**: Three.js によるレンダリング (`src/GRF/threeSetup.ts`)
-- **Controller**: ユーザー入力処理、View と Model の橋渡し (`src/GRF/threeSetup.ts`)
+- **Model**: ゲームロジック、データ管理 (`src/model/model.ts`)
+- **View**: Three.js によるレンダリング (`src/rendering/threeSetup.ts`)
+- **Controller**: ユーザー入力処理、View と Model の橋渡し (`src/logic/GameController.ts`)
 
 ### 2. 設定駆動 (Configuration-Driven)
 
@@ -508,43 +508,38 @@ gsap.to(mesh.position, { x: targetNode.x, y: targetNode.y })
 - React DOM ルートの作成とマウント
 - StrictMode の設定
 
-### View 層 (GRF ディレクトリ)
+### UI 層 (ui/ ディレクトリ)
 
-#### `src/GRF/GRF_main.tsx`
+#### `src/ui/GRF_main.tsx`
 - ルート React コンポーネント
 - canvas 参照の管理
 - ThreeSetup の初期化 (`setupThree`)
 - ExportMenu UI オーバーレイのレンダリング
+- AppState 管理 (`lobby → connecting → playing`)
 
-#### `src/GRF/threeSetup.ts`
-**最も重要なファイル** - コアレンダリングとインタラクション制御
-
-主な責務:
-- Three.js の scene, camera, renderer, controls の管理
-- ユーザー入力処理 (マウスクリック via raycasting)
-- UI イベントをゲーム状態変更に橋渡し
-- 視覚更新とアニメーション管理 (GSAP)
-- 双方向マッピング: mesh IDs ↔ node IDs
-
-主要メソッド:
-- `onCanvasClick()`: クリックイベント処理
-- `API_Init()`: 初期化とメッシュ生成
-- `API_Veiw()`: 視覚状態の更新
-- `animate()`: レンダリングループ
-
-#### `src/GRF/ExportMenu.tsx`
+#### `src/ui/ExportMenu.tsx`
 - マップ管理用の UI コントロール
 - 障害物のエクスポート/インポート
 - マップ生成/再生成のトリガー
 
-#### `src/GRF/StateMachine.ts`
+### Rendering 層 (rendering/ ディレクトリ)
+
+#### `src/rendering/threeSetup.ts`
+**最も重要なファイル** - コアレンダリングとインタラクション制御
+
+主な責務:
+- Three.js の初期化と全体統合 (`setupThree` 関数を export)
+- SceneManager, VisualizationSync, InputHandler, GameController の組み立て
+- 双方向マッピング: mesh IDs ↔ node IDs
+
+#### `src/logic/StateMachine.ts`
 - ゲーム状態マシン (Idle → Select → Move → Shot → Idle)
 - 状態遷移の検証
 - Enum ベースの状態とイベント定義
 
-### Model 層 (MODEL ディレクトリ)
+### Model 層 (model/ ディレクトリ)
 
-#### `src/MODEL/model.ts`
+#### `src/model/model.ts`
 **コアゲームロジックとデータモデル**
 
 主な責務:
@@ -564,22 +559,22 @@ gsap.to(mesh.position, { x: targetNode.x, y: targetNode.y })
 - `generate_random_obstruction()`: ランダム障害物生成
 - `generateComplexMap()`: 複雑マップ生成
 
-#### `src/MODEL/Graph.ts`
+#### `src/model/Graph.ts`
 - グラフデータ構造 (ノード接続性)
 - 隣接リスト実装
 - エッジ管理 (追加/削除)
 - 有向・無向エッジのサポート
 
-#### `src/MODEL/node.ts`
+#### `src/model/node.ts`
 - シンプルなノードデータ構造 (id, x, y 座標)
 
-#### `src/MODEL/LineSegment.ts`
+#### `src/model/LineSegment.ts`
 - 線分の幾何演算
 - 線分交差検出 (CCW アルゴリズム)
 - 矩形の線分生成
 - 障害物交差に基づくエッジ削除
 
-#### `src/MODEL/ObstacleExporter.ts`
+#### `src/model/ObstacleExporter.ts`
 - 障害物データのシリアライズ/デシリアライズ
 - JSON エクスポート/インポート機能
 - ファイルダウンロードユーティリティ

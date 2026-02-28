@@ -1,8 +1,8 @@
 import * as Colyseus from 'colyseus.js';
-import { Model } from '../MODEL/model';
-import { Player } from '../MODEL/Player';
+import { Model } from '../model/model';
+import { Player } from '../model/Player';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult } from './types';
+import { TurnAction, TurnResult } from '../schema/types';
 
 /**
  * Online-play implementation of INetworkAdapter.

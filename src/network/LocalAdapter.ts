@@ -1,6 +1,6 @@
-import { Model } from '../MODEL/model';
+import { Model } from '../model/model';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult } from './types';
+import { TurnAction, TurnResult } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
 import { ENTITY_IDS } from '../config/GameConstants';
 

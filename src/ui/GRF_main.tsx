@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { setupThree } from './threeSetup';
-import type { ThreeSetup } from './threeSetup';
+import { setupThree } from '../rendering/threeSetup';
+import type { ThreeSetup } from '../rendering/threeSetup';
 import ExportMenu from './ExportMenu';
 import ConsoleLogger from './ConsoleLogger';
 import LobbyUI from './LobbyUI';

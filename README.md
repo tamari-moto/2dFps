@@ -78,8 +78,12 @@ npm start        # ws://localhost:2567
 
 ```
 Config 層    → src/config/        定数の一元管理
-Model 層     → src/MODEL/         ゲームロジック・データ
-View 層      → src/GRF/           Three.js・React UI
+Schema 層    → src/schema/        型定義（サーバーと対称）
+Model 層     → src/model/         ゲームロジック・データ
+Logic 層     → src/logic/         ターン制御・状態機械
+Rendering 層 → src/rendering/     Three.js レンダリング
+Input 層     → src/input/         マウス・キーボード入力
+UI 層        → src/ui/            React UIコンポーネント
 Network 層   → src/network/       アダプターパターン
 Server       → server/src/        Colyseus サーバー
 ```
@@ -103,11 +107,15 @@ Idle → Select → Move → Shot → Idle
 
 ```
 ├── src/
-│   ├── config/            定数（GameConfig.ts, GameConstants.ts）
-│   ├── MODEL/             ゲームロジック（model, Graph, Player, node, ...）
-│   ├── GRF/               View 層（threeSetup, GameController, rendering/, input/）
-│   ├── network/           INetworkAdapter, LocalAdapter, ColyseusAdapter, types
-│   └── core/events/       GameEventBus
+│   ├── config/        定数（GameConfig.ts, GameConstants.ts）
+│   ├── schema/        型定義（TurnAction, TurnResult）
+│   ├── model/         ゲームロジック（model, Graph, Player, node, ...）
+│   ├── logic/         StateMachine, GameController
+│   ├── rendering/     threeSetup, SceneManager, MeshFactory, VisualizationSync, ViewAngleVisualizer
+│   ├── input/         InputHandler
+│   ├── ui/            GRF_main, LobbyUI, ExportMenu, ConsoleLogger
+│   ├── network/       INetworkAdapter, LocalAdapter, ColyseusAdapter
+│   └── core/          GameEventBus
 ├── server/
 │   └── src/
 │       ├── index.ts        Express + Colyseus エントリポイント
@@ -115,10 +123,11 @@ Idle → Select → Move → Shot → Idle
 │       ├── schema/         GameState（PlayerState, GameState）
 │       └── logic/          ServerGameLogic（権威ゲームロジック）
 ├── document/
-│   ├── SETUP.md            環境構築・セットアップガイド
-│   ├── DATA_FLOW.md        アーキテクチャ・データフロー詳細
-│   ├── REFACTORING_SUMMARY.md  リファクタリング履歴
-│   └── block_diagram.md   ブロック図
+│   ├── SETUP.md               環境構築・セットアップガイド
+│   ├── FOLDER_STRUCTURE.md    フォルダ構成の詳細ガイド
+│   ├── DATA_FLOW.md           アーキテクチャ・データフロー詳細
+│   ├── REFACTORING_SUMMARY.md リファクタリング履歴
+│   └── block_diagram.md       ブロック図
 ├── CLAUDE.md              AI 開発用の設計メモ
 └── README.md
 ```
@@ -128,6 +137,7 @@ Idle → Select → Move → Shot → Idle
 | ファイル | 内容 |
 |---------|------|
 | [document/SETUP.md](document/SETUP.md) | 環境構築・セットアップガイド |
+| [document/FOLDER_STRUCTURE.md](document/FOLDER_STRUCTURE.md) | フォルダ構成の詳細ガイド |
 | [document/DATA_FLOW.md](document/DATA_FLOW.md) | アーキテクチャ・データフロー詳細 |
 | [document/REFACTORING_SUMMARY.md](document/REFACTORING_SUMMARY.md) | リファクタリング履歴・設計変更記録 |
 | [document/block_diagram.md](document/block_diagram.md) | システム構成ブロック図 |

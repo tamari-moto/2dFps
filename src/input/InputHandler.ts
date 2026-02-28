@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { GameEventBus, GameEventType } from '../../core/events/GameEventBus';
-import { KEYBOARD_KEYS } from '../../config/GameConstants';
+import { GameEventBus, GameEventType } from '../core/GameEventBus';
+import { KEYBOARD_KEYS } from '../config/GameConstants';
 
 /**
  * Handles all user input (mouse and keyboard)

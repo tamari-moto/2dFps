@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { NodeConfig, PlayerConfig, ObstacleConfig } from '../../config/GameConfig';
+import { NodeConfig, PlayerConfig, ObstacleConfig } from '../config/GameConfig';
 
 /**
  * Factory for creating Three.js meshes
