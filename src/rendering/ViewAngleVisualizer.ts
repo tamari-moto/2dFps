@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { PlayerConfig, ViewAngleVisualizationConfig } from '../config/GameConfig';
-import { node } from '../MODEL/node';
+import { node } from '../model/node';
 
 /**
  * ViewAngleVisualizer class

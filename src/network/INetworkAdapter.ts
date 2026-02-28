@@ -1,5 +1,5 @@
-import { Model } from '../MODEL/model';
-import { TurnAction, TurnResult } from './types';
+import { Model } from '../model/model';
+import { TurnAction, TurnResult } from '../schema/types';
 
 /**
  * Abstraction layer between game logic and transport (local / online).

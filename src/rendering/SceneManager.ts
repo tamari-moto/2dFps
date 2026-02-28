@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { Vector3 } from 'three';
-import { CameraConfig } from '../../config/GameConfig';
+import { CameraConfig } from '../config/GameConfig';
 
 /**
  * Manages Three.js scene, camera, renderer, and controls setup

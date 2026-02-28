@@ -1,6 +1,6 @@
 import React from 'react';
-import type { ThreeSetup } from './threeSetup';
-import { downloadObstaclesJSON } from '../MODEL/ObstacleExporter';
+import type { ThreeSetup } from '../rendering/threeSetup';
+import { downloadObstaclesJSON } from '../model/ObstacleExporter';
 
 interface ExportMenuProps {
   threeSetup: ThreeSetup | null;

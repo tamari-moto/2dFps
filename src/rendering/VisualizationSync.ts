@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { Model } from '../../MODEL/model';
-import { ViewAngleVisualizer } from '../ViewAngleVisualizer';
+import { Model } from '../model/model';
+import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 import { MeshFactory } from './MeshFactory';
 import { SceneManager } from './SceneManager';
-import { NodeConfig, AnimationConfig, PlayerConfig } from '../../config/GameConfig';
-import { PLAYER_CONSTANTS } from '../../config/GameConstants';
-import { Player } from '../../MODEL/Player';
+import { NodeConfig, AnimationConfig, PlayerConfig } from '../config/GameConfig';
+import { PLAYER_CONSTANTS } from '../config/GameConstants';
+import { Player } from '../model/Player';
 
 /**
  * Synchronizes game model state with Three.js visualization

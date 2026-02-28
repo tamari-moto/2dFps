@@ -30,13 +30,16 @@ npm run dev      # ts-node で直接実行（開発用）
 
 ```
 Config 層    → src/config/
-Model 層     → src/MODEL/
-View 層      → src/GRF/
+Model 層     → src/model/
+Logic 層     → src/logic/
+View 層      → src/ui/ + src/rendering/
+Input 層     → src/input/
 Network 層   → src/network/
+Schema 層    → src/schema/
 Server       → server/src/
 ```
 
-### ディレクトリ構成
+### ディレクトリ構成（クライアント・サーバー対称構造）
 
 ```
 src/
@@ -44,7 +47,9 @@ src/
 ├── config/
 │   ├── GameConfig.ts           # 全定数の一元管理（マジックナンバー禁止）
 │   └── GameConstants.ts
-├── MODEL/
+├── schema/                     # ← server/src/schema/ と対称
+│   └── types.ts                # TurnAction, TurnResult 等
+├── model/                      # ← server/src/logic/ のデータ構造に対応
 │   ├── model.ts                # コアゲームロジック・データ管理
 │   ├── Graph.ts                # 隣接リストによるグラフ構造
 │   ├── node.ts                 # ノードデータ構造 (id, x, y)
@@ -55,28 +60,28 @@ src/
 │   └── entities/
 │       ├── Entity.ts
 │       └── EntityManager.ts
-├── GRF/
+├── logic/                      # ← server/src/logic/ と対称
+│   ├── StateMachine.ts         # ゲーム状態機械
+│   └── GameController.ts       # ゲームロジックコントローラ
+├── rendering/                  # Three.js 描画（クライアント固有）
+│   ├── threeSetup.ts           # Three.js 統合・オーケストレーション
+│   ├── SceneManager.ts         # シーン管理
+│   ├── MeshFactory.ts          # Three.js メッシュ生成
+│   ├── VisualizationSync.ts    # モデル↔描画の同期
+│   └── ViewAngleVisualizer.ts  # 視野角の可視化
+├── input/                      # 入力処理（クライアント固有）
+│   └── InputHandler.ts
+├── ui/                         # React UI コンポーネント（クライアント固有）
 │   ├── GRF_main.tsx            # ルート React コンポーネント（AppState 管理）
 │   ├── LobbyUI.tsx             # ロビー画面（オフライン/オンライン選択）
-│   ├── threeSetup.ts           # Three.js 統合・インタラクション制御
-│   ├── StateMachine.ts         # ゲーム状態機械
-│   ├── ViewAngleVisualizer.ts  # 視野角の可視化
 │   ├── ExportMenu.tsx          # マップ管理 UI
-│   ├── ConsoleLogger.tsx
-│   ├── game/
-│   │   └── GameController.ts
-│   ├── input/
-│   │   └── InputHandler.ts
-│   └── rendering/
-│       ├── MeshFactory.ts      # Three.js メッシュ生成
-│       ├── SceneManager.ts     # シーン管理
-│       └── VisualizationSync.ts # モデル↔描画の同期
-├── network/
+│   └── ConsoleLogger.tsx
+├── network/                    # ← server/src/rooms/ と対称（通信抽象化）
 │   ├── INetworkAdapter.ts      # アダプターインターフェース
 │   ├── LocalAdapter.ts         # オフライン用（プロセス内処理）
-│   ├── ColyseusAdapter.ts      # オンライン用（colyseus.js@0.15.x）
-│   └── types.ts                # TurnAction, TurnResult 等
-└── schema/
+│   └── ColyseusAdapter.ts      # オンライン用（colyseus.js@0.15.x）
+└── core/
+    └── GameEventBus.ts         # イベントバス
 
 server/
 ├── package.json                # colyseus@0.15.57, express@4.18, TS 5.4
@@ -93,7 +98,7 @@ server/
 
 ## 主要な設計パターン
 
-### AppState（GRF_main.tsx）
+### AppState（ui/GRF_main.tsx）
 
 ```
 lobby → connecting → playing
@@ -159,7 +164,7 @@ GameState:   { players: MapSchema<PlayerState>, currentTurnPlayerId, gameStarted
 ## コーディング規約
 
 - **マジックナンバー禁止**: 数値定数は必ず `src/config/GameConfig.ts` に追加する
-- **Model と View の分離**: ゲームロジックは MODEL 層、描画は GRF/rendering 層
+- **Model と View の分離**: ゲームロジックは `model/` + `logic/` 層、描画は `rendering/` 層、UI は `ui/` 層
 - **型安全**: TypeScript の型を省略しない
 
 ## 外部ライブラリ
