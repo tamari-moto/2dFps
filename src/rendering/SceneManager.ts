@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { Vector3 } from 'three';
-import { CameraConfig } from '../config/GameConfig';
+import { CameraConfig, MapConfig, RenderConfig } from '../config/GameConfig';
 
 /**
  * Manages Three.js scene, camera, renderer, and controls setup
@@ -22,7 +22,7 @@ export class SceneManager {
     this.renderer = new THREE.WebGLRenderer({ canvas });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(width, height);
-    this.renderer.setClearColor(0x000000);
+    this.renderer.setClearColor(RenderConfig.BackgroundColor);
 
     // Setup scene
     this.scene = new THREE.Scene();
@@ -40,9 +40,58 @@ export class SceneManager {
     this.orbitControls.maxDistance = CameraConfig.MaxDistance;
     this.orbitControls.enableRotate = CameraConfig.EnableRotate;
 
+    // Add background grid
+    this.createBackgroundGrid();
+
+    // Add lights
+    this.addLighting();
+
     // Handle window resize - store bound function to enable proper cleanup
     this.boundHandleResize = this.handleResize.bind(this);
     window.addEventListener('resize', this.boundHandleResize);
+  }
+
+  /**
+   * Adds ambient and directional lights to the scene
+   */
+  private addLighting(): void {
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(ambient);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+    dir.position.set(0, 0, 100);
+    this.scene.add(dir);
+  }
+
+  /**
+   * Creates a subtle background grid aligned to node positions
+   */
+  private createBackgroundGrid(): void {
+    const size = MapConfig.NodesInGridSize;
+    const spacing = MapConfig.NodeSpacing;
+    const total = (size - 1) * spacing;
+
+    const material = new THREE.LineBasicMaterial({
+      color: RenderConfig.GridLineColor,
+      transparent: true,
+      opacity: RenderConfig.GridLineOpacity,
+    });
+
+    for (let i = 0; i < size; i++) {
+      const x = i * spacing;
+      const vPts = [new THREE.Vector3(x, 0, -0.5), new THREE.Vector3(x, total, -0.5)];
+      const vLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(vPts), material);
+      vLine.userData['isGrid'] = true;
+      this.scene.add(vLine);
+    }
+
+    for (let i = 0; i < size; i++) {
+      const y = i * spacing;
+      const hPts = [new THREE.Vector3(0, y, -0.5), new THREE.Vector3(total, y, -0.5)];
+      const hLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hPts), material);
+      hLine.userData['isGrid'] = true;
+      this.scene.add(hLine);
+    }
   }
 
   /**
@@ -111,6 +160,17 @@ export class SceneManager {
    */
   getControls(): OrbitControls {
     return this.orbitControls;
+  }
+
+  /**
+   * Toggles background grid visibility
+   */
+  toggleGrid(): void {
+    this.scene.traverse((object) => {
+      if (object instanceof THREE.Line && object.userData['isGrid']) {
+        object.visible = !object.visible;
+      }
+    });
   }
 
   /**

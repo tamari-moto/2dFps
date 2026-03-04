@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { NodeConfig, PlayerConfig, ObstacleConfig } from '../config/GameConfig';
+import { NodeConfig, ObstacleConfig, RenderConfig } from '../config/GameConfig';
 
 /**
  * Factory for creating Three.js meshes
@@ -18,13 +18,38 @@ export class MeshFactory {
   }
 
   /**
-   * Creates a player mesh
+   * Creates a player mesh (arrow marker, pointing up by default)
    */
   static createPlayer(color: number = 0xffff00): THREE.Mesh {
-    const size = PlayerConfig.CubeSize;
-    const geometry = new THREE.BoxGeometry(size, size, size);
-    const material = new THREE.MeshBasicMaterial({ color });
+    const s = RenderConfig.PlayerMarkerSize;
+    const shape = new THREE.Shape();
+    shape.moveTo(0, s);
+    shape.lineTo(s * 0.5, 0);
+    shape.lineTo(s * 0.3, 0);
+    shape.lineTo(s * 0.3, -s);
+    shape.lineTo(-s * 0.3, -s);
+    shape.lineTo(-s * 0.3, 0);
+    shape.lineTo(-s * 0.5, 0);
+    shape.closePath();
+    const geometry = new THREE.ShapeGeometry(shape);
+    const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
     return new THREE.Mesh(geometry, material);
+  }
+
+  /**
+   * Creates a player mesh from a preloaded GLTF template (clones the model, tints with color)
+   */
+  static createPlayerFromGLTF(template: THREE.Group, color: number): THREE.Group {
+    const clone = template.clone(true);
+    clone.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.material = (child.material as THREE.Material).clone();
+        if ('color' in child.material) {
+          (child.material as THREE.MeshStandardMaterial).color.setHex(color);
+        }
+      }
+    });
+    return clone;
   }
 
   /**

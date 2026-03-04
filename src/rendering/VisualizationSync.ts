@@ -4,7 +4,7 @@ import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 import { MeshFactory } from './MeshFactory';
 import { SceneManager } from './SceneManager';
-import { NodeConfig, AnimationConfig, PlayerConfig } from '../config/GameConfig';
+import { NodeConfig, AnimationConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConstants';
 import { Player } from '../model/Player';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
@@ -20,7 +20,10 @@ export class VisualizationSync {
 
   // Mesh collections
   private meshList: THREE.Mesh[] = [];
-  private playerMeshes: Map<string, THREE.Mesh> = new Map();
+  private playerMeshes: Map<string, THREE.Object3D> = new Map();
+
+  // GLTF template for player models (null = use fallback arrow shape)
+  private gltfTemplate: THREE.Group | null = null;
 
   // Mapping between meshes and nodes
   private meshToNodeMap: Map<number, number> = new Map();
@@ -39,11 +42,13 @@ export class VisualizationSync {
     sceneManager: SceneManager,
     model: Model,
     activePlayerId: string,
-    eventBus: GameEventBus
+    eventBus: GameEventBus,
+    gltfTemplate?: THREE.Group
   ) {
     this.sceneManager = sceneManager;
     this.model = model;
     this.activePlayerId = activePlayerId;
+    this.gltfTemplate = gltfTemplate ?? null;
 
     this.viewAngleVisualizer = new ViewAngleVisualizer(sceneManager.getScene());
 
@@ -55,6 +60,30 @@ export class VisualizationSync {
 
     this.initializeVisualization();
     this.subscribeToEvents(eventBus);
+  }
+
+  /**
+   * Creates a player Object3D: GLTF model if available, otherwise arrow shape
+   */
+  private createPlayerObject(color: number): THREE.Object3D {
+    if (this.gltfTemplate) {
+      const group = MeshFactory.createPlayerFromGLTF(this.gltfTemplate, color);
+      return group;
+    }
+    return MeshFactory.createPlayer(color);
+  }
+
+  /**
+   * Sets color on a player Object3D (handles both Mesh and Group)
+   */
+  private setPlayerColor(obj: THREE.Object3D, color: number): void {
+    if (obj instanceof THREE.Mesh) {
+      MeshFactory.setMeshColor(obj, color);
+    } else {
+      obj.traverse((child) => {
+        if (child instanceof THREE.Mesh) MeshFactory.setMeshColor(child, color);
+      });
+    }
   }
 
   /**
@@ -131,9 +160,9 @@ export class VisualizationSync {
 
     // Create player meshes
     for (const [playerId, player] of this.model.players) {
-      const mesh = MeshFactory.createPlayer(player.color);
-      this.sceneManager.addToScene(mesh);
-      this.playerMeshes.set(playerId, mesh);
+      const obj = this.createPlayerObject(player.color);
+      this.sceneManager.addToScene(obj);
+      this.playerMeshes.set(playerId, obj);
     }
   }
 
@@ -165,19 +194,25 @@ export class VisualizationSync {
    */
   private updatePlayers(): void {
     for (const [playerId, player] of this.model.players) {
-      const mesh = this.playerMeshes.get(playerId);
-      if (mesh) {
-        gsap.to(mesh.position, {
+      const obj = this.playerMeshes.get(playerId);
+      if (obj) {
+        gsap.to(obj.position, {
           x: player.node.x,
           y: player.node.y,
           duration: AnimationConfig.MovementDuration,
         });
 
-        // Highlight active player
-        const scale = playerId === this.activePlayerId
+        // Rotate to match player facing angle (+X-forward model, Y-up rotation)
+        obj.rotation.x = Math.PI / 2;
+        obj.rotation.y = (player.angle * Math.PI / 180);
+        obj.rotation.z = 0;
+
+        // Highlight active player (preserve GLTF base scale)
+        const baseScale = this.gltfTemplate ? RenderConfig.PlayerModelScale : 1;
+        const scale = (playerId === this.activePlayerId
           ? PLAYER_CONSTANTS.ACTIVE_SCALE
-          : PLAYER_CONSTANTS.NORMAL_SCALE;
-        mesh.scale.set(scale, scale, scale);
+          : PLAYER_CONSTANTS.NORMAL_SCALE) * baseScale;
+        obj.scale.set(scale, scale, scale);
       }
     }
   }
@@ -250,7 +285,7 @@ export class VisualizationSync {
     const scene = this.sceneManager.getScene();
     const linesToRemove: THREE.Line[] = [];
     scene.traverse((object) => {
-      if (object instanceof THREE.Line) {
+      if (object instanceof THREE.Line && !object.userData['isGrid']) {
         linesToRemove.push(object);
       }
     });
@@ -274,23 +309,22 @@ export class VisualizationSync {
    * Shows hit effect on a player
    */
   showHitEffect(playerId: string): void {
-    const mesh = this.playerMeshes.get(playerId);
-    if (!mesh) return;
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
 
     // Flash red
-    // const originalColor = (mesh.material as THREE.MeshBasicMaterial).color.getHex();
-    MeshFactory.setMeshColor(mesh, 0xff0000);
+    this.setPlayerColor(obj, 0xff0000);
 
     // Scale up and down
     gsap.timeline()
-      .to(mesh.scale, {
+      .to(obj.scale, {
         x: 1.5,
         y: 1.5,
         z: 1.5,
         duration: 0.1,
         ease: 'power2.out',
       })
-      .to(mesh.scale, {
+      .to(obj.scale, {
         x: 1.0,
         y: 1.0,
         z: 1.0,
@@ -302,7 +336,7 @@ export class VisualizationSync {
     setTimeout(() => {
       const player = this.model.getPlayer(playerId);
       if (player) {
-        MeshFactory.setMeshColor(mesh, player.color);
+        this.setPlayerColor(obj, player.color);
       }
     }, 300);
   }
@@ -311,12 +345,12 @@ export class VisualizationSync {
    * Hides a player's mesh (when eliminated)
    */
   hidePlayer(playerId: string): void {
-    const mesh = this.playerMeshes.get(playerId);
-    if (!mesh) return;
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
 
     // Fade out and shrink animation
     gsap.timeline()
-      .to(mesh.scale, {
+      .to(obj.scale, {
         x: 0,
         y: 0,
         z: 0,
@@ -324,17 +358,21 @@ export class VisualizationSync {
         ease: 'power2.in',
       })
       .call(() => {
-        mesh.visible = false;
+        obj.visible = false;
       });
 
-    // Make material transparent
-    const material = mesh.material as THREE.MeshBasicMaterial;
-    gsap.to(material, {
-      opacity: 0,
-      duration: 0.5,
-      onStart: () => {
-        material.transparent = true;
-      },
+    // Make material(s) transparent
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const material = child.material as THREE.MeshBasicMaterial;
+        gsap.to(material, {
+          opacity: 0,
+          duration: 0.5,
+          onStart: () => {
+            material.transparent = true;
+          },
+        });
+      }
     });
   }
 
@@ -357,8 +395,8 @@ export class VisualizationSync {
    */
   addPlayerMesh(playerId: string, color: number): void {
     if (this.playerMeshes.has(playerId)) return;
-    const mesh = MeshFactory.createPlayer(color);
-    this.sceneManager.addToScene(mesh);
-    this.playerMeshes.set(playerId, mesh);
+    const obj = this.createPlayerObject(color);
+    this.sceneManager.addToScene(obj);
+    this.playerMeshes.set(playerId, obj);
   }
 }

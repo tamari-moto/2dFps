@@ -1,7 +1,11 @@
 import * as React from 'react';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three-stdlib';
+import type { GLTF } from 'three-stdlib';
 import { setupThree } from '../rendering/threeSetup';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import ExportMenu from './ExportMenu';
+import GameHUD from './GameHUD';
 import ConsoleLogger from './ConsoleLogger';
 import LobbyUI from './LobbyUI';
 import { LocalAdapter } from '../network/LocalAdapter';
@@ -10,6 +14,8 @@ import type { INetworkAdapter } from '../network/INetworkAdapter';
 
 type AppState = 'lobby' | 'connecting' | 'playing';
 
+const MODEL_URL = import.meta.env.BASE_URL + 'models/player.glb';
+
 const GRF_main = () => {
   const [appState, setAppState] = React.useState<AppState>('lobby');
   const [errorMsg, setErrorMsg] = React.useState('');
@@ -17,11 +23,24 @@ const GRF_main = () => {
   const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const initialized = React.useRef(false);
 
-  const startGame = React.useCallback((adapter: INetworkAdapter) => {
+  const startGame = React.useCallback(async (adapter: INetworkAdapter) => {
     const canvas = canvasRef.current;
     if (!canvas || initialized.current) return;
     initialized.current = true;
-    const setup = setupThree(canvas, adapter);
+
+    // Preload GLTF player model (fall back to arrow marker if not found)
+    let gltfTemplate: THREE.Group | undefined;
+    try {
+      const loader = new GLTFLoader();
+      const gltf = await new Promise<GLTF>((resolve, reject) =>
+        loader.load(MODEL_URL, resolve, undefined, reject)
+      );
+      gltfTemplate = gltf.scene;
+    } catch {
+      console.warn('GLTF model not found, using fallback arrow marker');
+    }
+
+    const setup = setupThree(canvas, adapter, gltfTemplate);
     setThreeSetup(setup);
     setAppState('playing');
 
@@ -60,6 +79,7 @@ const GRF_main = () => {
         style={{ display: appState === 'playing' ? 'block' : 'none' }}
       />
       {appState === 'playing' && <ExportMenu threeSetup={threeSetup} />}
+      {appState === 'playing' && <GameHUD threeSetup={threeSetup} />}
       {appState !== 'playing' && (
         <LobbyUI
           connecting={appState === 'connecting'}

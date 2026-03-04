@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { SceneManager } from './SceneManager';
 import { VisualizationSync } from './VisualizationSync';
 import { InputHandler } from '../input/InputHandler';
@@ -20,7 +21,11 @@ export class ThreeSetup {
   private gameController: GameController;
   private eventBus: GameEventBus;
 
-  constructor(canvas: HTMLCanvasElement, adapter: INetworkAdapter = new LocalAdapter()) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    adapter: INetworkAdapter = new LocalAdapter(),
+    gltfTemplate?: THREE.Group
+  ) {
     // Initialize event bus
     this.eventBus = gameEventBus;
 
@@ -35,7 +40,8 @@ export class ThreeSetup {
       this.sceneManager,
       model,
       adapter.getMyPlayerId(),
-      this.eventBus
+      this.eventBus,
+      gltfTemplate
     );
 
     // Initialize input handling
@@ -105,6 +111,20 @@ export class ThreeSetup {
   }
 
   /**
+   * Toggles background grid visibility
+   */
+  toggleGrid(): void {
+    this.sceneManager.toggleGrid();
+  }
+
+  /**
+   * Returns all player IDs in the current game
+   */
+  getPlayerIds(): string[] {
+    return Array.from(this.gameController.getModel().players.keys());
+  }
+
+  /**
    * Adds a player to the model and scene (called when a remote player joins).
    */
   addPlayer(playerId: string, nodeId: number, color: number): void {
@@ -130,6 +150,10 @@ export class ThreeSetup {
 /**
  * Factory function to create and initialize the Three.js setup
  */
-export function setupThree(canvas: HTMLCanvasElement, adapter?: INetworkAdapter): ThreeSetup {
-  return new ThreeSetup(canvas, adapter);
+export function setupThree(
+  canvas: HTMLCanvasElement,
+  adapter?: INetworkAdapter,
+  gltfTemplate?: THREE.Group
+): ThreeSetup {
+  return new ThreeSetup(canvas, adapter, gltfTemplate);
 }

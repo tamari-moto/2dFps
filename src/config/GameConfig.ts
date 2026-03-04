@@ -45,20 +45,20 @@ export const NodeConfig = {
   /** Number of segments in circle geometry */
   CircleSegments: 100,
 
-  /** Default node color (gray) */
-  DefaultColor: 0xA0A0A0,
+  /** Default node color (dark tactical green) */
+  DefaultColor: 0x1a3a2a,
 
-  /** Visible node color (white) */
-  VisibleColor: 0xffffff,
+  /** Visible node color (bright cyan) */
+  VisibleColor: 0x00e5cc,
 
-  /** Selected node color (blue) */
-  SelectedColor: 0x0000ff,
+  /** Selected node color (dark orange) */
+  SelectedColor: 0xff8c00,
 
-  /** Next move node color (green) */
-  NextMoveColor: 0x00ff00,
+  /** Next move node color (neon green) */
+  NextMoveColor: 0x39ff14,
 
   /** Shot target node color (red) */
-  ShotTargetColor: 0xff0000,
+  ShotTargetColor: 0xff2020,
 } as const;
 
 /**
@@ -95,8 +95,8 @@ export const ObstacleConfig = {
   /** Corridor width */
   CorridorWidth: 120,
 
-  /** Line color for obstacles (cyan) */
-  LineColor: 0x00ffff,
+  /** Line color for obstacles (muted teal) */
+  LineColor: 0x00bfbf,
 } as const;
 
 /**
@@ -244,14 +244,37 @@ export const ViewAngleVisualizationConfig = {
   /** Enable view angle edges visualization */
   ShowViewAngleEdges: false,
 
-  /** Color for view angle edges (yellow) */
-  EdgeColor: 0xffff00,
+  /** Color for view angle edges (cyan, matches VisibleColor) */
+  EdgeColor: 0x00e5cc,
 
   /** Opacity for view angle edges */
-  EdgeOpacity: 0.6,
+  EdgeOpacity: 0.45,
 
   /** Line width for view angle edges */
   EdgeLineWidth: 2,
+} as const;
+
+/**
+ * Render / visual theme configuration
+ */
+export const RenderConfig = {
+  /** Background clear color (very dark navy) */
+  BackgroundColor: 0x050d12,
+
+  /** Grid line color for background grid */
+  GridLineColor: 0x0d2b20,
+
+  /** Grid line opacity */
+  GridLineOpacity: 0.6,
+
+  /** Player diamond marker size */
+  PlayerMarkerSize: 20,
+
+  /** GLTF player model scale factor */
+  PlayerModelScale: 15,
+
+  /** GLTF player model Z rotation offset in radians */
+  PlayerModelRotationZ: Math.PI / 2,
 } as const;
 
 /**
