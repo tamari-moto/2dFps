@@ -70,7 +70,7 @@ export class VisualizationSync {
       const group = MeshFactory.createPlayerFromGLTF(this.gltfTemplate, color);
       return group;
     }
-    return MeshFactory.createPlayer(color);
+    return MeshFactory.createPrimitivePlayer(color);
   }
 
   /**

@@ -53,6 +53,30 @@ export class MeshFactory {
   }
 
   /**
+   * Creates a primitive player character (cylinder body + sphere head)
+   */
+  static createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
+    const group = new THREE.Group();
+    const s = RenderConfig.PlayerMarkerSize;
+
+    // Body: cylinder
+    const bodyGeo = new THREE.CylinderGeometry(s * 0.15, s * 0.15, s * 0.5, 16);
+    const bodyMat = new THREE.MeshStandardMaterial({ color });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = s * 0.25;
+    group.add(body);
+
+    // Head: sphere
+    const headGeo = new THREE.SphereGeometry(s * 0.2, 16, 16);
+    const headMat = new THREE.MeshStandardMaterial({ color });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = s * 0.65;
+    group.add(head);
+
+    return group;
+  }
+
+  /**
    * Creates a line segment for obstacles
    */
   static createLineSegment(
@@ -84,7 +108,8 @@ export class MeshFactory {
    * Updates mesh color
    */
   static setMeshColor(mesh: THREE.Mesh, color: number): void {
-    if (mesh.material instanceof THREE.MeshBasicMaterial) {
+    if (mesh.material instanceof THREE.MeshBasicMaterial ||
+        mesh.material instanceof THREE.MeshStandardMaterial) {
       mesh.material.color.setHex(color);
     }
   }

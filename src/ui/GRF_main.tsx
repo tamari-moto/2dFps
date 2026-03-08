@@ -23,21 +23,23 @@ const GRF_main = () => {
   const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const initialized = React.useRef(false);
 
-  const startGame = React.useCallback(async (adapter: INetworkAdapter) => {
+  const startGame = React.useCallback(async (adapter: INetworkAdapter, usePrimitive: boolean = false) => {
     const canvas = canvasRef.current;
     if (!canvas || initialized.current) return;
     initialized.current = true;
 
-    // Preload GLTF player model (fall back to arrow marker if not found)
+    // Preload GLTF player model unless primitive mode is selected
     let gltfTemplate: THREE.Group | undefined;
-    try {
-      const loader = new GLTFLoader();
-      const gltf = await new Promise<GLTF>((resolve, reject) =>
-        loader.load(MODEL_URL, resolve, undefined, reject)
-      );
-      gltfTemplate = gltf.scene;
-    } catch {
-      console.warn('GLTF model not found, using fallback arrow marker');
+    if (!usePrimitive) {
+      try {
+        const loader = new GLTFLoader();
+        const gltf = await new Promise<GLTF>((resolve, reject) =>
+          loader.load(MODEL_URL, resolve, undefined, reject)
+        );
+        gltfTemplate = gltf.scene;
+      } catch {
+        console.warn('GLTF model not found, using fallback primitive');
+      }
     }
 
     const setup = setupThree(canvas, adapter, gltfTemplate);
@@ -54,17 +56,17 @@ const GRF_main = () => {
     }
   }, []);
 
-  const handleOffline = React.useCallback(() => {
-    startGame(new LocalAdapter());
+  const handleOffline = React.useCallback((usePrimitive: boolean) => {
+    startGame(new LocalAdapter(), usePrimitive);
   }, [startGame]);
 
-  const handleOnline = React.useCallback(async (serverUrl: string) => {
+  const handleOnline = React.useCallback(async (serverUrl: string, usePrimitive: boolean) => {
     setAppState('connecting');
     setErrorMsg('');
     try {
       const adapter = new ColyseusAdapter(serverUrl);
       await adapter.connect();
-      startGame(adapter);
+      startGame(adapter, usePrimitive);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : '接続に失敗しました');
       setAppState('lobby');
