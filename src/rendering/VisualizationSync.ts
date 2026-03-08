@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
-import { MeshFactory } from './MeshFactory';
+import { createPlayerFromGLTF, createPrimitivePlayer } from './PlayerMeshFactory';
+import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
+import { createUndefinedMesh, setNodeColor } from './MeshUtils';
 import { SceneManager } from './SceneManager';
-import { NodeConfig, AnimationConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
+import { NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig, RenderConfig, WallConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConstants';
 import { Player } from '../model/Player';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
@@ -53,37 +55,38 @@ export class VisualizationSync {
     this.viewAngleVisualizer = new ViewAngleVisualizer(sceneManager.getScene());
 
     // Create placeholder meshes
-    this.playerSelectMesh = MeshFactory.createUndefinedMesh();
-    this.playerNextMesh = MeshFactory.createUndefinedMesh();
-    this.playerShotMesh = MeshFactory.createUndefinedMesh();
-    this.undefinedMesh = MeshFactory.createUndefinedMesh();
+    this.playerSelectMesh = createUndefinedMesh();
+    this.playerNextMesh = createUndefinedMesh();
+    this.playerShotMesh = createUndefinedMesh();
+    this.undefinedMesh = createUndefinedMesh();
 
     this.initializeVisualization();
     this.subscribeToEvents(eventBus);
   }
 
   /**
-   * Creates a player Object3D: GLTF model if available, otherwise arrow shape
+   * Creates a player Object3D: GLTF model if available, otherwise primitive character
    */
   private createPlayerObject(color: number): THREE.Object3D {
     if (this.gltfTemplate) {
-      const group = MeshFactory.createPlayerFromGLTF(this.gltfTemplate, color);
-      return group;
+      return createPlayerFromGLTF(this.gltfTemplate, color);
     }
-    return MeshFactory.createPrimitivePlayer(color);
+    return createPrimitivePlayer(color);
   }
 
   /**
    * Sets color on a player Object3D (handles both Mesh and Group)
    */
   private setPlayerColor(obj: THREE.Object3D, color: number): void {
-    if (obj instanceof THREE.Mesh) {
-      MeshFactory.setMeshColor(obj, color);
-    } else {
-      obj.traverse((child) => {
-        if (child instanceof THREE.Mesh) MeshFactory.setMeshColor(child, color);
-      });
-    }
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const mat = child.material as THREE.MeshStandardMaterial;
+        if ('color' in mat) mat.color.setHex(color);
+        if ('emissive' in mat && mat.emissiveIntensity > 0) {
+          mat.emissive.setHex(color);
+        }
+      }
+    });
   }
 
   /**
@@ -140,22 +143,22 @@ export class VisualizationSync {
   private initializeVisualization(): void {
     // Create node meshes
     for (const node of this.model.nodeList) {
-      const mesh = MeshFactory.createNodeCircle(node.x, node.y);
+      const mesh = createNodeCircle(node.x, node.y);
       this.sceneManager.addToScene(mesh);
       this.meshList.push(mesh);
       this.meshToNodeMap.set(mesh.id, node.id);
       this.nodeToMeshMap.set(node.id, mesh.id);
     }
 
-    // Create obstacle line segments
+    // Create obstacle wall meshes
     for (const line of this.model.Lines) {
-      const lineSegment = MeshFactory.createLineSegment(
+      const wall = createWallMesh(
         line.start.x,
         line.start.y,
         line.end.x,
         line.end.y
       );
-      this.sceneManager.addToScene(lineSegment);
+      this.sceneManager.addToScene(wall);
     }
 
     // Create player meshes
@@ -204,7 +207,7 @@ export class VisualizationSync {
 
         // Rotate to match player facing angle (+X-forward model, Y-up rotation)
         obj.rotation.x = Math.PI / 2;
-        obj.rotation.y = (player.angle * Math.PI / 180);
+        obj.rotation.y = (player.angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
         obj.rotation.z = 0;
 
         // Highlight active player (preserve GLTF base scale)
@@ -222,7 +225,7 @@ export class VisualizationSync {
    */
   private resetNodeColors(): void {
     this.meshList.forEach(mesh => {
-      MeshFactory.setMeshColor(mesh, NodeConfig.DefaultColor);
+      setNodeColor(mesh, NodeConfig.DefaultColor, NodeVisualConfig.EmissiveDefaultIntensity);
     });
   }
 
@@ -231,7 +234,7 @@ export class VisualizationSync {
    */
   private updateSpecialNodes(): void {
     if (this.playerShotMesh && this.playerShotMesh !== this.undefinedMesh) {
-      MeshFactory.setMeshColor(this.playerShotMesh, NodeConfig.ShotTargetColor);
+      setNodeColor(this.playerShotMesh, NodeConfig.ShotTargetColor, NodeVisualConfig.EmissiveShotIntensity);
       gsap.fromTo(
         this.playerShotMesh.scale,
         { x: 1, y: 1 },
@@ -249,11 +252,11 @@ export class VisualizationSync {
     }
 
     if (this.playerSelectMesh && this.playerSelectMesh !== this.undefinedMesh) {
-      MeshFactory.setMeshColor(this.playerSelectMesh, NodeConfig.SelectedColor);
+      setNodeColor(this.playerSelectMesh, NodeConfig.SelectedColor, NodeVisualConfig.EmissiveSelectedIntensity);
     }
 
     if (this.playerNextMesh && this.playerNextMesh !== this.undefinedMesh) {
-      MeshFactory.setMeshColor(this.playerNextMesh, NodeConfig.NextMoveColor);
+      setNodeColor(this.playerNextMesh, NodeConfig.NextMoveColor, NodeVisualConfig.EmissiveNextIntensity);
     }
   }
 
@@ -272,7 +275,7 @@ export class VisualizationSync {
         m => this.meshToNodeMap.get(m.id) === node.id
       );
       if (mesh) {
-        MeshFactory.setMeshColor(mesh, NodeConfig.VisibleColor);
+        setNodeColor(mesh, NodeConfig.VisibleColor, NodeVisualConfig.EmissiveVisibleIntensity);
       }
     }
   }
@@ -281,25 +284,25 @@ export class VisualizationSync {
    * Updates obstacles in the scene
    */
   updateObstacles(): void {
-    // Remove existing obstacle lines
+    // Remove existing obstacle wall meshes
     const scene = this.sceneManager.getScene();
-    const linesToRemove: THREE.Line[] = [];
+    const wallsToRemove: THREE.Mesh[] = [];
     scene.traverse((object) => {
-      if (object instanceof THREE.Line && !object.userData['isGrid']) {
-        linesToRemove.push(object);
+      if (object instanceof THREE.Mesh && object.userData[WallConfig.UserDataTag]) {
+        wallsToRemove.push(object);
       }
     });
-    linesToRemove.forEach(line => this.sceneManager.removeFromScene(line));
+    wallsToRemove.forEach(wall => this.sceneManager.removeFromScene(wall));
 
-    // Add new obstacle lines
+    // Add new obstacle wall meshes
     for (const line of this.model.Lines) {
-      const lineSegment = MeshFactory.createLineSegment(
+      const wall = createWallMesh(
         line.start.x,
         line.start.y,
         line.end.x,
         line.end.y
       );
-      this.sceneManager.addToScene(lineSegment);
+      this.sceneManager.addToScene(wall);
     }
 
     this.updateView();
