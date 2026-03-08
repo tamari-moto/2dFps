@@ -37,6 +37,10 @@ export class VisualizationSync {
   private playerShotMesh: THREE.Mesh;
   private undefinedMesh: THREE.Mesh;
 
+  // Primitive character animation state per player
+  private playerAnimState: Map<string, 'idle' | 'walk' | 'attack'> = new Map();
+  private playerBodyAnims: Map<string, Array<gsap.core.Tween | gsap.core.Timeline>> = new Map();
+
   // Active selections
   private activePlayerId: string;
 
@@ -109,6 +113,7 @@ export class VisualizationSync {
     eventBus.on(GameEventType.VIS_SET_SHOT_MESH, (data: { nodeId: number }) => {
       const mesh = this.findMeshByNodeId(data.nodeId);
       if (mesh) this.playerShotMesh = mesh;
+      this.startAttackAnim(this.activePlayerId);
     });
     eventBus.on(GameEventType.VIS_CLEAR_NEXT_MESH, () => {
       this.playerNextMesh = this.undefinedMesh;
@@ -166,6 +171,7 @@ export class VisualizationSync {
       const obj = this.createPlayerObject(player.color);
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
+      this.startIdleAnim(playerId);
     }
   }
 
@@ -199,6 +205,13 @@ export class VisualizationSync {
     for (const [playerId, player] of this.model.players) {
       const obj = this.playerMeshes.get(playerId);
       if (obj) {
+        const dx = obj.position.x - player.node.x;
+        const dy = obj.position.y - player.node.y;
+        const moving = Math.sqrt(dx * dx + dy * dy) > 0.5;
+        if (moving && this.playerAnimState.get(playerId) === 'idle') {
+          this.startWalkAnim(playerId);
+        }
+
         gsap.to(obj.position, {
           x: player.node.x,
           y: player.node.y,
@@ -351,6 +364,8 @@ export class VisualizationSync {
     const obj = this.playerMeshes.get(playerId);
     if (!obj) return;
 
+    this.killBodyAnims(playerId);
+
     // Fade out and shrink animation
     gsap.timeline()
       .to(obj.scale, {
@@ -379,6 +394,168 @@ export class VisualizationSync {
     });
   }
 
+  // ------------------------------------------------------------------ //
+  //  Primitive character body animation helpers
+  // ------------------------------------------------------------------ //
+
+  /** Find a named child part within a player Object3D */
+  private getPlayerPart(obj: THREE.Object3D, partName: string): THREE.Object3D | undefined {
+    let found: THREE.Object3D | undefined;
+    obj.traverse(child => {
+      if (!found && child.userData.partName === partName) found = child;
+    });
+    return found;
+  }
+
+  /** Kill all running body animations for a player */
+  private killBodyAnims(playerId: string): void {
+    const anims = this.playerBodyAnims.get(playerId) ?? [];
+    anims.forEach(a => a.kill());
+    this.playerBodyAnims.set(playerId, []);
+    this.playerAnimState.delete(playerId);
+  }
+
+  /** Start looping idle animation (breathing bob, arm sway, ring pulse) */
+  private startIdleAnim(playerId: string): void {
+    if (this.gltfTemplate) return;
+    if (this.playerAnimState.get(playerId) === 'idle') return;
+
+    this.killBodyAnims(playerId);
+    this.playerAnimState.set(playerId, 'idle');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
+
+    // Head bob (local Z toward camera)
+    const head = this.getPlayerPart(obj, 'head');
+    if (head) {
+      anims.push(gsap.to(head.position, {
+        z: AnimationConfig.IdleHeadBobAmplitude,
+        duration: AnimationConfig.IdleHeadBobDuration / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      }));
+    }
+
+    // Arm gentle sway (rotation.y, opposite phase)
+    const leftArm = this.getPlayerPart(obj, 'leftArm');
+    const rightArm = this.getPlayerPart(obj, 'rightArm');
+    if (leftArm) {
+      anims.push(gsap.to(leftArm.rotation, {
+        y: AnimationConfig.IdleArmSwayAngle,
+        duration: AnimationConfig.IdleArmSwayDuration / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      }));
+    }
+    if (rightArm) {
+      anims.push(gsap.to(rightArm.rotation, {
+        y: -AnimationConfig.IdleArmSwayAngle,
+        duration: AnimationConfig.IdleArmSwayDuration / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      }));
+    }
+
+    // Glow ring opacity pulse
+    const ring = this.getPlayerPart(obj, 'ring');
+    if (ring instanceof THREE.Mesh) {
+      const mat = ring.material as THREE.MeshStandardMaterial;
+      anims.push(gsap.fromTo(mat,
+        { opacity: AnimationConfig.IdleRingOpacityMax },
+        {
+          opacity: AnimationConfig.IdleRingOpacityMin,
+          duration: AnimationConfig.IdleRingPulseDuration / 2,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: -1,
+        }
+      ));
+    }
+
+    this.playerBodyAnims.set(playerId, anims);
+  }
+
+  /** Trigger walk arm-swing animation; reverts to idle after movement completes */
+  private startWalkAnim(playerId: string): void {
+    if (this.gltfTemplate) return;
+    if (this.playerAnimState.get(playerId) === 'walk') return;
+
+    this.killBodyAnims(playerId);
+    this.playerAnimState.set(playerId, 'walk');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
+    const angle = AnimationConfig.WalkArmSwingAngle;
+    const half = AnimationConfig.WalkArmSwingHalfDuration;
+
+    const leftArm = this.getPlayerPart(obj, 'leftArm');
+    const rightArm = this.getPlayerPart(obj, 'rightArm');
+
+    if (leftArm) {
+      anims.push(gsap.fromTo(leftArm.rotation,
+        { x: -angle },
+        { x: angle, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
+      ));
+    }
+    if (rightArm) {
+      anims.push(gsap.fromTo(rightArm.rotation,
+        { x: angle },
+        { x: -angle, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
+      ));
+    }
+
+    this.playerBodyAnims.set(playerId, anims);
+
+    // Revert to idle after movement duration
+    setTimeout(() => {
+      if (this.playerAnimState.get(playerId) === 'walk') {
+        this.startIdleAnim(playerId);
+      }
+    }, AnimationConfig.MovementDuration * 1000);
+  }
+
+  /** Trigger attack (arm thrust forward) animation; reverts to idle when done */
+  private startAttackAnim(playerId: string): void {
+    if (this.gltfTemplate) return;
+
+    this.killBodyAnims(playerId);
+    this.playerAnimState.set(playerId, 'attack');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const s = RenderConfig.PlayerMarkerSize;
+    const thrust = s * AnimationConfig.AttackArmThrustRatio;
+    const outDur = AnimationConfig.AttackThrustOutDuration;
+    const retDur = AnimationConfig.AttackThrustReturnDuration;
+
+    const leftArm = this.getPlayerPart(obj, 'leftArm');
+    const rightArm = this.getPlayerPart(obj, 'rightArm');
+
+    const tl = gsap.timeline({
+      onComplete: () => this.startIdleAnim(playerId),
+    });
+
+    if (leftArm) {
+      tl.to(leftArm.position, { y: `+=${thrust}`, duration: outDur, ease: 'power2.out' }, 0)
+        .to(leftArm.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' });
+    }
+    if (rightArm) {
+      tl.to(rightArm.position, { y: `+=${thrust}`, duration: outDur, ease: 'power2.out' }, 0)
+        .to(rightArm.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' }, outDur);
+    }
+
+    this.playerBodyAnims.set(playerId, [tl]);
+  }
+
   /**
    * Gets the mesh list for raycasting
    */
@@ -401,5 +578,6 @@ export class VisualizationSync {
     const obj = this.createPlayerObject(color);
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
+    this.startIdleAnim(playerId);
   }
 }

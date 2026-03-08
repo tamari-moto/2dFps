@@ -63,6 +63,7 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     RenderConfig.PlayerBodySegments
   );
   const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.userData.partName = 'body';
   body.position.y = s * 0.25;
   group.add(body);
 
@@ -75,6 +76,7 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     metalness: RenderConfig.PlayerHeadMetalness,
   });
   const head = new THREE.Mesh(headGeo, headMat);
+  head.userData.partName = 'head';
   head.position.y = s * 0.65;
   group.add(head);
 
@@ -91,12 +93,14 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     metalness: RenderConfig.PlayerArmMetalness,
   });
   const leftArm = new THREE.Mesh(armGeo, armMat);
+  leftArm.userData.partName = 'leftArm';
   leftArm.rotation.z = Math.PI / 2;
   leftArm.position.set(-s * RenderConfig.PlayerArmOffsetX, s * RenderConfig.PlayerArmOffsetY, 0);
   group.add(leftArm);
 
   // --- Right arm ---
   const rightArm = new THREE.Mesh(armGeo, armMat);
+  rightArm.userData.partName = 'rightArm';
   rightArm.rotation.z = Math.PI / 2;
   rightArm.position.set(s * RenderConfig.PlayerArmOffsetX, s * RenderConfig.PlayerArmOffsetY, 0);
   group.add(rightArm);
@@ -115,6 +119,7 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     emissiveIntensity: 0.15,
   });
   const nose = new THREE.Mesh(noseGeo, noseMat);
+  nose.userData.partName = 'nose';
   // Nose sits at the front (+Y) of the head surface
   nose.position.set(0, s * 0.65 + headR, 0);
   group.add(nose);
@@ -184,6 +189,7 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     opacity: 0.6,
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.userData.partName = 'ring';
   ring.position.y = 0;
   group.add(ring);
 

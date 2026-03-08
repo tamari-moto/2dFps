@@ -215,6 +215,32 @@ export const AnimationConfig = {
 
   /** Shot pulse ease function */
   ShotPulseEase: "elastic.out(1, 0.3)",
+
+  // --- Primitive character body animations ---
+  /** local-Z oscillation amplitude for idle head bob */
+  IdleHeadBobAmplitude: 0.3,
+  /** seconds per full breath cycle */
+  IdleHeadBobDuration: 1.5,
+  /** radians for idle arm gentle sway (rotation.y) */
+  IdleArmSwayAngle: 0.12,
+  /** seconds per full arm sway cycle */
+  IdleArmSwayDuration: 2.0,
+  /** ring material opacity at minimum during idle pulse */
+  IdleRingOpacityMin: 0.25,
+  /** ring material opacity at maximum during idle pulse */
+  IdleRingOpacityMax: 0.75,
+  /** seconds per ring opacity pulse cycle */
+  IdleRingPulseDuration: 1.2,
+  /** radians for arm swing during walk (rotation.x) */
+  WalkArmSwingAngle: 0.55,
+  /** seconds per half-swing during walk animation */
+  WalkArmSwingHalfDuration: 0.20,
+  /** arm thrust forward distance = PlayerMarkerSize × this ratio */
+  AttackArmThrustRatio: 0.20,
+  /** seconds for arm thrust out */
+  AttackThrustOutDuration: 0.12,
+  /** seconds for arm return after thrust */
+  AttackThrustReturnDuration: 0.30,
 } as const;
 
 /**
