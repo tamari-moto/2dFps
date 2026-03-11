@@ -380,6 +380,76 @@ export const RenderConfig = {
   PlayerGlowRingRoughness: 0.30,
   /** PBR metalness for glow ring */
   PlayerGlowRingMetalness: 0.0,
+
+  // --- Neck ---
+  /** Neck cylinder top radius = PlayerMarkerSize * this */
+  PlayerNeckTopRadius: 0.08,
+  /** Neck cylinder bottom radius = PlayerMarkerSize * this */
+  PlayerNeckBottomRadius: 0.10,
+  /** Neck cylinder height = PlayerMarkerSize * this */
+  PlayerNeckHeight: 0.10,
+  /** Radial segments for neck cylinder */
+  PlayerNeckSegments: 12,
+  /** Neck Y offset = PlayerMarkerSize * this */
+  PlayerNeckOffsetY: 0.50,
+
+  // --- Legs ---
+  /** Leg cylinder top radius = PlayerMarkerSize * this */
+  PlayerLegTopRadius: 0.07,
+  /** Leg cylinder bottom radius = PlayerMarkerSize * this */
+  PlayerLegBottomRadius: 0.06,
+  /** Leg cylinder length = PlayerMarkerSize * this */
+  PlayerLegLength: 0.40,
+  /** Radial segments for leg cylinders */
+  PlayerLegSegments: 8,
+  /** Leg X offset from center = PlayerMarkerSize * this */
+  PlayerLegOffsetX: 0.09,
+  /** Leg Y center offset = PlayerMarkerSize * this */
+  PlayerLegOffsetY: -0.20,
+
+  // --- Hands ---
+  /** Hand sphere radius = PlayerMarkerSize * this */
+  PlayerHandRadius: 0.065,
+  /** Segments for hand sphere */
+  PlayerHandSegments: 8,
+  /** Hand X offset = PlayerMarkerSize * this (= ArmOffsetX + ArmLength/2) */
+  PlayerHandOffsetX: 0.395,
+  /** Hand Y position = PlayerMarkerSize * this (same as arm Y) */
+  PlayerHandOffsetY: 0.30,
+
+  // --- Helmet ---
+  /** Helmet sphere radius = PlayerMarkerSize * this */
+  PlayerHelmetRadius: 0.225,
+  /** Segments for helmet sphere */
+  PlayerHelmetSegments: 16,
+  /** Helmet Y offset = PlayerMarkerSize * this */
+  PlayerHelmetOffsetY: 0.72,
+  /** Helmet Y scale (flatten into dome shape) */
+  PlayerHelmetScaleY: 0.55,
+  /** Helmet color (fixed dark gray armor, independent of player color) */
+  PlayerHelmetColor: 0x334455,
+  /** PBR roughness for helmet */
+  PlayerHelmetRoughness: 0.35,
+  /** PBR metalness for helmet */
+  PlayerHelmetMetalness: 0.40,
+
+  // --- Weapon ---
+  /** Weapon box width = PlayerMarkerSize * this */
+  PlayerWeaponWidth: 0.04,
+  /** Weapon box length (along Y = forward) = PlayerMarkerSize * this */
+  PlayerWeaponLength: 0.55,
+  /** Weapon box depth = PlayerMarkerSize * this */
+  PlayerWeaponDepth: 0.05,
+  /** Weapon X offset = PlayerMarkerSize * this */
+  PlayerWeaponOffsetX: 0.44,
+  /** Weapon Y center offset = PlayerMarkerSize * this */
+  PlayerWeaponOffsetY: 0.575,
+  /** Weapon color (fixed dark metallic, independent of player color) */
+  PlayerWeaponColor: 0x1a1a2e,
+  /** PBR roughness for weapon */
+  PlayerWeaponRoughness: 0.25,
+  /** PBR metalness for weapon */
+  PlayerWeaponMetalness: 0.75,
 } as const;
 
 /**

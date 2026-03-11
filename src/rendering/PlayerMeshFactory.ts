@@ -57,6 +57,23 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     metalness: RenderConfig.PlayerBodyMetalness,
   });
 
+  // --- Legs (added before body so they render behind it) ---
+  const legGeo = new THREE.CylinderGeometry(
+    s * RenderConfig.PlayerLegTopRadius,
+    s * RenderConfig.PlayerLegBottomRadius,
+    s * RenderConfig.PlayerLegLength,
+    RenderConfig.PlayerLegSegments
+  );
+  const leftLeg = new THREE.Mesh(legGeo, bodyMat);
+  leftLeg.userData.partName = 'leftLeg';
+  leftLeg.position.set(-s * RenderConfig.PlayerLegOffsetX, s * RenderConfig.PlayerLegOffsetY, 0);
+  group.add(leftLeg);
+
+  const rightLeg = new THREE.Mesh(legGeo, bodyMat);
+  rightLeg.userData.partName = 'rightLeg';
+  rightLeg.position.set(s * RenderConfig.PlayerLegOffsetX, s * RenderConfig.PlayerLegOffsetY, 0);
+  group.add(rightLeg);
+
   // --- Body ---
   const bodyGeo = new THREE.CylinderGeometry(
     s * 0.15, s * 0.15, s * 0.5,
@@ -104,6 +121,22 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
   rightArm.rotation.z = Math.PI / 2;
   rightArm.position.set(s * RenderConfig.PlayerArmOffsetX, s * RenderConfig.PlayerArmOffsetY, 0);
   group.add(rightArm);
+
+  // --- Hands ---
+  const handGeo = new THREE.SphereGeometry(
+    s * RenderConfig.PlayerHandRadius,
+    RenderConfig.PlayerHandSegments,
+    RenderConfig.PlayerHandSegments
+  );
+  const leftHand = new THREE.Mesh(handGeo, armMat);
+  leftHand.userData.partName = 'leftHand';
+  leftHand.position.set(-s * RenderConfig.PlayerHandOffsetX, s * RenderConfig.PlayerHandOffsetY, 0);
+  group.add(leftHand);
+
+  const rightHand = new THREE.Mesh(handGeo, armMat);
+  rightHand.userData.partName = 'rightHand';
+  rightHand.position.set(s * RenderConfig.PlayerHandOffsetX, s * RenderConfig.PlayerHandOffsetY, 0);
+  group.add(rightHand);
 
   // --- Nose (small cone pointing in +Y = forward direction) ---
   const noseGeo = new THREE.ConeGeometry(
@@ -171,6 +204,54 @@ export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
     s * RenderConfig.PlayerPupilOffsetZ
   );
   group.add(rightPupil);
+
+  // --- Neck ---
+  const neckGeo = new THREE.CylinderGeometry(
+    s * RenderConfig.PlayerNeckTopRadius,
+    s * RenderConfig.PlayerNeckBottomRadius,
+    s * RenderConfig.PlayerNeckHeight,
+    RenderConfig.PlayerNeckSegments
+  );
+  const neck = new THREE.Mesh(neckGeo, bodyMat);
+  neck.userData.partName = 'neck';
+  neck.position.set(0, s * RenderConfig.PlayerNeckOffsetY, 0);
+  group.add(neck);
+
+  // --- Tactical Helmet ---
+  const helmetMat = new THREE.MeshStandardMaterial({
+    color: RenderConfig.PlayerHelmetColor,
+    roughness: RenderConfig.PlayerHelmetRoughness,
+    metalness: RenderConfig.PlayerHelmetMetalness,
+  });
+  const helmetGeo = new THREE.SphereGeometry(
+    s * RenderConfig.PlayerHelmetRadius,
+    RenderConfig.PlayerHelmetSegments,
+    RenderConfig.PlayerHelmetSegments
+  );
+  const helmet = new THREE.Mesh(helmetGeo, helmetMat);
+  helmet.userData.partName = 'helmet';
+  helmet.userData.fixedColor = true;
+  helmet.position.set(0, s * RenderConfig.PlayerHelmetOffsetY, 0);
+  helmet.scale.set(1.0, RenderConfig.PlayerHelmetScaleY, 1.0);
+  helmet.renderOrder = 1;
+  group.add(helmet);
+
+  // --- Weapon / Rifle ---
+  const weaponMat = new THREE.MeshStandardMaterial({
+    color: RenderConfig.PlayerWeaponColor,
+    roughness: RenderConfig.PlayerWeaponRoughness,
+    metalness: RenderConfig.PlayerWeaponMetalness,
+  });
+  const weaponGeo = new THREE.BoxGeometry(
+    s * RenderConfig.PlayerWeaponWidth,
+    s * RenderConfig.PlayerWeaponLength,
+    s * RenderConfig.PlayerWeaponDepth
+  );
+  const weapon = new THREE.Mesh(weaponGeo, weaponMat);
+  weapon.userData.partName = 'weapon';
+  weapon.userData.fixedColor = true;
+  weapon.position.set(s * RenderConfig.PlayerWeaponOffsetX, s * RenderConfig.PlayerWeaponOffsetY, 0);
+  group.add(weapon);
 
   // --- Glow ring at base ---
   const ringGeo = new THREE.RingGeometry(

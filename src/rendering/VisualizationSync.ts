@@ -83,7 +83,7 @@ export class VisualizationSync {
    */
   private setPlayerColor(obj: THREE.Object3D, color: number): void {
     obj.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
+      if (child instanceof THREE.Mesh && !child.userData.fixedColor) {
         const mat = child.material as THREE.MeshStandardMaterial;
         if ('color' in mat) mat.color.setHex(color);
         if ('emissive' in mat && mat.emissiveIntensity > 0) {
