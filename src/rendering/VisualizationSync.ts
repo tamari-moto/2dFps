@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
-import { MeshFactory } from './MeshFactory';
+import { createPlayerFromGLTF, createPrimitivePlayer } from './PlayerMeshFactory';
+import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
+import { createUndefinedMesh, setNodeColor } from './MeshUtils';
 import { SceneManager } from './SceneManager';
-import { NodeConfig, AnimationConfig, PlayerConfig } from '../config/GameConfig';
+import { NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig, RenderConfig, WallConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConstants';
 import { Player } from '../model/Player';
+import { GameEventBus, GameEventType } from '../core/GameEventBus';
 
 /**
  * Synchronizes game model state with Three.js visualization
@@ -19,7 +22,10 @@ export class VisualizationSync {
 
   // Mesh collections
   private meshList: THREE.Mesh[] = [];
-  private playerMeshes: Map<string, THREE.Mesh> = new Map();
+  private playerMeshes: Map<string, THREE.Object3D> = new Map();
+
+  // GLTF template for player models (null = use fallback arrow shape)
+  private gltfTemplate: THREE.Group | null = null;
 
   // Mapping between meshes and nodes
   private meshToNodeMap: Map<number, number> = new Map();
@@ -31,27 +37,109 @@ export class VisualizationSync {
   private playerShotMesh: THREE.Mesh;
   private undefinedMesh: THREE.Mesh;
 
+  // Primitive character animation state per player
+  private playerAnimState: Map<string, 'idle' | 'walk' | 'attack'> = new Map();
+  private playerBodyAnims: Map<string, Array<gsap.core.Tween | gsap.core.Timeline>> = new Map();
+
   // Active selections
   private activePlayerId: string;
 
   constructor(
     sceneManager: SceneManager,
     model: Model,
-    activePlayerId: string
+    activePlayerId: string,
+    eventBus: GameEventBus,
+    gltfTemplate?: THREE.Group
   ) {
     this.sceneManager = sceneManager;
     this.model = model;
     this.activePlayerId = activePlayerId;
+    this.gltfTemplate = gltfTemplate ?? null;
 
     this.viewAngleVisualizer = new ViewAngleVisualizer(sceneManager.getScene());
 
     // Create placeholder meshes
-    this.playerSelectMesh = MeshFactory.createUndefinedMesh();
-    this.playerNextMesh = MeshFactory.createUndefinedMesh();
-    this.playerShotMesh = MeshFactory.createUndefinedMesh();
-    this.undefinedMesh = MeshFactory.createUndefinedMesh();
+    this.playerSelectMesh = createUndefinedMesh();
+    this.playerNextMesh = createUndefinedMesh();
+    this.playerShotMesh = createUndefinedMesh();
+    this.undefinedMesh = createUndefinedMesh();
 
     this.initializeVisualization();
+    this.subscribeToEvents(eventBus);
+  }
+
+  /**
+   * Creates a player Object3D: GLTF model if available, otherwise primitive character
+   */
+  private createPlayerObject(color: number): THREE.Object3D {
+    if (this.gltfTemplate) {
+      return createPlayerFromGLTF(this.gltfTemplate, color);
+    }
+    return createPrimitivePlayer(color);
+  }
+
+  /**
+   * Sets color on a player Object3D (handles both Mesh and Group)
+   */
+  private setPlayerColor(obj: THREE.Object3D, color: number): void {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh && !child.userData.fixedColor) {
+        const mat = child.material as THREE.MeshStandardMaterial;
+        if ('color' in mat) mat.color.setHex(color);
+        if ('emissive' in mat && mat.emissiveIntensity > 0) {
+          mat.emissive.setHex(color);
+        }
+      }
+    });
+  }
+
+  /**
+   * Subscribes to visualization command events from GameController
+   */
+  private subscribeToEvents(eventBus: GameEventBus): void {
+    eventBus.on(GameEventType.VIS_UPDATE_VIEW, () => this.updateView());
+    eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
+      this.activePlayerId = data.playerId;
+      this.updateView();
+    });
+    eventBus.on(GameEventType.VIS_SET_SELECT_MESH, (data: { nodeId: number }) => {
+      const mesh = this.findMeshByNodeId(data.nodeId);
+      if (mesh) this.playerSelectMesh = mesh;
+    });
+    eventBus.on(GameEventType.VIS_SET_NEXT_MESH, (data: { nodeId: number }) => {
+      const mesh = this.findMeshByNodeId(data.nodeId);
+      if (mesh) this.playerNextMesh = mesh;
+    });
+    eventBus.on(GameEventType.VIS_SET_SHOT_MESH, (data: { nodeId: number }) => {
+      const mesh = this.findMeshByNodeId(data.nodeId);
+      if (mesh) this.playerShotMesh = mesh;
+      this.startAttackAnim(this.activePlayerId);
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_NEXT_MESH, () => {
+      this.playerNextMesh = this.undefinedMesh;
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_SHOT_MESH, () => {
+      this.playerShotMesh = this.undefinedMesh;
+    });
+    eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
+      this.showHitEffect(data.playerId);
+    });
+    eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
+      this.hidePlayer(data.playerId);
+    });
+    eventBus.on(GameEventType.VIS_TOGGLE_VIEW_ANGLE, () => {
+      const isVisible = this.viewAngleVisualizer.toggle();
+      this.updateView();
+      console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
+    });
+    eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
+  }
+
+  /**
+   * Finds a mesh by node ID
+   */
+  private findMeshByNodeId(nodeId: number): THREE.Mesh | undefined {
+    return this.meshList.find(m => this.meshToNodeMap.get(m.id) === nodeId);
   }
 
   /**
@@ -60,29 +148,30 @@ export class VisualizationSync {
   private initializeVisualization(): void {
     // Create node meshes
     for (const node of this.model.nodeList) {
-      const mesh = MeshFactory.createNodeCircle(node.x, node.y);
+      const mesh = createNodeCircle(node.x, node.y);
       this.sceneManager.addToScene(mesh);
       this.meshList.push(mesh);
       this.meshToNodeMap.set(mesh.id, node.id);
       this.nodeToMeshMap.set(node.id, mesh.id);
     }
 
-    // Create obstacle line segments
+    // Create obstacle wall meshes
     for (const line of this.model.Lines) {
-      const lineSegment = MeshFactory.createLineSegment(
+      const wall = createWallMesh(
         line.start.x,
         line.start.y,
         line.end.x,
         line.end.y
       );
-      this.sceneManager.addToScene(lineSegment);
+      this.sceneManager.addToScene(wall);
     }
 
     // Create player meshes
     for (const [playerId, player] of this.model.players) {
-      const mesh = MeshFactory.createPlayer(player.color);
-      this.sceneManager.addToScene(mesh);
-      this.playerMeshes.set(playerId, mesh);
+      const obj = this.createPlayerObject(player.color);
+      this.sceneManager.addToScene(obj);
+      this.playerMeshes.set(playerId, obj);
+      this.startIdleAnim(playerId);
     }
   }
 
@@ -114,19 +203,32 @@ export class VisualizationSync {
    */
   private updatePlayers(): void {
     for (const [playerId, player] of this.model.players) {
-      const mesh = this.playerMeshes.get(playerId);
-      if (mesh) {
-        gsap.to(mesh.position, {
+      const obj = this.playerMeshes.get(playerId);
+      if (obj) {
+        const dx = obj.position.x - player.node.x;
+        const dy = obj.position.y - player.node.y;
+        const moving = Math.sqrt(dx * dx + dy * dy) > 0.5;
+        if (moving && this.playerAnimState.get(playerId) === 'idle') {
+          this.startWalkAnim(playerId);
+        }
+
+        gsap.to(obj.position, {
           x: player.node.x,
           y: player.node.y,
           duration: AnimationConfig.MovementDuration,
         });
 
-        // Highlight active player
-        const scale = playerId === this.activePlayerId
+        // Rotate to match player facing angle (+X-forward model, Y-up rotation)
+        obj.rotation.x = Math.PI / 2;
+        obj.rotation.y = (player.angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
+        obj.rotation.z = 0;
+
+        // Highlight active player (preserve GLTF base scale)
+        const baseScale = this.gltfTemplate ? RenderConfig.PlayerModelScale : 1;
+        const scale = (playerId === this.activePlayerId
           ? PLAYER_CONSTANTS.ACTIVE_SCALE
-          : PLAYER_CONSTANTS.NORMAL_SCALE;
-        mesh.scale.set(scale, scale, scale);
+          : PLAYER_CONSTANTS.NORMAL_SCALE) * baseScale;
+        obj.scale.set(scale, scale, scale);
       }
     }
   }
@@ -136,7 +238,7 @@ export class VisualizationSync {
    */
   private resetNodeColors(): void {
     this.meshList.forEach(mesh => {
-      MeshFactory.setMeshColor(mesh, NodeConfig.DefaultColor);
+      setNodeColor(mesh, NodeConfig.DefaultColor, NodeVisualConfig.EmissiveDefaultIntensity);
     });
   }
 
@@ -145,7 +247,7 @@ export class VisualizationSync {
    */
   private updateSpecialNodes(): void {
     if (this.playerShotMesh && this.playerShotMesh !== this.undefinedMesh) {
-      MeshFactory.setMeshColor(this.playerShotMesh, NodeConfig.ShotTargetColor);
+      setNodeColor(this.playerShotMesh, NodeConfig.ShotTargetColor, NodeVisualConfig.EmissiveShotIntensity);
       gsap.fromTo(
         this.playerShotMesh.scale,
         { x: 1, y: 1 },
@@ -163,11 +265,11 @@ export class VisualizationSync {
     }
 
     if (this.playerSelectMesh && this.playerSelectMesh !== this.undefinedMesh) {
-      MeshFactory.setMeshColor(this.playerSelectMesh, NodeConfig.SelectedColor);
+      setNodeColor(this.playerSelectMesh, NodeConfig.SelectedColor, NodeVisualConfig.EmissiveSelectedIntensity);
     }
 
     if (this.playerNextMesh && this.playerNextMesh !== this.undefinedMesh) {
-      MeshFactory.setMeshColor(this.playerNextMesh, NodeConfig.NextMoveColor);
+      setNodeColor(this.playerNextMesh, NodeConfig.NextMoveColor, NodeVisualConfig.EmissiveNextIntensity);
     }
   }
 
@@ -186,7 +288,7 @@ export class VisualizationSync {
         m => this.meshToNodeMap.get(m.id) === node.id
       );
       if (mesh) {
-        MeshFactory.setMeshColor(mesh, NodeConfig.VisibleColor);
+        setNodeColor(mesh, NodeConfig.VisibleColor, NodeVisualConfig.EmissiveVisibleIntensity);
       }
     }
   }
@@ -195,44 +297,27 @@ export class VisualizationSync {
    * Updates obstacles in the scene
    */
   updateObstacles(): void {
-    // Remove existing obstacle lines
+    // Remove existing obstacle wall meshes
     const scene = this.sceneManager.getScene();
-    const linesToRemove: THREE.Line[] = [];
+    const wallsToRemove: THREE.Mesh[] = [];
     scene.traverse((object) => {
-      if (object instanceof THREE.Line) {
-        linesToRemove.push(object);
+      if (object instanceof THREE.Mesh && object.userData[WallConfig.UserDataTag]) {
+        wallsToRemove.push(object);
       }
     });
-    linesToRemove.forEach(line => this.sceneManager.removeFromScene(line));
+    wallsToRemove.forEach(wall => this.sceneManager.removeFromScene(wall));
 
-    // Add new obstacle lines
+    // Add new obstacle wall meshes
     for (const line of this.model.Lines) {
-      const lineSegment = MeshFactory.createLineSegment(
+      const wall = createWallMesh(
         line.start.x,
         line.start.y,
         line.end.x,
         line.end.y
       );
-      this.sceneManager.addToScene(lineSegment);
+      this.sceneManager.addToScene(wall);
     }
 
-    this.updateView();
-  }
-
-  /**
-   * Toggles view angle visualization
-   */
-  toggleViewAngle(): boolean {
-    const isVisible = this.viewAngleVisualizer.toggle();
-    this.updateView();
-    return isVisible;
-  }
-
-  /**
-   * Sets the active player
-   */
-  setActivePlayer(playerId: string): void {
-    this.activePlayerId = playerId;
     this.updateView();
   }
 
@@ -240,23 +325,22 @@ export class VisualizationSync {
    * Shows hit effect on a player
    */
   showHitEffect(playerId: string): void {
-    const mesh = this.playerMeshes.get(playerId);
-    if (!mesh) return;
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
 
     // Flash red
-    // const originalColor = (mesh.material as THREE.MeshBasicMaterial).color.getHex();
-    MeshFactory.setMeshColor(mesh, 0xff0000);
+    this.setPlayerColor(obj, 0xff0000);
 
     // Scale up and down
     gsap.timeline()
-      .to(mesh.scale, {
+      .to(obj.scale, {
         x: 1.5,
         y: 1.5,
         z: 1.5,
         duration: 0.1,
         ease: 'power2.out',
       })
-      .to(mesh.scale, {
+      .to(obj.scale, {
         x: 1.0,
         y: 1.0,
         z: 1.0,
@@ -268,7 +352,7 @@ export class VisualizationSync {
     setTimeout(() => {
       const player = this.model.getPlayer(playerId);
       if (player) {
-        MeshFactory.setMeshColor(mesh, player.color);
+        this.setPlayerColor(obj, player.color);
       }
     }, 300);
   }
@@ -277,12 +361,14 @@ export class VisualizationSync {
    * Hides a player's mesh (when eliminated)
    */
   hidePlayer(playerId: string): void {
-    const mesh = this.playerMeshes.get(playerId);
-    if (!mesh) return;
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    this.killBodyAnims(playerId);
 
     // Fade out and shrink animation
     gsap.timeline()
-      .to(mesh.scale, {
+      .to(obj.scale, {
         x: 0,
         y: 0,
         z: 0,
@@ -290,18 +376,184 @@ export class VisualizationSync {
         ease: 'power2.in',
       })
       .call(() => {
-        mesh.visible = false;
+        obj.visible = false;
       });
 
-    // Make material transparent
-    const material = mesh.material as THREE.MeshBasicMaterial;
-    gsap.to(material, {
-      opacity: 0,
-      duration: 0.5,
-      onStart: () => {
-        material.transparent = true;
-      },
+    // Make material(s) transparent
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const material = child.material as THREE.MeshBasicMaterial;
+        gsap.to(material, {
+          opacity: 0,
+          duration: 0.5,
+          onStart: () => {
+            material.transparent = true;
+          },
+        });
+      }
     });
+  }
+
+  // ------------------------------------------------------------------ //
+  //  Primitive character body animation helpers
+  // ------------------------------------------------------------------ //
+
+  /** Find a named child part within a player Object3D */
+  private getPlayerPart(obj: THREE.Object3D, partName: string): THREE.Object3D | undefined {
+    let found: THREE.Object3D | undefined;
+    obj.traverse(child => {
+      if (!found && child.userData.partName === partName) found = child;
+    });
+    return found;
+  }
+
+  /** Kill all running body animations for a player */
+  private killBodyAnims(playerId: string): void {
+    const anims = this.playerBodyAnims.get(playerId) ?? [];
+    anims.forEach(a => a.kill());
+    this.playerBodyAnims.set(playerId, []);
+    this.playerAnimState.delete(playerId);
+  }
+
+  /** Start looping idle animation (breathing bob, arm sway, ring pulse) */
+  private startIdleAnim(playerId: string): void {
+    if (this.gltfTemplate) return;
+    if (this.playerAnimState.get(playerId) === 'idle') return;
+
+    this.killBodyAnims(playerId);
+    this.playerAnimState.set(playerId, 'idle');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
+
+    // Head bob (local Z toward camera)
+    const head = this.getPlayerPart(obj, 'head');
+    if (head) {
+      anims.push(gsap.to(head.position, {
+        z: AnimationConfig.IdleHeadBobAmplitude,
+        duration: AnimationConfig.IdleHeadBobDuration / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      }));
+    }
+
+    // Arm gentle sway (rotation.y, opposite phase)
+    const leftArm = this.getPlayerPart(obj, 'leftArm');
+    const rightArm = this.getPlayerPart(obj, 'rightArm');
+    if (leftArm) {
+      anims.push(gsap.to(leftArm.rotation, {
+        y: AnimationConfig.IdleArmSwayAngle,
+        duration: AnimationConfig.IdleArmSwayDuration / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      }));
+    }
+    if (rightArm) {
+      anims.push(gsap.to(rightArm.rotation, {
+        y: -AnimationConfig.IdleArmSwayAngle,
+        duration: AnimationConfig.IdleArmSwayDuration / 2,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: -1,
+      }));
+    }
+
+    // Glow ring opacity pulse
+    const ring = this.getPlayerPart(obj, 'ring');
+    if (ring instanceof THREE.Mesh) {
+      const mat = ring.material as THREE.MeshStandardMaterial;
+      anims.push(gsap.fromTo(mat,
+        { opacity: AnimationConfig.IdleRingOpacityMax },
+        {
+          opacity: AnimationConfig.IdleRingOpacityMin,
+          duration: AnimationConfig.IdleRingPulseDuration / 2,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: -1,
+        }
+      ));
+    }
+
+    this.playerBodyAnims.set(playerId, anims);
+  }
+
+  /** Trigger walk arm-swing animation; reverts to idle after movement completes */
+  private startWalkAnim(playerId: string): void {
+    if (this.gltfTemplate) return;
+    if (this.playerAnimState.get(playerId) === 'walk') return;
+
+    this.killBodyAnims(playerId);
+    this.playerAnimState.set(playerId, 'walk');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
+    const angle = AnimationConfig.WalkArmSwingAngle;
+    const half = AnimationConfig.WalkArmSwingHalfDuration;
+
+    const leftArm = this.getPlayerPart(obj, 'leftArm');
+    const rightArm = this.getPlayerPart(obj, 'rightArm');
+
+    if (leftArm) {
+      anims.push(gsap.fromTo(leftArm.rotation,
+        { x: -angle },
+        { x: angle, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
+      ));
+    }
+    if (rightArm) {
+      anims.push(gsap.fromTo(rightArm.rotation,
+        { x: angle },
+        { x: -angle, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
+      ));
+    }
+
+    this.playerBodyAnims.set(playerId, anims);
+
+    // Revert to idle after movement duration
+    setTimeout(() => {
+      if (this.playerAnimState.get(playerId) === 'walk') {
+        this.startIdleAnim(playerId);
+      }
+    }, AnimationConfig.MovementDuration * 1000);
+  }
+
+  /** Trigger attack (arm thrust forward) animation; reverts to idle when done */
+  private startAttackAnim(playerId: string): void {
+    if (this.gltfTemplate) return;
+
+    this.killBodyAnims(playerId);
+    this.playerAnimState.set(playerId, 'attack');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const s = RenderConfig.PlayerMarkerSize;
+    const thrust = s * AnimationConfig.AttackArmThrustRatio;
+    const outDur = AnimationConfig.AttackThrustOutDuration;
+    const retDur = AnimationConfig.AttackThrustReturnDuration;
+
+    const leftArm = this.getPlayerPart(obj, 'leftArm');
+    const rightArm = this.getPlayerPart(obj, 'rightArm');
+
+    const tl = gsap.timeline({
+      onComplete: () => this.startIdleAnim(playerId),
+    });
+
+    if (leftArm) {
+      tl.to(leftArm.position, { y: `+=${thrust}`, duration: outDur, ease: 'power2.out' }, 0)
+        .to(leftArm.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' });
+    }
+    if (rightArm) {
+      tl.to(rightArm.position, { y: `+=${thrust}`, duration: outDur, ease: 'power2.out' }, 0)
+        .to(rightArm.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' }, outDur);
+    }
+
+    this.playerBodyAnims.set(playerId, [tl]);
   }
 
   /**
@@ -319,43 +571,13 @@ export class VisualizationSync {
   }
 
   /**
-   * Sets special meshes for game state
-   */
-  setPlayerSelectMesh(mesh: THREE.Mesh): void {
-    this.playerSelectMesh = mesh;
-  }
-
-  setPlayerNextMesh(mesh: THREE.Mesh): void {
-    this.playerNextMesh = mesh;
-  }
-
-  setPlayerShotMesh(mesh: THREE.Mesh): void {
-    this.playerShotMesh = mesh;
-  }
-
-  getUndefinedMesh(): THREE.Mesh {
-    return this.undefinedMesh;
-  }
-
-  getPlayerSelectMesh(): THREE.Mesh {
-    return this.playerSelectMesh;
-  }
-
-  getPlayerNextMesh(): THREE.Mesh {
-    return this.playerNextMesh;
-  }
-
-  getPlayerShotMesh(): THREE.Mesh {
-    return this.playerShotMesh;
-  }
-
-  /**
    * Adds a mesh for a player that joined after initialization (online mode).
    */
   addPlayerMesh(playerId: string, color: number): void {
     if (this.playerMeshes.has(playerId)) return;
-    const mesh = MeshFactory.createPlayer(color);
-    this.sceneManager.addToScene(mesh);
-    this.playerMeshes.set(playerId, mesh);
+    const obj = this.createPlayerObject(color);
+    this.sceneManager.addToScene(obj);
+    this.playerMeshes.set(playerId, obj);
+    this.startIdleAnim(playerId);
   }
 }

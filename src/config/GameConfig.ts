@@ -45,20 +45,20 @@ export const NodeConfig = {
   /** Number of segments in circle geometry */
   CircleSegments: 100,
 
-  /** Default node color (gray) */
-  DefaultColor: 0xA0A0A0,
+  /** Default node color (dark tactical green) */
+  DefaultColor: 0x1a3a2a,
 
-  /** Visible node color (white) */
-  VisibleColor: 0xffffff,
+  /** Visible node color (bright cyan) */
+  VisibleColor: 0x00e5cc,
 
-  /** Selected node color (blue) */
-  SelectedColor: 0x0000ff,
+  /** Selected node color (dark orange) */
+  SelectedColor: 0xff8c00,
 
-  /** Next move node color (green) */
-  NextMoveColor: 0x00ff00,
+  /** Next move node color (neon green) */
+  NextMoveColor: 0x39ff14,
 
   /** Shot target node color (red) */
-  ShotTargetColor: 0xff0000,
+  ShotTargetColor: 0xff2020,
 } as const;
 
 /**
@@ -95,8 +95,8 @@ export const ObstacleConfig = {
   /** Corridor width */
   CorridorWidth: 120,
 
-  /** Line color for obstacles (cyan) */
-  LineColor: 0x00ffff,
+  /** Line color for obstacles (muted teal) */
+  LineColor: 0x00bfbf,
 } as const;
 
 /**
@@ -215,6 +215,32 @@ export const AnimationConfig = {
 
   /** Shot pulse ease function */
   ShotPulseEase: "elastic.out(1, 0.3)",
+
+  // --- Primitive character body animations ---
+  /** local-Z oscillation amplitude for idle head bob */
+  IdleHeadBobAmplitude: 0.3,
+  /** seconds per full breath cycle */
+  IdleHeadBobDuration: 1.5,
+  /** radians for idle arm gentle sway (rotation.y) */
+  IdleArmSwayAngle: 0.12,
+  /** seconds per full arm sway cycle */
+  IdleArmSwayDuration: 2.0,
+  /** ring material opacity at minimum during idle pulse */
+  IdleRingOpacityMin: 0.25,
+  /** ring material opacity at maximum during idle pulse */
+  IdleRingOpacityMax: 0.75,
+  /** seconds per ring opacity pulse cycle */
+  IdleRingPulseDuration: 1.2,
+  /** radians for arm swing during walk (rotation.x) */
+  WalkArmSwingAngle: 0.55,
+  /** seconds per half-swing during walk animation */
+  WalkArmSwingHalfDuration: 0.20,
+  /** arm thrust forward distance = PlayerMarkerSize × this ratio */
+  AttackArmThrustRatio: 0.20,
+  /** seconds for arm thrust out */
+  AttackThrustOutDuration: 0.12,
+  /** seconds for arm return after thrust */
+  AttackThrustReturnDuration: 0.30,
 } as const;
 
 /**
@@ -244,14 +270,276 @@ export const ViewAngleVisualizationConfig = {
   /** Enable view angle edges visualization */
   ShowViewAngleEdges: false,
 
-  /** Color for view angle edges (yellow) */
-  EdgeColor: 0xffff00,
+  /** Color for view angle edges (cyan, matches VisibleColor) */
+  EdgeColor: 0x00e5cc,
 
   /** Opacity for view angle edges */
-  EdgeOpacity: 0.6,
+  EdgeOpacity: 0.45,
 
   /** Line width for view angle edges */
   EdgeLineWidth: 2,
+} as const;
+
+/**
+ * Render / visual theme configuration
+ */
+export const RenderConfig = {
+  /** Background clear color (very dark navy) */
+  BackgroundColor: 0x050d12,
+
+  /** Grid line color for background grid */
+  GridLineColor: 0x0d2b20,
+
+  /** Grid line opacity */
+  GridLineOpacity: 0.6,
+
+  /** Player diamond marker size */
+  PlayerMarkerSize: 20,
+
+  /** GLTF player model scale factor */
+  PlayerModelScale: 15,
+
+  /** GLTF player model Z rotation offset in radians */
+  PlayerModelRotationZ: Math.PI / 2,
+
+  /** Y rotation offset applied to all player models so the face points forward (radians) */
+  PlayerFacingOffset: Math.PI / 2,
+
+  // --- Primitive player geometry ---
+  /** Radial segments for player body cylinder (smoother = higher) */
+  PlayerBodySegments: 24,
+  /** Radial/height segments for player head sphere */
+  PlayerHeadSegments: 24,
+  /** PBR roughness for player body */
+  PlayerBodyRoughness: 0.55,
+  /** PBR metalness for player body */
+  PlayerBodyMetalness: 0.05,
+  /** PBR roughness for player head */
+  PlayerHeadRoughness: 0.45,
+  /** PBR metalness for player head */
+  PlayerHeadMetalness: 0.10,
+
+  // --- Nose (small cone on face front) ---
+  /** Nose cone base radius = PlayerMarkerSize * this */
+  PlayerNoseRadiusRatio: 0.04,
+  /** Nose cone height = PlayerMarkerSize * this */
+  PlayerNoseHeightRatio: 0.12,
+  /** Radial segments for nose cone */
+  PlayerNoseSegments: 8,
+  /** PBR roughness for nose */
+  PlayerNoseRoughness: 0.50,
+  /** PBR metalness for nose */
+  PlayerNoseMetalness: 0.05,
+
+  // --- Arms ---
+  /** Arm cylinder radius = PlayerMarkerSize * this */
+  PlayerArmRadius: 0.04,
+  /** Arm cylinder length = PlayerMarkerSize * this */
+  PlayerArmLength: 0.35,
+  /** Radial segments for arms */
+  PlayerArmSegments: 8,
+  /** PBR roughness for arms */
+  PlayerArmRoughness: 0.55,
+  /** PBR metalness for arms */
+  PlayerArmMetalness: 0.05,
+  /** Arm X offset from center = PlayerMarkerSize * this */
+  PlayerArmOffsetX: 0.22,
+  /** Arm Y position = PlayerMarkerSize * this */
+  PlayerArmOffsetY: 0.30,
+
+  // --- Eyes (white sclera) ---
+  /** Eye sphere radius = PlayerMarkerSize * this */
+  PlayerEyeRadius: 0.055,
+  /** Segments for eye sphere */
+  PlayerEyeSegments: 8,
+  /** Eye X offset (left/right) = PlayerMarkerSize * this */
+  PlayerEyeOffsetX: 0.08,
+  /** Eye Y position = PlayerMarkerSize * this */
+  PlayerEyeOffsetY: 0.70,
+  /** Eye Z offset (forward on head) = PlayerMarkerSize * this */
+  PlayerEyeOffsetZ: 0.12,
+
+  // --- Pupils ---
+  /** Pupil sphere radius = PlayerMarkerSize * this */
+  PlayerPupilRadius: 0.03,
+  /** Segments for pupil sphere */
+  PlayerPupilSegments: 6,
+  /** Pupil Z offset (in front of eye) = PlayerMarkerSize * this */
+  PlayerPupilOffsetZ: 0.165,
+
+  // --- Glow ring ---
+  /** Ring inner radius = PlayerMarkerSize * this */
+  PlayerGlowRingInnerRatio: 0.17,
+  /** Ring outer radius = PlayerMarkerSize * this */
+  PlayerGlowRingOuterRatio: 0.28,
+  /** Radial segments for glow ring */
+  PlayerGlowRingSegments: 32,
+  /** Emissive intensity for glow ring */
+  PlayerGlowRingEmissiveIntensity: 0.8,
+  /** PBR roughness for glow ring */
+  PlayerGlowRingRoughness: 0.30,
+  /** PBR metalness for glow ring */
+  PlayerGlowRingMetalness: 0.0,
+
+  // --- Neck ---
+  /** Neck cylinder top radius = PlayerMarkerSize * this */
+  PlayerNeckTopRadius: 0.08,
+  /** Neck cylinder bottom radius = PlayerMarkerSize * this */
+  PlayerNeckBottomRadius: 0.10,
+  /** Neck cylinder height = PlayerMarkerSize * this */
+  PlayerNeckHeight: 0.10,
+  /** Radial segments for neck cylinder */
+  PlayerNeckSegments: 12,
+  /** Neck Y offset = PlayerMarkerSize * this */
+  PlayerNeckOffsetY: 0.50,
+
+  // --- Legs ---
+  /** Leg cylinder top radius = PlayerMarkerSize * this */
+  PlayerLegTopRadius: 0.07,
+  /** Leg cylinder bottom radius = PlayerMarkerSize * this */
+  PlayerLegBottomRadius: 0.06,
+  /** Leg cylinder length = PlayerMarkerSize * this */
+  PlayerLegLength: 0.40,
+  /** Radial segments for leg cylinders */
+  PlayerLegSegments: 8,
+  /** Leg X offset from center = PlayerMarkerSize * this */
+  PlayerLegOffsetX: 0.09,
+  /** Leg Y center offset = PlayerMarkerSize * this */
+  PlayerLegOffsetY: -0.20,
+
+  // --- Hands ---
+  /** Hand sphere radius = PlayerMarkerSize * this */
+  PlayerHandRadius: 0.065,
+  /** Segments for hand sphere */
+  PlayerHandSegments: 8,
+  /** Hand X offset = PlayerMarkerSize * this (= ArmOffsetX + ArmLength/2) */
+  PlayerHandOffsetX: 0.395,
+  /** Hand Y position = PlayerMarkerSize * this (same as arm Y) */
+  PlayerHandOffsetY: 0.30,
+
+  // --- Helmet ---
+  /** Helmet sphere radius = PlayerMarkerSize * this */
+  PlayerHelmetRadius: 0.225,
+  /** Segments for helmet sphere */
+  PlayerHelmetSegments: 16,
+  /** Helmet Y offset = PlayerMarkerSize * this */
+  PlayerHelmetOffsetY: 0.72,
+  /** Helmet Y scale (flatten into dome shape) */
+  PlayerHelmetScaleY: 0.55,
+  /** Helmet color (fixed dark gray armor, independent of player color) */
+  PlayerHelmetColor: 0x334455,
+  /** PBR roughness for helmet */
+  PlayerHelmetRoughness: 0.35,
+  /** PBR metalness for helmet */
+  PlayerHelmetMetalness: 0.40,
+
+  // --- Weapon ---
+  /** Weapon box width = PlayerMarkerSize * this */
+  PlayerWeaponWidth: 0.04,
+  /** Weapon box length (along Y = forward) = PlayerMarkerSize * this */
+  PlayerWeaponLength: 0.55,
+  /** Weapon box depth = PlayerMarkerSize * this */
+  PlayerWeaponDepth: 0.05,
+  /** Weapon X offset = PlayerMarkerSize * this */
+  PlayerWeaponOffsetX: 0.44,
+  /** Weapon Y center offset = PlayerMarkerSize * this */
+  PlayerWeaponOffsetY: 0.575,
+  /** Weapon color (fixed dark metallic, independent of player color) */
+  PlayerWeaponColor: 0x1a1a2e,
+  /** PBR roughness for weapon */
+  PlayerWeaponRoughness: 0.25,
+  /** PBR metalness for weapon */
+  PlayerWeaponMetalness: 0.75,
+} as const;
+
+/**
+ * Lighting configuration
+ */
+export const LightingConfig = {
+  /** Ambient light intensity */
+  AmbientIntensity: 0.3,
+  /** Hemisphere light sky color */
+  HemisphereSkyColor: 0x223344,
+  /** Hemisphere light ground color */
+  HemisphereGroundColor: 0x0d2b20,
+  /** Hemisphere light intensity */
+  HemisphereIntensity: 0.7,
+  /** Main directional light intensity */
+  DirectionalIntensity: 1.2,
+  /** Main directional light X position */
+  DirectionalX: 30,
+  /** Main directional light Y position */
+  DirectionalY: 20,
+  /** Main directional light Z position */
+  DirectionalZ: 100,
+  /** Rim light color (cool blue) */
+  RimLightColor: 0x4488cc,
+  /** Rim light intensity */
+  RimLightIntensity: 0.4,
+  /** Rim light X position */
+  RimLightX: -50,
+  /** Rim light Y position */
+  RimLightY: -50,
+  /** Rim light Z position */
+  RimLightZ: 60,
+} as const;
+
+/**
+ * Wall (3D obstacle) visual configuration
+ */
+export const WallConfig = {
+  /** Wall extrusion height in world units */
+  Height: 8,
+  /** Wall base Z position */
+  ZOffset: 0,
+  /** Wall depth (screen-width of the wall slab) */
+  Depth: 4,
+  /** Wall color (dark tactical blue-grey) */
+  Color: 0x1a2e38,
+  /** PBR roughness for walls */
+  Roughness: 0.85,
+  /** PBR metalness for walls */
+  Metalness: 0.05,
+  /** Emissive color for walls */
+  EmissiveColor: 0x0a1520,
+  /** Emissive intensity for walls */
+  EmissiveIntensity: 0.15,
+  /** userData key used to identify wall meshes during scene traversal */
+  UserDataTag: 'isWall',
+} as const;
+
+/**
+ * Node (grid tile) visual configuration
+ */
+export const NodeVisualConfig = {
+  /** PBR roughness for node circles */
+  Roughness: 0.7,
+  /** PBR metalness for node circles */
+  Metalness: 0.0,
+  /** Emissive intensity for default (invisible) nodes */
+  EmissiveDefaultIntensity: 0.0,
+  /** Emissive intensity for visible nodes */
+  EmissiveVisibleIntensity: 0.25,
+  /** Emissive intensity for selected node */
+  EmissiveSelectedIntensity: 0.4,
+  /** Emissive intensity for next-move node */
+  EmissiveNextIntensity: 0.3,
+  /** Emissive intensity for shot-target node */
+  EmissiveShotIntensity: 0.5,
+} as const;
+
+/**
+ * Post-processing configuration
+ */
+export const PostProcessConfig = {
+  /** Enable bloom post-processing */
+  EnableBloom: true,
+  /** Bloom effect strength */
+  BloomStrength: 0.4,
+  /** Bloom effect radius */
+  BloomRadius: 0.3,
+  /** Bloom threshold (only pixels brighter than this bloom) */
+  BloomThreshold: 0.35,
 } as const;
 
 /**
