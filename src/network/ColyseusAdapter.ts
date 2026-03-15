@@ -21,9 +21,9 @@ export class ColyseusAdapter implements INetworkAdapter {
   private turnResultCallback?: (result: TurnResult) => void;
   private playerJoinedCallback?: (playerId: string) => void;
   private playerLeftCallback?: (playerId: string) => void;
-  private gameStartedCallback?: (firstTurnPlayerId: string) => void;
+  private gameStartedCallback?: () => void;
   private obstaclesReadyCallback?: (obstacles: ObstaclePayload[]) => void;
-  private pendingGameStarted?: string; // cached firstTurnPlayerId if game_started arrived early
+  private pendingGameStarted?: boolean; // cached flag if game_started arrived early
   private pendingObstacles: ObstaclesReadyPayload | null = null;
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
@@ -52,12 +52,12 @@ export class ColyseusAdapter implements INetworkAdapter {
     });
 
     // Game lifecycle messages
-    this.room.onMessage('game_started', (data: { firstTurnPlayerId: string }) => {
+    this.room.onMessage('game_started', () => {
       if (this.gameStartedCallback) {
-        this.gameStartedCallback(data.firstTurnPlayerId);
+        this.gameStartedCallback();
       } else {
-        // Callback not yet registered (startGame hasn't been called yet) — cache it
-        this.pendingGameStarted = data.firstTurnPlayerId;
+        // Callback not yet registered — cache the flag
+        this.pendingGameStarted = true;
       }
     });
     this.room.onMessage('game_over', () => {});
@@ -160,10 +160,6 @@ export class ColyseusAdapter implements INetworkAdapter {
     return this.myPlayerId;
   }
 
-  isMyTurn(): boolean {
-    return this.room?.state?.currentTurnPlayerId === this.myPlayerId;
-  }
-
   sendTurnAction(action: TurnAction): void {
     this.room.send('turn_action', {
       playerId: action.playerId,
@@ -184,11 +180,11 @@ export class ColyseusAdapter implements INetworkAdapter {
     this.playerLeftCallback = callback;
   }
 
-  onGameStarted(callback: (firstTurnPlayerId: string) => void): void {
+  onGameStarted(callback: () => void): void {
     this.gameStartedCallback = callback;
     // Fire immediately if game_started arrived before this callback was registered
-    if (this.pendingGameStarted !== undefined) {
-      callback(this.pendingGameStarted);
+    if (this.pendingGameStarted) {
+      callback();
       this.pendingGameStarted = undefined;
     }
   }

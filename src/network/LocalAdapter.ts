@@ -25,11 +25,6 @@ export class LocalAdapter implements INetworkAdapter {
     return this.myPlayerId;
   }
 
-  /** Local play: the user controls all players, so it is always "their turn". */
-  isMyTurn(): boolean {
-    return true;
-  }
-
   onTurnResult(callback: (result: TurnResult) => void): void {
     this.turnResultCallback = callback;
   }
@@ -41,7 +36,7 @@ export class LocalAdapter implements INetworkAdapter {
   onPlayerLeft(_callback: (playerId: string) => void): void { /* no-op in local mode */ }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onGameStarted(_callback: (firstTurnPlayerId: string) => void): void { /* no-op in local mode */ }
+  onGameStarted(_callback: () => void): void { /* no-op in local mode */ }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onObstaclesReady(_callback: (obstacles: ObstaclePayload[]) => void): void { /* no-op in local mode */ }
@@ -81,15 +76,11 @@ export class LocalAdapter implements INetworkAdapter {
       this.resolveShot(action.playerId, action.shotAtNodeId, hits);
     }
 
-    // 5. Determine next turn player (simple round-robin among alive players)
-    const nextTurnPlayerId = this.nextAlivePlayer(action.playerId);
-
     this.turnResultCallback?.({
       movingPlayerId: action.playerId,
       newNodeId: action.moveToNodeId,
       newAngle,
       hits,
-      nextTurnPlayerId,
     });
   }
 
@@ -109,13 +100,5 @@ export class LocalAdapter implements INetworkAdapter {
       target.takeDamage(damage);
       hits.push({ targetId, damage, isEliminated: !target.isAlive });
     }
-  }
-
-  private nextAlivePlayer(currentPlayerId: string): string {
-    const ids = Array.from(this.model.players.keys()).filter(
-      id => this.model.players.get(id)?.isAlive
-    );
-    const idx = ids.indexOf(currentPlayerId);
-    return ids[(idx + 1) % ids.length] ?? currentPlayerId;
   }
 }

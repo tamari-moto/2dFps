@@ -14,7 +14,6 @@ export class InputHandler {
   private meshToNodeMap: Map<number, number>;
   private eventBus: GameEventBus;
   private playerIds: string[];
-  private myTurn: boolean = true; // local mode: always true
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -44,18 +43,9 @@ export class InputHandler {
   }
 
   /**
-   * Called by the game host to enable/disable input based on whose turn it is.
-   * In local mode this is always true; in online mode ColyseusAdapter drives this.
-   */
-  setTurnState(isMyTurn: boolean): void {
-    this.myTurn = isMyTurn;
-  }
-
-  /**
    * Handles canvas click events
    */
   private handleCanvasClick(event: MouseEvent): void {
-    if (!this.myTurn) return;
     const intersects = this.getIntersects(event);
 
     if (intersects.length > 0) {

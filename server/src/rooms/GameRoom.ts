@@ -57,15 +57,12 @@ export class GameRoom extends Room<GameState> {
     this.logic.generateObstacles();
     this.logic.initializePlayers(this.state.players);
 
-    // Use the player order established by initializePlayers (insertion order = join order)
-    const firstPlayerId = this.logic.getFirstPlayerId();
-    this.state.currentTurnPlayerId = firstPlayerId;
     this.state.gameStarted = true;
 
     // Send obstacles before game_started so clients can apply them in initializeModel()
     this.broadcast('obstacles_ready', { obstacles: this.logic.getObstacles() });
-    this.broadcast('game_started', { firstTurnPlayerId: firstPlayerId });
-    console.log(`[GameRoom] game started — first turn: ${firstPlayerId}`);
+    this.broadcast('game_started', {});
+    console.log('[GameRoom] game started');
   }
 
   private handleTurnAction(client: Client, action: TurnAction): void {
@@ -79,18 +76,12 @@ export class GameRoom extends Room<GameState> {
       return;
     }
 
-    if (client.sessionId !== this.state.currentTurnPlayerId) {
-      client.send('error', { code: 'NOT_YOUR_TURN' });
-      return;
-    }
-
-    const result = this.logic.processTurn(action, this.state.players, this.state.currentTurnPlayerId);
+    const result = this.logic.processTurn(action, this.state.players);
     if (!result) {
       client.send('error', { code: 'INVALID_ACTION' });
       return;
     }
 
-    this.state.currentTurnPlayerId = result.nextTurnPlayerId;
     this.broadcast('turn_result', result);
 
     // Check win condition

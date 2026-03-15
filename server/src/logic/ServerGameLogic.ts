@@ -34,7 +34,6 @@ export interface TurnResult {
   newNodeId: number;
   newAngle: number;
   hits: HitResult[];
-  nextTurnPlayerId: string;
 }
 
 export interface ObstacleSegmentData {
@@ -52,13 +51,11 @@ export interface ObstaclePayload {
 export class ServerGameLogic {
   private nodes: NodePos[];
   private adjacency: number[][];   // adjacency[nodeId] = connected node ids
-  private playerOrder: string[];   // ordered list of player IDs for turns
   private generatedObstacles: ObstaclePayload[] = [];
 
   constructor() {
     this.nodes = this.buildNodes();
     this.adjacency = this.buildAdjacency();
-    this.playerOrder = [];
   }
 
   // ---- map building ---------------------------------------------------------
@@ -125,26 +122,6 @@ export class ServerGameLogic {
     return Math.acos(Math.max(-1, Math.min(1, dot))) * (180 / Math.PI);
   }
 
-  // ---- player order management ----------------------------------------------
-
-  getFirstPlayerId(): string {
-    return this.playerOrder[0] ?? '';
-  }
-
-  setPlayerOrder(playerIds: string[]): void {
-    this.playerOrder = [...playerIds];
-  }
-
-  nextTurnPlayerId(currentId: string, players: MapSchema<PlayerState>): string {
-    const alivePlayers = this.playerOrder.filter(id => {
-      const p = players.get(id);
-      return p && p.isAlive;
-    });
-    if (alivePlayers.length === 0) return '';
-    const idx = alivePlayers.indexOf(currentId);
-    return alivePlayers[(idx + 1) % alivePlayers.length];
-  }
-
   // ---- obstacle generation --------------------------------------------------
 
   generateObstacles(
@@ -199,7 +176,6 @@ export class ServerGameLogic {
       p.color = this.hslToHex((i / ids.length) * 360, 100, 50);
     });
 
-    this.playerOrder = ids;
   }
 
   // ---- turn processing ------------------------------------------------------
@@ -207,10 +183,7 @@ export class ServerGameLogic {
   processTurn(
     action: TurnAction,
     players: MapSchema<PlayerState>,
-    currentTurnPlayerId: string,
   ): TurnResult | null {
-    if (action.playerId !== currentTurnPlayerId) return null;
-
     const actor = players.get(action.playerId);
     if (!actor || !actor.isAlive) return null;
 
@@ -274,14 +247,11 @@ export class ServerGameLogic {
       }
     }
 
-    const nextId = this.nextTurnPlayerId(action.playerId, players);
-
     return {
       movingPlayerId: action.playerId,
       newNodeId: actor.nodeId,
       newAngle: actor.angle,
       hits,
-      nextTurnPlayerId: nextId,
     };
   }
 

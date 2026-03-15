@@ -16,7 +16,6 @@ export interface TurnResult {
   newNodeId: number;
   newAngle: number;
   hits: Array<{ targetId: string; damage: number; isEliminated: boolean }>;
-  nextTurnPlayerId: string;
 }
 
 /** Obstacle segment data transferred over the network */

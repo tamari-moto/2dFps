@@ -53,8 +53,6 @@ export class GameController {
    * Handles node click events
    */
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
-    if (!this.networkAdapter.isMyTurn()) return;
-
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
@@ -172,17 +170,9 @@ export class GameController {
 
   /**
    * Called when the game starts (≥2 players connected).
-   * Updates the active player to whoever goes first.
    */
-  private handleGameStarted(firstTurnPlayerId: string): void {
-    this.activePlayerId = firstTurnPlayerId;
-    this.visualizationSync.setActivePlayer(firstTurnPlayerId);
-    const myId = this.networkAdapter.getMyPlayerId();
-    if (firstTurnPlayerId === myId) {
-      console.log(`▶ Game started! Your turn first. (${myId})`);
-    } else {
-      console.log(`⏳ Game started! Waiting for ${firstTurnPlayerId}...`);
-    }
+  private handleGameStarted(): void {
+    console.log(`▶ Game started! (${this.networkAdapter.getMyPlayerId()})`);
     this.visualizationSync.updateView();
   }
 
@@ -209,21 +199,8 @@ export class GameController {
       });
     }
 
-    if (result.hits.length === 0 && result.nextTurnPlayerId !== '') {
+    if (result.hits.length === 0) {
       console.log(`❌ ${result.movingPlayerId} missed!`);
-    }
-
-    // In online mode: update activePlayerId to match whose turn it now is.
-    // (In local mode isMyTurn() always returns true so this is a no-op for clicks.)
-    if (result.nextTurnPlayerId) {
-      this.activePlayerId = result.nextTurnPlayerId;
-      this.visualizationSync.setActivePlayer(result.nextTurnPlayerId);
-      const myId = this.networkAdapter.getMyPlayerId();
-      if (result.nextTurnPlayerId === myId) {
-        console.log(`▶ Your turn! (${myId})`);
-      } else {
-        console.log(`⏳ Waiting for ${result.nextTurnPlayerId}...`);
-      }
     }
 
     this.visualizationSync.updateView();
