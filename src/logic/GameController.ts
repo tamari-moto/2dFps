@@ -185,7 +185,7 @@ export class GameController {
    */
   private handleGameStarted(): void {
     console.log(`▶ Game started! (${this.networkAdapter.getMyPlayerId()})`);
-    this.visualizationSync.updateView();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
 
   /**
@@ -211,7 +211,7 @@ export class GameController {
       console.log(`❌ ${result.movingPlayerId} missed!`);
     }
 
-    this.visualizationSync.updateView();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
 
   /**
