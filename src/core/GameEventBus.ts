@@ -30,6 +30,19 @@ export enum GameEventType {
   VIEW_ANGLE_TOGGLED = 'view:angle_toggled',
   CAMERA_MOVED = 'camera:moved',
 
+  // Visualization commands (GameController → VisualizationSync)
+  VIS_UPDATE_VIEW = 'vis:update_view',
+  VIS_SET_ACTIVE_PLAYER = 'vis:set_active_player',
+  VIS_SET_SELECT_MESH = 'vis:set_select_mesh',
+  VIS_SET_NEXT_MESH = 'vis:set_next_mesh',
+  VIS_SET_SHOT_MESH = 'vis:set_shot_mesh',
+  VIS_CLEAR_NEXT_MESH = 'vis:clear_next_mesh',
+  VIS_CLEAR_SHOT_MESH = 'vis:clear_shot_mesh',
+  VIS_SHOW_HIT_EFFECT = 'vis:show_hit_effect',
+  VIS_HIDE_PLAYER = 'vis:hide_player',
+  VIS_TOGGLE_VIEW_ANGLE = 'vis:toggle_view_angle',
+  VIS_UPDATE_OBSTACLES = 'vis:update_obstacles',
+
   // Map events
   MAP_GENERATED = 'map:generated',
   OBSTACLES_UPDATED = 'obstacles:updated',

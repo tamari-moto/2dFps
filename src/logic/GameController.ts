@@ -1,7 +1,6 @@
-import * as THREE from 'three';
 import { Model } from '../model/model';
+import type { ObstacleData } from '../model/ObstacleExporter';
 import { State, GameEvent, StateMachine } from './StateMachine';
-import { VisualizationSync } from '../rendering/VisualizationSync';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerConfig } from '../config/GameConfig';
 import { Player } from '../model/Player';
@@ -15,23 +14,26 @@ import type { TurnResult } from '../schema/types';
  */
 export class GameController {
   private model: Model;
-  private visualizationSync: VisualizationSync;
   private eventBus: GameEventBus;
   private activePlayerId: string;
   private networkAdapter: INetworkAdapter;
+  private stateMachines: Map<string, StateMachine> = new Map();
 
   constructor(
     model: Model,
-    visualizationSync: VisualizationSync,
     eventBus: GameEventBus,
     activePlayerId: string,
     networkAdapter: INetworkAdapter
   ) {
     this.model = model;
-    this.visualizationSync = visualizationSync;
     this.eventBus = eventBus;
     this.activePlayerId = activePlayerId;
     this.networkAdapter = networkAdapter;
+
+    // Create a StateMachine for each player
+    for (const playerId of model.players.keys()) {
+      this.stateMachines.set(playerId, new StateMachine());
+    }
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
@@ -50,13 +52,23 @@ export class GameController {
   }
 
   /**
+   * Gets or creates a StateMachine for the given player
+   */
+  private getStateMachine(playerId: string): StateMachine {
+    if (!this.stateMachines.has(playerId)) {
+      this.stateMachines.set(playerId, new StateMachine());
+    }
+    return this.stateMachines.get(playerId)!;
+  }
+
+  /**
    * Handles node click events
    */
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
-    const sm = activePlayer.stateMachine;
+    const sm = this.getStateMachine(this.activePlayerId);
     const clickedNode = this.model.nodeList[data.nodeId];
 
     if (!clickedNode) return;
@@ -73,7 +85,7 @@ export class GameController {
       this.handleShotStateClick(activePlayer, clickedNode, sm);
     }
 
-    this.visualizationSync.updateView();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
 
   /**
@@ -82,8 +94,7 @@ export class GameController {
   private handleIdleStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.SelectPlayer);
-      const mesh = this.findMeshByNodeId(clickedNode.id);
-      if (mesh) this.visualizationSync.setPlayerSelectMesh(mesh);
+      this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: clickedNode.id });
     }
   }
 
@@ -95,7 +106,8 @@ export class GameController {
                     this.model.areNodesConnected(activePlayer.node, clickedNode);
     if (canMove) {
       sm.transition(GameEvent.MovePlayer);
-      this.applyNextMesh(clickedNode.id);
+      this.currentNextNodeId = clickedNode.id;
+      this.eventBus.emit(GameEventType.VIS_SET_NEXT_MESH, { nodeId: clickedNode.id });
     }
   }
 
@@ -103,38 +115,39 @@ export class GameController {
    * Handles clicks in Move state
    */
   private handleMoveStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
-    if (this.tryShotTarget(activePlayer, clickedNode, sm)) return;
+    this.tryShotTarget(activePlayer, clickedNode, sm);
   }
 
   /**
    * Handles clicks in Shot state
    */
   private handleShotStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
-    const shotNodeId = this.getMeshToNodeMap().get(this.visualizationSync.getPlayerShotMesh().id);
-
-    if (shotNodeId === clickedNode.id) {
+    if (this.currentShotNodeId === clickedNode.id) {
       this.executeTurn(sm);
     } else {
       this.tryShotTarget(activePlayer, clickedNode, sm);
     }
   }
 
+  // Tracks the currently selected next/shot node IDs (replaces VisualizationSync mesh queries)
+  private currentNextNodeId: number | undefined;
+  private currentShotNodeId: number | undefined;
+
   /**
    * Checks if a node is visible from the next move position and sets it as the shot target.
-   * Returns true if the shot target was successfully set.
    */
   private tryShotTarget(activePlayer: Player, clickedNode: node, sm: StateMachine): boolean {
-    const nextNodeId = this.getMeshToNodeMap().get(this.visualizationSync.getPlayerNextMesh().id);
-    if (nextNodeId === undefined) return false;
+    if (this.currentNextNodeId === undefined) return false;
 
-    const nextNode = this.model.nodeList[nextNodeId];
+    const nextNode = this.model.nodeList[this.currentNextNodeId];
     const isVisible = this.model
       .getVisibleNodesAtAngle(nextNode, activePlayer.angle, PlayerConfig.MaxViewDistance)
       .some(n => n.id === clickedNode.id);
 
     if (isVisible) {
       sm.transition(GameEvent.ShotPlayer);
-      this.applyShotMesh(clickedNode.id);
+      this.currentShotNodeId = clickedNode.id;
+      this.eventBus.emit(GameEventType.VIS_SET_SHOT_MESH, { nodeId: clickedNode.id });
       return true;
     }
     return false;
@@ -142,23 +155,22 @@ export class GameController {
 
   /**
    * Executes a complete turn by delegating to the network adapter.
-   * LocalAdapter runs the logic in-process; ColyseusAdapter sends it to the server.
    */
   private executeTurn(sm: StateMachine): void {
     sm.transition(GameEvent.Complete);
 
-    const nextMesh = this.visualizationSync.getPlayerNextMesh();
-    const shotMesh = this.visualizationSync.getPlayerShotMesh();
-    const nextNodeId = this.getMeshToNodeMap().get(nextMesh.id);
-    const shotNodeId = this.getMeshToNodeMap().get(shotMesh.id);
+    const nextNodeId = this.currentNextNodeId;
+    const shotNodeId = this.currentShotNodeId;
 
     if (nextNodeId === undefined) return;
 
     // Reset visual state immediately
     sm.transition(GameEvent.SelectPlayer);
-    this.visualizationSync.setPlayerSelectMesh(nextMesh);
-    this.visualizationSync.setPlayerNextMesh(this.visualizationSync.getUndefinedMesh());
-    this.visualizationSync.setPlayerShotMesh(this.visualizationSync.getUndefinedMesh());
+    this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: nextNodeId });
+    this.currentNextNodeId = undefined;
+    this.currentShotNodeId = undefined;
+    this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
+    this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
 
     // Delegate logic to adapter; result is applied via applyTurnResult callback
     this.networkAdapter.sendTurnAction({
@@ -178,18 +190,14 @@ export class GameController {
 
   /**
    * Applies a turn result received from the network adapter.
-   * Called by LocalAdapter synchronously, or by ColyseusAdapter after server response.
    */
   private applyTurnResult(result: TurnResult): void {
-    // Update moving player's position and angle (already done inside LocalAdapter,
-    // but we keep this for ColyseusAdapter where the model is updated here)
     const movingPlayer = this.model.getPlayer(result.movingPlayerId);
     if (movingPlayer) {
       this.model.setPlayerRef(result.movingPlayerId, this.model.nodeList[result.newNodeId]);
       movingPlayer.setAngle(result.newAngle);
     }
 
-    // Apply hit results
     for (const hit of result.hits) {
       console.log(`🎯 ${result.movingPlayerId} HIT ${hit.targetId}!`);
       this.eventBus.emit(GameEventType.HIT_DETECTED, {
@@ -210,15 +218,14 @@ export class GameController {
    * Handles empty canvas clicks (cancel action)
    */
   private handleCanvasEmptyClick(): void {
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
-    if (!activePlayer) return;
-
-    const sm = activePlayer.stateMachine;
+    const sm = this.getStateMachine(this.activePlayerId);
     sm.transition(GameEvent.Cancel);
-    this.visualizationSync.setPlayerShotMesh(this.visualizationSync.getUndefinedMesh());
-    this.visualizationSync.setPlayerNextMesh(this.visualizationSync.getUndefinedMesh());
+    this.currentShotNodeId = undefined;
+    this.currentNextNodeId = undefined;
+    this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
+    this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     sm.transition(GameEvent.SelectPlayer);
-    this.visualizationSync.updateView();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
 
   /**
@@ -226,7 +233,7 @@ export class GameController {
    */
   private handlePlayerSwitch(data: { currentPlayerId: string }): void {
     this.activePlayerId = data.currentPlayerId;
-    this.visualizationSync.setActivePlayer(data.currentPlayerId);
+    this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
     console.log(`Switched to ${data.currentPlayerId}`);
   }
 
@@ -234,13 +241,11 @@ export class GameController {
    * Handles view angle toggle
    */
   private handleViewAngleToggle(): void {
-    const isVisible = this.visualizationSync.toggleViewAngle();
-    console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
+    this.eventBus.emit(GameEventType.VIS_TOGGLE_VIEW_ANGLE);
   }
 
   /**
-   * Handles hit detection events (damage already applied by the adapter).
-   * Responsible for visual feedback only.
+   * Handles hit detection events.
    */
   private handleHitDetected(data: { attackerId: string; targetId: string; nodeId: number }): void {
     console.log(`💥 ${data.attackerId} hit ${data.targetId} at node ${data.nodeId}!`);
@@ -248,7 +253,7 @@ export class GameController {
     const targetPlayer = this.model.getPlayer(data.targetId);
     if (targetPlayer) {
       console.log(`${data.targetId} HP: ${targetPlayer.health}/${targetPlayer.maxHealth}`);
-      this.visualizationSync.showHitEffect(data.targetId);
+      this.eventBus.emit(GameEventType.VIS_SHOW_HIT_EFFECT, { playerId: data.targetId });
 
       if (!targetPlayer.isAlive) {
         this.handlePlayerElimination(data.targetId);
@@ -261,47 +266,12 @@ export class GameController {
    */
   private handlePlayerElimination(playerId: string): void {
     console.log(`⚰️ ${playerId} has been eliminated!`);
+    this.eventBus.emit(GameEventType.VIS_HIDE_PLAYER, { playerId });
 
-    // Hide the eliminated player's mesh
-    this.visualizationSync.hidePlayer(playerId);
-
-    // Check for game over (only one player remaining)
     const alivePlayers = Array.from(this.model.players.values()).filter(p => p.isAlive);
     if (alivePlayers.length === 1) {
       console.log(`🏆 ${alivePlayers[0].id} wins!`);
     }
-  }
-
-  /**
-   * Sets the next move mesh by node ID
-   */
-  private applyNextMesh(nodeId: number): void {
-    const mesh = this.findMeshByNodeId(nodeId);
-    if (mesh) this.visualizationSync.setPlayerNextMesh(mesh);
-  }
-
-  /**
-   * Sets the shot target mesh by node ID
-   */
-  private applyShotMesh(nodeId: number): void {
-    const mesh = this.findMeshByNodeId(nodeId);
-    if (mesh) this.visualizationSync.setPlayerShotMesh(mesh);
-  }
-
-  /**
-   * Finds a mesh by node ID
-   */
-  private findMeshByNodeId(nodeId: number): THREE.Mesh | undefined {
-    const meshList = this.visualizationSync.getMeshList();
-    const meshToNodeMap = this.getMeshToNodeMap();
-    return meshList.find(m => meshToNodeMap.get(m.id) === nodeId);
-  }
-
-  /**
-   * Gets the mesh-to-node mapping
-   */
-  private getMeshToNodeMap(): Map<number, number> {
-    return this.visualizationSync.getMeshToNodeMap();
   }
 
   /**
@@ -316,15 +286,15 @@ export class GameController {
    */
   regenerateObstacles(): void {
     this.model.generateRandomObstacles();
-    this.visualizationSync.updateObstacles();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
   }
 
   /**
    * Imports obstacles
    */
-  importObstacles(obstaclesData: any[]): void {
+  importObstacles(obstaclesData: ObstacleData[]): void {
     this.model.importObstacles(obstaclesData);
-    this.visualizationSync.updateObstacles();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
   }
 
   /**
@@ -332,6 +302,6 @@ export class GameController {
    */
   generateComplexMap(): void {
     this.model.generateComplexMap();
-    this.visualizationSync.updateObstacles();
+    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
   }
 }
