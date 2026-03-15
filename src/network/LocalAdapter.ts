@@ -54,12 +54,15 @@ export class LocalAdapter implements INetworkAdapter {
     const player = this.model.getPlayer(action.playerId);
     if (!player) return;
 
-    // 1. Move
+    // 1. Record position before move
+    const fromNode = player.node;
+
+    // 2. Move
     const newNode = this.model.nodeList[action.moveToNodeId];
     if (!newNode) return;
     this.model.setPlayerRef(action.playerId, newNode);
 
-    // 2. Update facing angle (toward shot target if provided, else unchanged)
+    // 3. Update facing angle: toward shot target if provided, else toward move destination
     let newAngle = player.angle;
     if (action.shotAtNodeId !== undefined) {
       const shotNode = this.model.nodeList[action.shotAtNodeId];
@@ -67,15 +70,18 @@ export class LocalAdapter implements INetworkAdapter {
         newAngle = this.model.getAngleBetweenNodes(newNode, shotNode);
         player.setAngle(newAngle);
       }
+    } else if (action.moveToNodeId !== fromNode.id) {
+      newAngle = this.model.getAngleBetweenNodes(fromNode, newNode);
+      player.setAngle(newAngle);
     }
 
-    // 3. Shot resolution
+    // 4. Shot resolution
     const hits: TurnResult['hits'] = [];
     if (action.shotAtNodeId !== undefined) {
       this.resolveShot(action.playerId, action.shotAtNodeId, hits);
     }
 
-    // 4. Determine next turn player (simple round-robin among alive players)
+    // 5. Determine next turn player (simple round-robin among alive players)
     const nextTurnPlayerId = this.nextAlivePlayer(action.playerId);
 
     this.turnResultCallback?.({

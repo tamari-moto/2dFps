@@ -229,8 +229,13 @@ export class ServerGameLogic {
 
     actor.nodeId = action.moveToNodeId;
 
-    // Update angle toward new position (or keep current if staying put)
-    if (action.moveToNodeId !== fromNode.id) {
+    // Update angle: toward shot target if provided, else toward move destination
+    if (action.shotAtNodeId !== undefined) {
+      const shotNode = this.nodes[action.shotAtNodeId];
+      if (shotNode) {
+        actor.angle = this.angleBetween(toNode, shotNode) * (180 / Math.PI);
+      }
+    } else if (action.moveToNodeId !== fromNode.id) {
       actor.angle = this.angleBetween(fromNode, toNode) * (180 / Math.PI);
     }
 
