@@ -54,6 +54,7 @@ export class GameRoom extends Room<GameState> {
   // ---- private helpers ------------------------------------------------------
 
   private startGame(): void {
+    this.logic.generateObstacles();
     this.logic.initializePlayers(this.state.players);
 
     // Use the player order established by initializePlayers (insertion order = join order)
@@ -61,6 +62,8 @@ export class GameRoom extends Room<GameState> {
     this.state.currentTurnPlayerId = firstPlayerId;
     this.state.gameStarted = true;
 
+    // Send obstacles before game_started so clients can apply them in initializeModel()
+    this.broadcast('obstacles_ready', { obstacles: this.logic.getObstacles() });
     this.broadcast('game_started', { firstTurnPlayerId: firstPlayerId });
     console.log(`[GameRoom] game started — first turn: ${firstPlayerId}`);
   }

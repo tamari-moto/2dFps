@@ -1,6 +1,6 @@
 import { Model } from '../model/model';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
 import { ENTITY_IDS } from '../config/GameConstants';
 
@@ -42,6 +42,9 @@ export class LocalAdapter implements INetworkAdapter {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onGameStarted(_callback: (firstTurnPlayerId: string) => void): void { /* no-op in local mode */ }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onObstaclesReady(_callback: (obstacles: ObstaclePayload[]) => void): void { /* no-op in local mode */ }
 
   /**
    * Executes a turn synchronously (ported from GameController.executeTurn /

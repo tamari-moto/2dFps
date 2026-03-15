@@ -1,5 +1,5 @@
 import { Model } from '../model/model';
-import { TurnAction, TurnResult } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload } from '../schema/types';
 
 /**
  * Abstraction layer between game logic and transport (local / online).
@@ -37,4 +37,7 @@ export interface INetworkAdapter {
 
   /** Register a callback invoked when the game starts (≥2 players ready) */
   onGameStarted(callback: (firstTurnPlayerId: string) => void): void;
+
+  /** Register a callback invoked when obstacle data arrives from the server */
+  onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void;
 }

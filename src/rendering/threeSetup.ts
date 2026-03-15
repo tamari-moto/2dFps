@@ -57,6 +57,11 @@ export class ThreeSetup {
       adapter
     );
 
+    // Re-apply obstacles + redraw if obstacles_ready arrives after initializeModel()
+    adapter.onObstaclesReady((obstacles) => {
+      this.gameController.importObstacles(obstacles);
+    });
+
     // Start render loop
     this.startRenderLoop();
 

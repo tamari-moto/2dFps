@@ -2,7 +2,7 @@ import * as Colyseus from 'colyseus.js';
 import { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ObstaclesReadyPayload } from '../schema/types';
 
 /**
  * Online-play implementation of INetworkAdapter.
@@ -22,7 +22,9 @@ export class ColyseusAdapter implements INetworkAdapter {
   private playerJoinedCallback?: (playerId: string) => void;
   private playerLeftCallback?: (playerId: string) => void;
   private gameStartedCallback?: (firstTurnPlayerId: string) => void;
+  private obstaclesReadyCallback?: (obstacles: ObstaclePayload[]) => void;
   private pendingGameStarted?: string; // cached firstTurnPlayerId if game_started arrived early
+  private pendingObstacles: ObstaclesReadyPayload | null = null;
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
     this.client = new Colyseus.Client(serverUrl);
@@ -58,9 +60,12 @@ export class ColyseusAdapter implements INetworkAdapter {
         this.pendingGameStarted = data.firstTurnPlayerId;
       }
     });
-    this.room.onMessage('game_over', (_data: { winnerId: string | null }) => {});
-    this.room.onMessage('obstacles_ready', (_data: { rects: number[] }) => {});
-    this.room.onMessage('player_left', (_data: { playerId: string }) => {});
+    this.room.onMessage('game_over', () => {});
+    this.room.onMessage('obstacles_ready', (data: ObstaclesReadyPayload) => {
+      this.pendingObstacles = data;
+      this.obstaclesReadyCallback?.(data.obstacles);
+    });
+    this.room.onMessage('player_left', () => {});
 
     // Turn result from server
     this.room.onMessage('turn_result', (data: TurnResult) => {
@@ -124,6 +129,15 @@ export class ColyseusAdapter implements INetworkAdapter {
   initializeModel(): Model {
     this.model = new Model();
 
+    // Override locally-generated obstacles with the server's shared obstacle layout.
+    if (this.pendingObstacles) {
+      // ObstaclePayload[].segments are plain objects; importObstacles() converts
+      // them to LineSegment instances internally via MapGenerator.importObstacles().
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.model.importObstacles(this.pendingObstacles.obstacles as any);
+      this.pendingObstacles = null;
+    }
+
     // Replace the local-play default players with the server's player set.
     this.model.players.clear();
     this.room.state.players.forEach((sp: {
@@ -176,6 +190,14 @@ export class ColyseusAdapter implements INetworkAdapter {
     if (this.pendingGameStarted !== undefined) {
       callback(this.pendingGameStarted);
       this.pendingGameStarted = undefined;
+    }
+  }
+
+  onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void {
+    this.obstaclesReadyCallback = callback;
+    // Fire immediately if obstacles_ready arrived before this callback was registered
+    if (this.pendingObstacles) {
+      callback(this.pendingObstacles.obstacles);
     }
   }
 
