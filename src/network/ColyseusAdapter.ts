@@ -2,7 +2,7 @@ import * as Colyseus from 'colyseus.js';
 import { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ObstaclesReadyPayload } from '../schema/types';
 
 /**
  * Online-play implementation of INetworkAdapter.
@@ -21,8 +21,10 @@ export class ColyseusAdapter implements INetworkAdapter {
   private turnResultCallback?: (result: TurnResult) => void;
   private playerJoinedCallback?: (playerId: string) => void;
   private playerLeftCallback?: (playerId: string) => void;
-  private gameStartedCallback?: (firstTurnPlayerId: string) => void;
-  private pendingGameStarted?: string; // cached firstTurnPlayerId if game_started arrived early
+  private gameStartedCallback?: () => void;
+  private obstaclesReadyCallback?: (obstacles: ObstaclePayload[]) => void;
+  private pendingGameStarted?: boolean; // cached flag if game_started arrived early
+  private pendingObstacles: ObstaclesReadyPayload | null = null;
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
     this.client = new Colyseus.Client(serverUrl);
@@ -50,17 +52,20 @@ export class ColyseusAdapter implements INetworkAdapter {
     });
 
     // Game lifecycle messages
-    this.room.onMessage('game_started', (data: { firstTurnPlayerId: string }) => {
+    this.room.onMessage('game_started', () => {
       if (this.gameStartedCallback) {
-        this.gameStartedCallback(data.firstTurnPlayerId);
+        this.gameStartedCallback();
       } else {
-        // Callback not yet registered (startGame hasn't been called yet) — cache it
-        this.pendingGameStarted = data.firstTurnPlayerId;
+        // Callback not yet registered — cache the flag
+        this.pendingGameStarted = true;
       }
     });
-    this.room.onMessage('game_over', (_data: { winnerId: string | null }) => {});
-    this.room.onMessage('obstacles_ready', (_data: { rects: number[] }) => {});
-    this.room.onMessage('player_left', (_data: { playerId: string }) => {});
+    this.room.onMessage('game_over', () => {});
+    this.room.onMessage('obstacles_ready', (data: ObstaclesReadyPayload) => {
+      this.pendingObstacles = data;
+      this.obstaclesReadyCallback?.(data.obstacles);
+    });
+    this.room.onMessage('player_left', () => {});
 
     // Turn result from server
     this.room.onMessage('turn_result', (data: TurnResult) => {
@@ -124,6 +129,15 @@ export class ColyseusAdapter implements INetworkAdapter {
   initializeModel(): Model {
     this.model = new Model();
 
+    // Override locally-generated obstacles with the server's shared obstacle layout.
+    if (this.pendingObstacles) {
+      // ObstaclePayload[].segments are plain objects; importObstacles() converts
+      // them to LineSegment instances internally via MapGenerator.importObstacles().
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.model.importObstacles(this.pendingObstacles.obstacles as any);
+      this.pendingObstacles = null;
+    }
+
     // Replace the local-play default players with the server's player set.
     this.model.players.clear();
     this.room.state.players.forEach((sp: {
@@ -146,10 +160,6 @@ export class ColyseusAdapter implements INetworkAdapter {
     return this.myPlayerId;
   }
 
-  isMyTurn(): boolean {
-    return this.room?.state?.currentTurnPlayerId === this.myPlayerId;
-  }
-
   sendTurnAction(action: TurnAction): void {
     this.room.send('turn_action', {
       playerId: action.playerId,
@@ -170,12 +180,20 @@ export class ColyseusAdapter implements INetworkAdapter {
     this.playerLeftCallback = callback;
   }
 
-  onGameStarted(callback: (firstTurnPlayerId: string) => void): void {
+  onGameStarted(callback: () => void): void {
     this.gameStartedCallback = callback;
     // Fire immediately if game_started arrived before this callback was registered
-    if (this.pendingGameStarted !== undefined) {
-      callback(this.pendingGameStarted);
+    if (this.pendingGameStarted) {
+      callback();
       this.pendingGameStarted = undefined;
+    }
+  }
+
+  onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void {
+    this.obstaclesReadyCallback = callback;
+    // Fire immediately if obstacles_ready arrived before this callback was registered
+    if (this.pendingObstacles) {
+      callback(this.pendingObstacles.obstacles);
     }
   }
 

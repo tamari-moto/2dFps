@@ -16,5 +16,21 @@ export interface TurnResult {
   newNodeId: number;
   newAngle: number;
   hits: Array<{ targetId: string; damage: number; isEliminated: boolean }>;
-  nextTurnPlayerId: string;
+}
+
+/** Obstacle segment data transferred over the network */
+export interface ObstacleSegmentData {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
+/** Single obstacle data transferred over the network */
+export interface ObstaclePayload {
+  id: number;
+  segments: ObstacleSegmentData[];
+}
+
+/** Payload for the obstacles_ready message */
+export interface ObstaclesReadyPayload {
+  obstacles: ObstaclePayload[];
 }

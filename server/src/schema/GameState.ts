@@ -11,6 +11,5 @@ export class PlayerState extends Schema {
 
 export class GameState extends Schema {
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
-  @type('string') currentTurnPlayerId: string = '';
   @type('boolean') gameStarted: boolean = false;
 }

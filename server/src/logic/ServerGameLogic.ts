@@ -34,7 +34,16 @@ export interface TurnResult {
   newNodeId: number;
   newAngle: number;
   hits: HitResult[];
-  nextTurnPlayerId: string;
+}
+
+export interface ObstacleSegmentData {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
+export interface ObstaclePayload {
+  id: number;
+  segments: ObstacleSegmentData[];
 }
 
 // ---- ServerGameLogic -------------------------------------------------------
@@ -42,12 +51,11 @@ export interface TurnResult {
 export class ServerGameLogic {
   private nodes: NodePos[];
   private adjacency: number[][];   // adjacency[nodeId] = connected node ids
-  private playerOrder: string[];   // ordered list of player IDs for turns
+  private generatedObstacles: ObstaclePayload[] = [];
 
   constructor() {
     this.nodes = this.buildNodes();
     this.adjacency = this.buildAdjacency();
-    this.playerOrder = [];
   }
 
   // ---- map building ---------------------------------------------------------
@@ -114,24 +122,40 @@ export class ServerGameLogic {
     return Math.acos(Math.max(-1, Math.min(1, dot))) * (180 / Math.PI);
   }
 
-  // ---- player order management ----------------------------------------------
+  // ---- obstacle generation --------------------------------------------------
 
-  getFirstPlayerId(): string {
-    return this.playerOrder[0] ?? '';
+  generateObstacles(
+    count: number = 3,
+    minWidth: number = 60,
+    maxWidth: number = 150,
+    minHeight: number = 60,
+    maxHeight: number = 150,
+  ): void {
+    const MAP_SIZE = (NODES_IN_GRID_SIZE - 1) * NODE_SPACING;
+    const MARGIN = 30;
+    const obstacles: ObstaclePayload[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const w = Math.floor(Math.random() * (maxWidth - minWidth + 1)) + minWidth;
+      const h = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+      const x = Math.floor(Math.random() * (MAP_SIZE - w - MARGIN * 2)) + MARGIN;
+      const y = Math.floor(Math.random() * (MAP_SIZE - h - MARGIN * 2)) + MARGIN;
+      obstacles.push({
+        id: i + 1,
+        segments: [
+          { start: { x, y }, end: { x: x + w, y } },
+          { start: { x: x + w, y }, end: { x: x + w, y: y + h } },
+          { start: { x: x + w, y: y + h }, end: { x, y: y + h } },
+          { start: { x, y: y + h }, end: { x, y } },
+        ],
+      });
+    }
+
+    this.generatedObstacles = obstacles;
   }
 
-  setPlayerOrder(playerIds: string[]): void {
-    this.playerOrder = [...playerIds];
-  }
-
-  nextTurnPlayerId(currentId: string, players: MapSchema<PlayerState>): string {
-    const alivePlayers = this.playerOrder.filter(id => {
-      const p = players.get(id);
-      return p && p.isAlive;
-    });
-    if (alivePlayers.length === 0) return '';
-    const idx = alivePlayers.indexOf(currentId);
-    return alivePlayers[(idx + 1) % alivePlayers.length];
+  getObstacles(): ObstaclePayload[] {
+    return this.generatedObstacles;
   }
 
   // ---- initial placement ----------------------------------------------------
@@ -152,7 +176,6 @@ export class ServerGameLogic {
       p.color = this.hslToHex((i / ids.length) * 360, 100, 50);
     });
 
-    this.playerOrder = ids;
   }
 
   // ---- turn processing ------------------------------------------------------
@@ -160,10 +183,7 @@ export class ServerGameLogic {
   processTurn(
     action: TurnAction,
     players: MapSchema<PlayerState>,
-    currentTurnPlayerId: string,
   ): TurnResult | null {
-    if (action.playerId !== currentTurnPlayerId) return null;
-
     const actor = players.get(action.playerId);
     if (!actor || !actor.isAlive) return null;
 
@@ -182,8 +202,13 @@ export class ServerGameLogic {
 
     actor.nodeId = action.moveToNodeId;
 
-    // Update angle toward new position (or keep current if staying put)
-    if (action.moveToNodeId !== fromNode.id) {
+    // Update angle: toward shot target if provided, else toward move destination
+    if (action.shotAtNodeId !== undefined) {
+      const shotNode = this.nodes[action.shotAtNodeId];
+      if (shotNode) {
+        actor.angle = this.angleBetween(toNode, shotNode) * (180 / Math.PI);
+      }
+    } else if (action.moveToNodeId !== fromNode.id) {
       actor.angle = this.angleBetween(fromNode, toNode) * (180 / Math.PI);
     }
 
@@ -222,14 +247,11 @@ export class ServerGameLogic {
       }
     }
 
-    const nextId = this.nextTurnPlayerId(action.playerId, players);
-
     return {
       movingPlayerId: action.playerId,
       newNodeId: actor.nodeId,
       newAngle: actor.angle,
       hits,
-      nextTurnPlayerId: nextId,
     };
   }
 

@@ -1,5 +1,5 @@
 import { Model } from '../model/model';
-import { TurnAction, TurnResult } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload } from '../schema/types';
 
 /**
  * Abstraction layer between game logic and transport (local / online).
@@ -10,9 +10,6 @@ import { TurnAction, TurnResult } from '../schema/types';
 export interface INetworkAdapter {
   /** Returns the player ID assigned to the local user */
   getMyPlayerId(): string;
-
-  /** Returns true when it is the local user's turn to act */
-  isMyTurn(): boolean;
 
   /**
    * Initializes and returns the game Model.
@@ -36,5 +33,8 @@ export interface INetworkAdapter {
   onPlayerLeft(callback: (playerId: string) => void): void;
 
   /** Register a callback invoked when the game starts (≥2 players ready) */
-  onGameStarted(callback: (firstTurnPlayerId: string) => void): void;
+  onGameStarted(callback: () => void): void;
+
+  /** Register a callback invoked when obstacle data arrives from the server */
+  onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void;
 }
