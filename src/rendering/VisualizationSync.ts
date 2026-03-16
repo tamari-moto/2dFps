@@ -415,7 +415,7 @@ export class VisualizationSync {
     this.playerAnimState.delete(playerId);
   }
 
-  /** Start looping idle animation (breathing bob, arm sway, ring pulse) */
+  /** Start looping idle animation (cockpit emissive pulse) */
   private startIdleAnim(playerId: string): void {
     if (this.gltfTemplate) return;
     if (this.playerAnimState.get(playerId) === 'idle') return;
@@ -428,49 +428,15 @@ export class VisualizationSync {
 
     const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
 
-    // Head bob (local Z toward camera)
-    const head = this.getPlayerPart(obj, 'head');
-    if (head) {
-      anims.push(gsap.to(head.position, {
-        z: AnimationConfig.IdleHeadBobAmplitude,
-        duration: AnimationConfig.IdleHeadBobDuration / 2,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1,
-      }));
-    }
-
-    // Arm gentle sway (rotation.y, opposite phase)
-    const leftArm = this.getPlayerPart(obj, 'leftArm');
-    const rightArm = this.getPlayerPart(obj, 'rightArm');
-    if (leftArm) {
-      anims.push(gsap.to(leftArm.rotation, {
-        y: AnimationConfig.IdleArmSwayAngle,
-        duration: AnimationConfig.IdleArmSwayDuration / 2,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1,
-      }));
-    }
-    if (rightArm) {
-      anims.push(gsap.to(rightArm.rotation, {
-        y: -AnimationConfig.IdleArmSwayAngle,
-        duration: AnimationConfig.IdleArmSwayDuration / 2,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: -1,
-      }));
-    }
-
-    // Glow ring opacity pulse
-    const ring = this.getPlayerPart(obj, 'ring');
-    if (ring instanceof THREE.Mesh) {
-      const mat = ring.material as THREE.MeshStandardMaterial;
+    // Cockpit emissive pulse
+    const cockpit = this.getPlayerPart(obj, 'cockpit');
+    if (cockpit instanceof THREE.Mesh) {
+      const mat = cockpit.material as THREE.MeshStandardMaterial;
       anims.push(gsap.fromTo(mat,
-        { opacity: AnimationConfig.IdleRingOpacityMax },
+        { emissiveIntensity: AnimationConfig.IdleCockpitPulseMax },
         {
-          opacity: AnimationConfig.IdleRingOpacityMin,
-          duration: AnimationConfig.IdleRingPulseDuration / 2,
+          emissiveIntensity: AnimationConfig.IdleCockpitPulseMin,
+          duration: AnimationConfig.IdleCockpitPulseDuration / 2,
           ease: 'sine.inOut',
           yoyo: true,
           repeat: -1,
@@ -481,7 +447,7 @@ export class VisualizationSync {
     this.playerBodyAnims.set(playerId, anims);
   }
 
-  /** Trigger walk arm-swing animation; reverts to idle after movement completes */
+  /** Trigger walk thruster-sway animation; reverts to idle after movement completes */
   private startWalkAnim(playerId: string): void {
     if (this.gltfTemplate) return;
     if (this.playerAnimState.get(playerId) === 'walk') return;
@@ -493,22 +459,22 @@ export class VisualizationSync {
     if (!obj) return;
 
     const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
-    const angle = AnimationConfig.WalkArmSwingAngle;
-    const half = AnimationConfig.WalkArmSwingHalfDuration;
+    const sway = AnimationConfig.WalkThrusterSwayY;
+    const half = AnimationConfig.WalkThrusterSwayHalfDuration;
 
-    const leftArm = this.getPlayerPart(obj, 'leftArm');
-    const rightArm = this.getPlayerPart(obj, 'rightArm');
+    const thrusterL = this.getPlayerPart(obj, 'thrusterL');
+    const thrusterR = this.getPlayerPart(obj, 'thrusterR');
 
-    if (leftArm) {
-      anims.push(gsap.fromTo(leftArm.rotation,
-        { x: -angle },
-        { x: angle, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
+    if (thrusterL) {
+      anims.push(gsap.fromTo(thrusterL.position,
+        { y: -sway },
+        { y: sway, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
       ));
     }
-    if (rightArm) {
-      anims.push(gsap.fromTo(rightArm.rotation,
-        { x: angle },
-        { x: -angle, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
+    if (thrusterR) {
+      anims.push(gsap.fromTo(thrusterR.position,
+        { y: sway },
+        { y: -sway, duration: half, ease: 'sine.inOut', yoyo: true, repeat: -1 }
       ));
     }
 
@@ -522,7 +488,7 @@ export class VisualizationSync {
     }, AnimationConfig.MovementDuration * 1000);
   }
 
-  /** Trigger attack (arm thrust forward) animation; reverts to idle when done */
+  /** Trigger attack (barrel recoil + cockpit flash) animation; reverts to idle when done */
   private startAttackAnim(playerId: string): void {
     if (this.gltfTemplate) return;
 
@@ -533,24 +499,25 @@ export class VisualizationSync {
     if (!obj) return;
 
     const s = RenderConfig.PlayerMarkerSize;
-    const thrust = s * AnimationConfig.AttackArmThrustRatio;
-    const outDur = AnimationConfig.AttackThrustOutDuration;
-    const retDur = AnimationConfig.AttackThrustReturnDuration;
+    const thrust = s * AnimationConfig.AttackBarrelForwardRatio;
+    const outDur = AnimationConfig.AttackBarrelOutDuration;
+    const retDur = AnimationConfig.AttackBarrelReturnDuration;
 
-    const leftArm = this.getPlayerPart(obj, 'leftArm');
-    const rightArm = this.getPlayerPart(obj, 'rightArm');
+    const barrel = this.getPlayerPart(obj, 'barrel');
+    const cockpit = this.getPlayerPart(obj, 'cockpit');
 
     const tl = gsap.timeline({
       onComplete: () => this.startIdleAnim(playerId),
     });
 
-    if (leftArm) {
-      tl.to(leftArm.position, { y: `+=${thrust}`, duration: outDur, ease: 'power2.out' }, 0)
-        .to(leftArm.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' });
+    if (barrel) {
+      tl.to(barrel.position, { y: `+=${thrust}`, duration: outDur, ease: 'power3.out' }, 0)
+        .to(barrel.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' });
     }
-    if (rightArm) {
-      tl.to(rightArm.position, { y: `+=${thrust}`, duration: outDur, ease: 'power2.out' }, 0)
-        .to(rightArm.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' }, outDur);
+    if (cockpit instanceof THREE.Mesh) {
+      const mat = cockpit.material as THREE.MeshStandardMaterial;
+      tl.to(mat, { emissiveIntensity: 4.0, duration: outDur, ease: 'power3.out' }, 0)
+        .to(mat, { emissiveIntensity: AnimationConfig.IdleCockpitPulseMin, duration: retDur });
     }
 
     this.playerBodyAnims.set(playerId, [tl]);
