@@ -221,18 +221,3 @@ export function createPlayer(color: number = 0xffff00): THREE.Mesh {
   return new THREE.Mesh(geometry, material);
 }
 
-/**
- * Creates a player mesh from a preloaded GLTF template (clones the model, tints with color)
- */
-export function createPlayerFromGLTF(template: THREE.Group, color: number): THREE.Group {
-  const clone = template.clone(true);
-  clone.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.material = (child.material as THREE.Material).clone();
-      if ('color' in child.material) {
-        (child.material as THREE.MeshStandardMaterial).color.setHex(color);
-      }
-    }
-  });
-  return clone;
-}

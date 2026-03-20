@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
-import { createPlayerFromGLTF, createVariantPlayer } from './PlayerMeshFactory';
+import { createVariantPlayer } from './PlayerMeshFactory';
 import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
 import { createUndefinedMesh, setNodeColor } from './MeshUtils';
 import { SceneManager } from './SceneManager';
@@ -23,9 +23,6 @@ export class VisualizationSync {
   // Mesh collections
   private meshList: THREE.Mesh[] = [];
   private playerMeshes: Map<string, THREE.Object3D> = new Map();
-
-  // GLTF template for player models (null = use fallback arrow shape)
-  private gltfTemplate: THREE.Group | null = null;
 
   // Mapping between meshes and nodes
   private meshToNodeMap: Map<number, number> = new Map();
@@ -49,12 +46,10 @@ export class VisualizationSync {
     model: Model,
     activePlayerId: string,
     eventBus: GameEventBus,
-    gltfTemplate?: THREE.Group
   ) {
     this.sceneManager = sceneManager;
     this.model = model;
     this.activePlayerId = activePlayerId;
-    this.gltfTemplate = gltfTemplate ?? null;
 
     this.viewAngleVisualizer = new ViewAngleVisualizer(sceneManager.getScene());
 
@@ -68,13 +63,7 @@ export class VisualizationSync {
     this.subscribeToEvents(eventBus);
   }
 
-  /**
-   * Creates a player Object3D: GLTF model if available, otherwise primitive character
-   */
   private createPlayerObject(color: number): THREE.Object3D {
-    if (this.gltfTemplate) {
-      return createPlayerFromGLTF(this.gltfTemplate, color);
-    }
     return createVariantPlayer(color);
   }
 
@@ -223,8 +212,7 @@ export class VisualizationSync {
         obj.rotation.y = (player.angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
         obj.rotation.z = 0;
 
-        // Highlight active player (preserve GLTF base scale)
-        const baseScale = this.gltfTemplate ? RenderConfig.PlayerModelScale : 1;
+        const baseScale = 1;
         const scale = (playerId === this.activePlayerId
           ? PLAYER_CONSTANTS.ACTIVE_SCALE
           : PLAYER_CONSTANTS.NORMAL_SCALE) * baseScale;
@@ -417,7 +405,6 @@ export class VisualizationSync {
 
   /** Start looping idle animation (cockpit emissive pulse) */
   private startIdleAnim(playerId: string): void {
-    if (this.gltfTemplate) return;
     if (this.playerAnimState.get(playerId) === 'idle') return;
 
     this.killBodyAnims(playerId);
@@ -449,7 +436,6 @@ export class VisualizationSync {
 
   /** Trigger walk thruster-sway animation; reverts to idle after movement completes */
   private startWalkAnim(playerId: string): void {
-    if (this.gltfTemplate) return;
     if (this.playerAnimState.get(playerId) === 'walk') return;
 
     this.killBodyAnims(playerId);
@@ -490,7 +476,6 @@ export class VisualizationSync {
 
   /** Trigger attack (barrel recoil + cockpit flash) animation; reverts to idle when done */
   private startAttackAnim(playerId: string): void {
-    if (this.gltfTemplate) return;
 
     this.killBodyAnims(playerId);
     this.playerAnimState.set(playerId, 'attack');

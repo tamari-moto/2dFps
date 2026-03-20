@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { SceneManager } from './SceneManager';
 import { VisualizationSync } from './VisualizationSync';
 import { InputHandler } from '../input/InputHandler';
@@ -24,7 +23,6 @@ export class ThreeSetup {
   constructor(
     canvas: HTMLCanvasElement,
     adapter: INetworkAdapter = new LocalAdapter(),
-    gltfTemplate?: THREE.Group
   ) {
     // Initialize event bus
     this.eventBus = gameEventBus;
@@ -41,7 +39,6 @@ export class ThreeSetup {
       model,
       adapter.getMyPlayerId(),
       this.eventBus,
-      gltfTemplate
     );
 
     // Initialize input handling
@@ -161,7 +158,6 @@ export class ThreeSetup {
 export function setupThree(
   canvas: HTMLCanvasElement,
   adapter?: INetworkAdapter,
-  gltfTemplate?: THREE.Group
 ): ThreeSetup {
-  return new ThreeSetup(canvas, adapter, gltfTemplate);
+  return new ThreeSetup(canvas, adapter);
 }

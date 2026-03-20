@@ -1,7 +1,4 @@
 import * as React from 'react';
-import * as THREE from 'three';
-import { GLTFLoader } from 'three-stdlib';
-import type { GLTF } from 'three-stdlib';
 import { setupThree } from '../rendering/threeSetup';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import ExportMenu from './ExportMenu';
@@ -14,8 +11,6 @@ import type { INetworkAdapter } from '../network/INetworkAdapter';
 
 type AppState = 'lobby' | 'connecting' | 'playing';
 
-const MODEL_URL = import.meta.env.BASE_URL + 'models/player.glb';
-
 const GRF_main = () => {
   const [appState, setAppState] = React.useState<AppState>('lobby');
   const [errorMsg, setErrorMsg] = React.useState('');
@@ -23,26 +18,12 @@ const GRF_main = () => {
   const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const initialized = React.useRef(false);
 
-  const startGame = React.useCallback(async (adapter: INetworkAdapter, usePrimitive: boolean = false) => {
+  const startGame = React.useCallback(async (adapter: INetworkAdapter) => {
     const canvas = canvasRef.current;
     if (!canvas || initialized.current) return;
     initialized.current = true;
 
-    // Preload GLTF player model unless primitive mode is selected
-    let gltfTemplate: THREE.Group | undefined;
-    if (!usePrimitive) {
-      try {
-        const loader = new GLTFLoader();
-        const gltf = await new Promise<GLTF>((resolve, reject) =>
-          loader.load(MODEL_URL, resolve, undefined, reject)
-        );
-        gltfTemplate = gltf.scene;
-      } catch {
-        console.warn('GLTF model not found, using fallback primitive');
-      }
-    }
-
-    const setup = setupThree(canvas, adapter, gltfTemplate);
+    const setup = setupThree(canvas, adapter);
     setThreeSetup(setup);
     setAppState('playing');
 
@@ -56,17 +37,17 @@ const GRF_main = () => {
     }
   }, []);
 
-  const handleOffline = React.useCallback((usePrimitive: boolean) => {
-    startGame(new LocalAdapter(), usePrimitive);
+  const handleOffline = React.useCallback(() => {
+    startGame(new LocalAdapter());
   }, [startGame]);
 
-  const handleOnline = React.useCallback(async (serverUrl: string, usePrimitive: boolean) => {
+  const handleOnline = React.useCallback(async (serverUrl: string) => {
     setAppState('connecting');
     setErrorMsg('');
     try {
       const adapter = new ColyseusAdapter(serverUrl);
       await adapter.connect();
-      startGame(adapter, usePrimitive);
+      startGame(adapter);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : '接続に失敗しました');
       setAppState('lobby');

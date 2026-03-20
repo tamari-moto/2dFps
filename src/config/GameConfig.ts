@@ -288,12 +288,6 @@ export const RenderConfig = {
   /** Player diamond marker size */
   PlayerMarkerSize: 20,
 
-  /** GLTF player model scale factor */
-  PlayerModelScale: 15,
-
-  /** GLTF player model Z rotation offset in radians */
-  PlayerModelRotationZ: Math.PI / 2,
-
   /** Y rotation offset applied to all player models so the face points forward (radians) */
   PlayerFacingOffset: Math.PI / 2,
 
