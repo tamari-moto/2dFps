@@ -329,20 +329,6 @@ export const RenderConfig = {
   /** Thruster X offset from center = PlayerMarkerSize * this */
   PlayerThrusterOffsetX: 0.48,
 
-  // --- Humanoid variant: glow ring at base ---
-  /** Glow ring inner radius = PlayerMarkerSize * this */
-  PlayerGlowRingInnerRatio: 0.55,
-  /** Glow ring outer radius = PlayerMarkerSize * this */
-  PlayerGlowRingOuterRatio: 0.85,
-  /** Glow ring radial segments */
-  PlayerGlowRingSegments: 32,
-  /** PBR roughness for glow ring */
-  PlayerGlowRingRoughness: 0.3,
-  /** PBR metalness for glow ring */
-  PlayerGlowRingMetalness: 0.0,
-  /** Emissive intensity for glow ring */
-  PlayerGlowRingEmissiveIntensity: 0.8,
-
   // --- Humanoid variant: head ---
   /** PBR roughness for head sphere */
   PlayerHeadRoughness: 0.7,

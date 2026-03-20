@@ -15,29 +15,6 @@ function bodyMat(color: number): THREE.MeshStandardMaterial {
   });
 }
 
-// ── Glow ring at base (partName='ring') ──────────────────────────────────────
-function buildRing(s: number, color: number): THREE.Mesh {
-  const geo = new THREE.RingGeometry(
-    s * RenderConfig.PlayerGlowRingInnerRatio,
-    s * RenderConfig.PlayerGlowRingOuterRatio,
-    RenderConfig.PlayerGlowRingSegments
-  );
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: RenderConfig.PlayerGlowRingRoughness,
-    metalness: RenderConfig.PlayerGlowRingMetalness,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: RenderConfig.PlayerGlowRingEmissiveIntensity,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.6,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.userData.partName = 'ring';
-  mesh.position.y = 0;
-  return mesh;
-}
-
 // ── Leg group: thigh + shin + foot ───────────────────────────────────────────
 function buildLegGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE.Material): THREE.Group {
   const g = new THREE.Group();
@@ -176,7 +153,6 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   const HS = s / 6.4;
   const bMat = bodyMat(color);
 
-  group.add(buildRing(s, color));
   group.add(buildLegGroup(s, HS, 'left', bMat));
   group.add(buildLegGroup(s, HS, 'right', bMat));
   group.add(buildHips(s, HS, bMat));
