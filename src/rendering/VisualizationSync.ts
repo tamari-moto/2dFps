@@ -403,7 +403,7 @@ export class VisualizationSync {
     this.playerAnimState.delete(playerId);
   }
 
-  /** Start looping idle animation (cockpit emissive pulse) */
+  /** Start looping idle animation (head bob) */
   private startIdleAnim(playerId: string): void {
     if (this.playerAnimState.get(playerId) === 'idle') return;
 
@@ -415,14 +415,16 @@ export class VisualizationSync {
 
     const anims: Array<gsap.core.Tween | gsap.core.Timeline> = [];
 
-    // Cockpit emissive pulse
-    const cockpit = this.getPlayerPart(obj, 'cockpit');
-    if (cockpit instanceof THREE.Mesh) {
-      const mat = cockpit.material as THREE.MeshStandardMaterial;
-      anims.push(gsap.fromTo(mat,
-        { emissiveIntensity: AnimationConfig.IdleCockpitPulseMax },
+    // Head bob
+    const head = this.getPlayerPart(obj, 'head');
+    if (head) {
+      const s = RenderConfig.PlayerMarkerSize;
+      const HS = s / 6.4;
+      const baseY = HS * 1.3;
+      anims.push(gsap.fromTo(head.position,
+        { y: baseY },
         {
-          emissiveIntensity: AnimationConfig.IdleCockpitPulseMin,
+          y: baseY + HS * AnimationConfig.IdleHeadBobAmount,
           duration: AnimationConfig.IdleCockpitPulseDuration / 2,
           ease: 'sine.inOut',
           yoyo: true,
@@ -489,7 +491,6 @@ export class VisualizationSync {
     const retDur = AnimationConfig.AttackBarrelReturnDuration;
 
     const barrel = this.getPlayerPart(obj, 'barrel');
-    const cockpit = this.getPlayerPart(obj, 'cockpit');
 
     const tl = gsap.timeline({
       onComplete: () => this.startIdleAnim(playerId),
@@ -498,11 +499,6 @@ export class VisualizationSync {
     if (barrel) {
       tl.to(barrel.position, { y: `+=${thrust}`, duration: outDur, ease: 'power3.out' }, 0)
         .to(barrel.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' });
-    }
-    if (cockpit instanceof THREE.Mesh) {
-      const mat = cockpit.material as THREE.MeshStandardMaterial;
-      tl.to(mat, { emissiveIntensity: 4.0, duration: outDur, ease: 'power3.out' }, 0)
-        .to(mat, { emissiveIntensity: AnimationConfig.IdleCockpitPulseMin, duration: retDur });
     }
 
     this.playerBodyAnims.set(playerId, [tl]);

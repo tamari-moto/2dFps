@@ -3,7 +3,7 @@ import { RenderConfig } from '../config/GameConfig';
 
 // ── Scout character definition ────────────────────────────────────────────────
 const SCOUT_DEF = {
-  torsoW: 0.90, torsoH: 1.9, hipW: 0.78, headR: 0.46, armW: 0.09, legW: 0.14,
+  torsoW: 0.90, torsoH: 0.9, hipW: 0.78, headR: 0.46, armW: 0.09, legW: 0.14,
 } as const;
 
 // ── Helper: standard body material (color-tinted) ────────────────────────────
@@ -152,6 +152,7 @@ function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.G
     new THREE.MeshStandardMaterial({ color: RenderConfig.PlayerGunBarrelColor, roughness: 0.3, metalness: 0.85 })
   );
   barrel.userData.fixedColor = true;
+  barrel.userData.partName = 'barrel';
   barrel.position.set(x, HS * 0.5, 0);
   g.add(barrel);
 

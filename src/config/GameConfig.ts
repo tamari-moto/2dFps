@@ -216,12 +216,10 @@ export const AnimationConfig = {
   /** Shot pulse ease function */
   ShotPulseEase: "elastic.out(1, 0.3)",
 
-  // --- Primitive drone body animations ---
-  /** cockpit emissive intensity at minimum during idle pulse */
-  IdleCockpitPulseMin: 0.6,
-  /** cockpit emissive intensity at maximum during idle pulse */
-  IdleCockpitPulseMax: 2.0,
-  /** seconds per cockpit pulse cycle */
+  // --- Scout (humanoid) body animations ---
+  /** head Y-bob amplitude in HS units during idle */
+  IdleHeadBobAmount: 0.15,
+  /** seconds per idle head-bob half-period */
   IdleCockpitPulseDuration: 1.2,
   /** thruster Y sway amplitude in world units during walk */
   WalkThrusterSwayY: 1.5,
