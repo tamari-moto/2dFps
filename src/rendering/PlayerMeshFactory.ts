@@ -121,33 +121,39 @@ function buildArmGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE
 }
 
 // ── Gear: handgun (SCOUT) ─────────────────────────────────────────────────────
+// 座標系: VisualizationSync が rotation.x = π/2 を適用するため
+//   ローカル +Y → 前方（プレイヤーが向く方向）
+//   ローカル +X → 右
+//   ローカル +Z → カメラ向き（上から見える面）
+// CylinderGeometry はデフォルトで +Y 向き → 銃身に rotation 不要
 function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.Group {
   const g = new THREE.Group();
-  // スライド（上部本体）
-  const slide = new THREE.Mesh(
-    new THREE.BoxGeometry(s * 0.18, s * 0.45, s * 0.12),
+  const x = rx + s * 0.06;
+
+  // グリップ（手の高さに配置）
+  const grip = new THREE.Mesh(
+    new THREE.BoxGeometry(s * 0.12, HS * 0.8, s * 0.10),
     new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
   );
-  slide.position.set(rx + s * 0.12, HS * -0.85, 0);
+  grip.position.set(x, HS * -1.0, 0);
+  g.add(grip);
+
+  // スライド（グリップ上部の銃本体）
+  const slide = new THREE.Mesh(
+    new THREE.BoxGeometry(s * 0.16, HS * 1.0, s * 0.11),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+  );
+  slide.position.set(x, HS * -0.3, 0);
   g.add(slide);
 
-  // 銃身（前方へ突き出る）
+  // 銃身（スライド上端から前方 +Y へ突き出る）
   const barrel = new THREE.Mesh(
-    new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.30, 6),
+    new THREE.CylinderGeometry(s * 0.03, s * 0.03, HS * 0.7, 6),
     new THREE.MeshStandardMaterial({ color: RenderConfig.PlayerGunBarrelColor, roughness: 0.3, metalness: 0.85 })
   );
   barrel.userData.fixedColor = true;
-  barrel.rotation.x = Math.PI / 2;
-  barrel.position.set(rx + s * 0.12, HS * -0.82, s * 0.22);
+  barrel.position.set(x, HS * 0.5, 0);
   g.add(barrel);
-
-  // グリップ（下向き）
-  const grip = new THREE.Mesh(
-    new THREE.BoxGeometry(s * 0.14, s * 0.38, s * 0.10),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
-  );
-  grip.position.set(rx + s * 0.10, HS * -1.10, 0);
-  g.add(grip);
 
   return g;
 }
