@@ -71,11 +71,11 @@ export class VisualizationSync {
   /**
    * Creates a player Object3D: GLTF model if available, otherwise primitive character
    */
-  private createPlayerObject(color: number, playerIndex: number = 0): THREE.Object3D {
+  private createPlayerObject(color: number): THREE.Object3D {
     if (this.gltfTemplate) {
       return createPlayerFromGLTF(this.gltfTemplate, color);
     }
-    return createVariantPlayer(playerIndex, color);
+    return createVariantPlayer(color);
   }
 
   /**
@@ -167,9 +167,8 @@ export class VisualizationSync {
     }
 
     // Create player meshes
-    let playerIndex = 0;
     for (const [playerId, player] of this.model.players) {
-      const obj = this.createPlayerObject(player.color, playerIndex++);
+      const obj = this.createPlayerObject(player.color);
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
       this.startIdleAnim(playerId);
@@ -543,8 +542,7 @@ export class VisualizationSync {
    */
   addPlayerMesh(playerId: string, color: number): void {
     if (this.playerMeshes.has(playerId)) return;
-    const playerIndex = this.playerMeshes.size;
-    const obj = this.createPlayerObject(color, playerIndex);
+    const obj = this.createPlayerObject(color);
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
     this.startIdleAnim(playerId);

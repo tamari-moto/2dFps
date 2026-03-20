@@ -65,7 +65,10 @@ export class ThreeSetup {
 
     // Re-apply obstacles + redraw if obstacles_ready arrives after initializeModel()
     adapter.onObstaclesReady((obstacles) => {
-      this.gameController.importObstacles(obstacles);
+      // ObstaclePayload[].segments are plain objects; importObstacles() converts
+      // them to LineSegment instances internally via MapGenerator.importObstacles().
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.gameController.importObstacles(obstacles as any);
     });
 
     // Start render loop
