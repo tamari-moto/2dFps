@@ -123,27 +123,29 @@ function buildArmGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE
 // ── Gear: handgun (SCOUT) ─────────────────────────────────────────────────────
 function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.Group {
   const g = new THREE.Group();
-  const slideMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 });
-
   // スライド（上部本体）
-  const slide = new THREE.Mesh(new THREE.BoxGeometry(s * 0.18, s * 0.45, s * 0.12), slideMat);
+  const slide = new THREE.Mesh(
+    new THREE.BoxGeometry(s * 0.18, s * 0.45, s * 0.12),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+  );
   slide.position.set(rx + s * 0.12, HS * -0.85, 0);
   g.add(slide);
 
   // 銃身（前方へ突き出る）
-  const barrelMat = new THREE.MeshStandardMaterial({
-    color: RenderConfig.PlayerGunBarrelColor,
-    roughness: 0.3,
-    metalness: 0.85,
-  });
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.30, 6), barrelMat);
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.30, 6),
+    new THREE.MeshStandardMaterial({ color: RenderConfig.PlayerGunBarrelColor, roughness: 0.3, metalness: 0.85 })
+  );
   barrel.userData.fixedColor = true;
   barrel.rotation.x = Math.PI / 2;
   barrel.position.set(rx + s * 0.12, HS * -0.82, s * 0.22);
   g.add(barrel);
 
   // グリップ（下向き）
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(s * 0.14, s * 0.38, s * 0.10), slideMat);
+  const grip = new THREE.Mesh(
+    new THREE.BoxGeometry(s * 0.14, s * 0.38, s * 0.10),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+  );
   grip.position.set(rx + s * 0.10, HS * -1.10, 0);
   g.add(grip);
 
