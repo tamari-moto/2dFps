@@ -206,6 +206,7 @@ export class VisualizationSync {
           y: player.node.y,
           duration: AnimationConfig.MovementDuration,
         });
+        obj.position.z = RenderConfig.PlayerZOffset;
 
         // Rotate to match player facing angle (+X-forward model, Y-up rotation)
         obj.rotation.x = Math.PI / 2;
