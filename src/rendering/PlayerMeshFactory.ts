@@ -175,25 +175,3 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   return group;
 }
 
-// ── Backward-compatible wrapper ───────────────────────────────────────────────
-export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
-  return createVariantPlayer(color);
-}
-
-// ── Arrow marker (2D fallback) ────────────────────────────────────────────────
-export function createPlayer(color: number = 0xffff00): THREE.Mesh {
-  const s = RenderConfig.PlayerMarkerSize;
-  const shape = new THREE.Shape();
-  shape.moveTo(0, s);
-  shape.lineTo(s * 0.5, 0);
-  shape.lineTo(s * 0.3, 0);
-  shape.lineTo(s * 0.3, -s);
-  shape.lineTo(-s * 0.3, -s);
-  shape.lineTo(-s * 0.3, 0);
-  shape.lineTo(-s * 0.5, 0);
-  shape.closePath();
-  const geometry = new THREE.ShapeGeometry(shape);
-  const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
-  return new THREE.Mesh(geometry, material);
-}
-
