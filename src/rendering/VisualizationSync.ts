@@ -6,7 +6,7 @@ import { createVariantPlayer } from './PlayerMeshFactory';
 import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
 import { createUndefinedMesh, setNodeColor } from './MeshUtils';
 import { SceneManager } from './SceneManager';
-import { NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig, RenderConfig, WallConfig } from '../config/GameConfig';
+import { NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig, RenderConfig, WallConfig, CameraConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConstants';
 import { Player } from '../model/Player';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
@@ -38,6 +38,9 @@ export class VisualizationSync {
   private playerAnimState: Map<string, 'idle' | 'walk' | 'attack'> = new Map();
   private playerBodyAnims: Map<string, Array<gsap.core.Tween | gsap.core.Timeline>> = new Map();
 
+  // Camera follow
+  private cameraFollowTween: gsap.core.Tween | null = null;
+
   // Active selections
   private activePlayerId: string;
 
@@ -61,6 +64,22 @@ export class VisualizationSync {
 
     this.initializeVisualization();
     this.subscribeToEvents(eventBus);
+
+    // 初期カメラ位置をアクティブプレイヤーに合わせる（アニメーションなし）
+    const initialPlayer = this.model.getPlayer(activePlayerId);
+    if (initialPlayer) {
+      const controls = this.sceneManager.getControls();
+      const camera = this.sceneManager.getCamera();
+      const px = initialPlayer.node.x;
+      const py = initialPlayer.node.y;
+      controls.target.set(px, py, 0);
+      camera.position.set(
+        px + CameraConfig.OffsetX,
+        py + CameraConfig.OffsetY,
+        CameraConfig.OffsetZ,
+      );
+      controls.update();
+    }
   }
 
   private createPlayerObject(color: number): THREE.Object3D {
@@ -83,12 +102,46 @@ export class VisualizationSync {
   }
 
   /**
+   * Smoothly pans the camera to the given position.
+   * Animates both OrbitControls target and camera.position together to maintain 3D offset angle.
+   */
+  private panCameraTo(x: number, y: number, duration: number, ease: string): void {
+    if (this.cameraFollowTween) {
+      this.cameraFollowTween.kill();
+    }
+    const controls = this.sceneManager.getControls();
+    const camera = this.sceneManager.getCamera();
+    const target = controls.target;
+
+    // Compute current offset (camera position relative to target)
+    const offsetX = camera.position.x - target.x;
+    const offsetY = camera.position.y - target.y;
+    const offsetZ = camera.position.z - target.z;
+
+    // Animate both target and camera position together to preserve the 3D angle
+    const tl = gsap.timeline({ onComplete: () => { this.cameraFollowTween = null; } });
+    tl.to(target, { x, y, duration, ease }, 0);
+    tl.to(camera.position, {
+      x: x + offsetX,
+      y: y + offsetY,
+      z: offsetZ + target.z,
+      duration,
+      ease,
+    }, 0);
+    this.cameraFollowTween = tl.getChildren()[0] as gsap.core.Tween;
+  }
+
+  /**
    * Subscribes to visualization command events from GameController
    */
   private subscribeToEvents(eventBus: GameEventBus): void {
     eventBus.on(GameEventType.VIS_UPDATE_VIEW, () => this.updateView());
     eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
       this.activePlayerId = data.playerId;
+      const player = this.model.getPlayer(data.playerId);
+      if (player) {
+        this.panCameraTo(player.node.x, player.node.y, CameraConfig.FollowPanDuration, CameraConfig.FollowPanEase);
+      }
       this.updateView();
     });
     eventBus.on(GameEventType.VIS_SET_SELECT_MESH, (data: { nodeId: number }) => {
@@ -207,6 +260,11 @@ export class VisualizationSync {
           duration: AnimationConfig.MovementDuration,
         });
         obj.position.z = RenderConfig.PlayerZOffset;
+
+        // アクティブプレイヤーの移動にカメラを追従
+        if (playerId === this.activePlayerId && moving) {
+          this.panCameraTo(player.node.x, player.node.y, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
+        }
 
         // Rotate to match player facing angle (+X-forward model, Y-up rotation)
         obj.rotation.x = Math.PI / 2;

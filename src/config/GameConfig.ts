@@ -251,6 +251,30 @@ export const CameraConfig = {
 
   /** Enable rotation control */
   EnableRotate: false,
+
+  /** 3D斜め視点: カメラの target に対する X オフセット（横ずれ、0=真後ろ） */
+  OffsetX: 0,
+
+  /** 3D斜め視点: カメラの target に対する Y オフセット（手前引き）。負値でプレイヤー後方から */
+  OffsetY: -150,
+
+  /** 3D斜め視点: カメラの Z オフセット（高さ）。大きいほど俯瞰 */
+  OffsetZ: 150,
+
+  /** パン操作を無効化（カメラは自動追従） */
+  EnablePan: false,
+
+  /** プレイヤー切り替え時のカメラパン秒数 */
+  FollowPanDuration: 0.8,
+
+  /** 移動追従時のカメラパン秒数（MovementDuration と同値） */
+  FollowMoveDuration: 1.0,
+
+  /** プレイヤー切り替え時の ease */
+  FollowPanEase: 'power2.inOut',
+
+  /** 移動追従時の ease */
+  FollowMoveEase: 'power2.out',
 } as const;
 
 /**
