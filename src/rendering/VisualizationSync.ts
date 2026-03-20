@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
-import { createPlayerFromGLTF, createPrimitivePlayer } from './PlayerMeshFactory';
+import { createPlayerFromGLTF, createVariantPlayer } from './PlayerMeshFactory';
 import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
 import { createUndefinedMesh, setNodeColor } from './MeshUtils';
 import { SceneManager } from './SceneManager';
@@ -71,11 +71,11 @@ export class VisualizationSync {
   /**
    * Creates a player Object3D: GLTF model if available, otherwise primitive character
    */
-  private createPlayerObject(color: number): THREE.Object3D {
+  private createPlayerObject(color: number, playerIndex: number = 0): THREE.Object3D {
     if (this.gltfTemplate) {
       return createPlayerFromGLTF(this.gltfTemplate, color);
     }
-    return createPrimitivePlayer(color);
+    return createVariantPlayer(playerIndex, color);
   }
 
   /**
@@ -167,8 +167,9 @@ export class VisualizationSync {
     }
 
     // Create player meshes
+    let playerIndex = 0;
     for (const [playerId, player] of this.model.players) {
-      const obj = this.createPlayerObject(player.color);
+      const obj = this.createPlayerObject(player.color, playerIndex++);
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
       this.startIdleAnim(playerId);
@@ -542,7 +543,8 @@ export class VisualizationSync {
    */
   addPlayerMesh(playerId: string, color: number): void {
     if (this.playerMeshes.has(playerId)) return;
-    const obj = this.createPlayerObject(color);
+    const playerIndex = this.playerMeshes.size;
+    const obj = this.createPlayerObject(color, playerIndex);
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
     this.startIdleAnim(playerId);
