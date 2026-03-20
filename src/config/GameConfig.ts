@@ -292,7 +292,7 @@ export const RenderConfig = {
   /** Z offset applied to player mesh groups to vertically center the Scout model over the node circle.
    *  After rotation.x = π/2, local Y maps to world Z. The model's visual center is below Y=0,
    *  so we lift by HS * 0.7 (HS = PlayerMarkerSize / 6.4). */
-  PlayerZOffset: (20 / 6.4) * 0.7,
+  PlayerZOffset: (20 / 6.4) * 3.21,
 
   // --- Primitive drone player geometry ---
   /** Radial segments for body octagon */
