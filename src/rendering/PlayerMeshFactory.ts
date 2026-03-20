@@ -120,19 +120,32 @@ function buildArmGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE
   return g;
 }
 
-// ── Gear: bow (SCOUT) ─────────────────────────────────────────────────────────
-function buildGearBow(s: number, HS: number, rx: number, color: number): THREE.Group {
+// ── Gear: handgun (SCOUT) ─────────────────────────────────────────────────────
+function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.1 });
+  const slideMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 });
 
-  const arc = new THREE.Mesh(new THREE.TorusGeometry(s * 0.55, s * 0.04, 5, 12, Math.PI), mat);
-  arc.position.set(rx + s * 0.18, HS * -0.2, 0);
-  arc.rotation.z = Math.PI / 2;
-  g.add(arc);
+  // スライド（上部本体）
+  const slide = new THREE.Mesh(new THREE.BoxGeometry(s * 0.18, s * 0.45, s * 0.12), slideMat);
+  slide.position.set(rx + s * 0.12, HS * -0.85, 0);
+  g.add(slide);
 
-  const str = new THREE.Mesh(new THREE.BoxGeometry(s * 0.03, s * 1.1, s * 0.03), mat);
-  str.position.set(rx + s * 0.18, HS * -0.2, 0);
-  g.add(str);
+  // 銃身（前方へ突き出る）
+  const barrelMat = new THREE.MeshStandardMaterial({
+    color: RenderConfig.PlayerGunBarrelColor,
+    roughness: 0.3,
+    metalness: 0.85,
+  });
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.03, s * 0.03, s * 0.30, 6), barrelMat);
+  barrel.userData.fixedColor = true;
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(rx + s * 0.12, HS * -0.82, s * 0.22);
+  g.add(barrel);
+
+  // グリップ（下向き）
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(s * 0.14, s * 0.38, s * 0.10), slideMat);
+  grip.position.set(rx + s * 0.10, HS * -1.10, 0);
+  g.add(grip);
 
   return g;
 }
@@ -170,7 +183,7 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   rightArm.userData.partName = 'rightArm';
   group.add(rightArm);
 
-  group.add(buildGearBow(s, HS, rx, color));
+  group.add(buildGearGun(s, HS, rx, color));
 
   return group;
 }

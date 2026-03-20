@@ -329,6 +329,10 @@ export const RenderConfig = {
   /** Thruster X offset from center = PlayerMarkerSize * this */
   PlayerThrusterOffsetX: 0.48,
 
+  // --- Humanoid variant: handgun ---
+  /** Handgun barrel color (dark metallic) */
+  PlayerGunBarrelColor: 0x222233,
+
   // --- Humanoid variant: head ---
   /** PBR roughness for head sphere */
   PlayerHeadRoughness: 0.7,
