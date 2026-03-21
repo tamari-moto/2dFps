@@ -1,4 +1,4 @@
-import { node } from '../node';
+import { Node } from '../node';
 
 /**
  * Entity type enumeration
@@ -14,23 +14,20 @@ export enum EntityType {
 export abstract class Entity {
   id: string;
   type: EntityType;
-  node: node;
+  node: Node;
   color: number;
   angle: number;
 
   constructor(
     id: string,
     type: EntityType,
-    initialNode: node,
+    initialNode: Node,
     color: number,
     initialAngle: number = 0
   ) {
     this.id = id;
     this.type = type;
-    this.node = new node();
-    this.node.id = initialNode.id;
-    this.node.x = initialNode.x;
-    this.node.y = initialNode.y;
+    this.node = new Node(initialNode.id, initialNode.x, initialNode.y);
     this.color = color;
     this.angle = initialAngle;
   }
@@ -38,7 +35,7 @@ export abstract class Entity {
   /**
    * Updates the entity's position to a new node
    */
-  setNode(newNode: node): void {
+  setNode(newNode: Node): void {
     this.node.id = newNode.id;
     this.node.x = newNode.x;
     this.node.y = newNode.y;
@@ -51,17 +48,4 @@ export abstract class Entity {
     this.angle = angle;
   }
 
-  /**
-   * Gets the entity's current position
-   */
-  getPosition(): { x: number; y: number } {
-    return { x: this.node.x, y: this.node.y };
-  }
-
-  /**
-   * Checks if this entity is at the same position as another entity
-   */
-  isAtSamePositionAs(other: Entity): boolean {
-    return this.node.id === other.node.id;
-  }
 }

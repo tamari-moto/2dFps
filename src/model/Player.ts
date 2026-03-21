@@ -1,4 +1,4 @@
-import { node } from './node';
+import { Node } from './node';
 import { Entity, EntityType } from './entities/Entity';
 
 /**
@@ -9,7 +9,7 @@ export class Player extends Entity {
   maxHealth: number;
   isAlive: boolean;
 
-  constructor(id: string, initialNode: node, color: number, maxHealth: number = 100) {
+  constructor(id: string, initialNode: Node, color: number, maxHealth: number = 100) {
     super(id, EntityType.PLAYER, initialNode, color, 0);
     this.maxHealth = maxHealth;
     this.health = maxHealth;
@@ -30,18 +30,4 @@ export class Player extends Entity {
     }
   }
 
-  /**
-   * Heals the player
-   */
-  heal(amount: number): void {
-    if (!this.isAlive) return;
-    this.health = Math.min(this.maxHealth, this.health + amount);
-  }
-
-  /**
-   * Gets the health percentage (0-1)
-   */
-  getHealthPercentage(): number {
-    return this.health / this.maxHealth;
-  }
 }

@@ -69,6 +69,7 @@ export enum GameEventType {
  * Event data interface for type safety
  */
 export interface GameEventData {
+  // Player events
   [GameEventType.PLAYER_MOVED]: {
     playerId: string;
     from: { x: number; y: number; id: number };
@@ -90,6 +91,9 @@ export interface GameEventData {
     playerId: string;
     angle: number;
   };
+
+  // Combat events
+  [GameEventType.COMBAT_RESOLVED]: void;
   [GameEventType.HIT_DETECTED]: {
     attackerId: string;
     targetId: string;
@@ -99,13 +103,76 @@ export interface GameEventData {
     attackerId: string;
     nodeId: number;
   };
+
+  // Turn events
+  [GameEventType.TURN_STARTED]: void;
+  [GameEventType.TURN_ENDED]: void;
+  [GameEventType.TURN_ACTION]: void;
+
+  // Input events
   [GameEventType.NODE_CLICKED]: {
     nodeId: number;
     position: { x: number; y: number };
   };
+  [GameEventType.CANVAS_CLICKED_EMPTY]: void;
+  [GameEventType.KEY_PRESSED]: {
+    key: string;
+  };
+
+  // View events
+  [GameEventType.VIEW_UPDATED]: void;
   [GameEventType.VIEW_ANGLE_TOGGLED]: {
     isVisible: boolean;
   };
+  [GameEventType.CAMERA_MOVED]: void;
+
+  // Visualization commands
+  [GameEventType.VIS_UPDATE_VIEW]: void;
+  [GameEventType.VIS_SET_ACTIVE_PLAYER]: {
+    playerId: string;
+  };
+  [GameEventType.VIS_SET_SELECT_MESH]: {
+    nodeId: number;
+  };
+  [GameEventType.VIS_SET_NEXT_MESH]: {
+    nodeId: number;
+  };
+  [GameEventType.VIS_SET_SHOT_MESH]: {
+    nodeId: number;
+  };
+  [GameEventType.VIS_CLEAR_NEXT_MESH]: void;
+  [GameEventType.VIS_CLEAR_SHOT_MESH]: void;
+  [GameEventType.VIS_SHOW_HIT_EFFECT]: {
+    playerId: string;
+  };
+  [GameEventType.VIS_HIDE_PLAYER]: {
+    playerId: string;
+  };
+  [GameEventType.VIS_TOGGLE_VIEW_ANGLE]: void;
+  [GameEventType.VIS_UPDATE_OBSTACLES]: void;
+  [GameEventType.VIS_PLAY_DANCE]: {
+    playerId: string;
+  };
+
+  // Map events
+  [GameEventType.MAP_GENERATED]: void;
+  [GameEventType.OBSTACLES_UPDATED]: void;
+
+  // Game state events
+  [GameEventType.GAME_STARTED]: void;
+  [GameEventType.GAME_PAUSED]: void;
+  [GameEventType.GAME_RESUMED]: void;
+  [GameEventType.GAME_OVER]: void;
+
+  // Network events
+  [GameEventType.NETWORK_CONNECTED]: void;
+  [GameEventType.NETWORK_DISCONNECTED]: void;
+  [GameEventType.NETWORK_ERROR]: void;
+  [GameEventType.TURN_ASSIGNED]: void;
+  [GameEventType.TURN_RESULT_RECEIVED]: void;
+  [GameEventType.PLAYER_JOINED]: void;
+  [GameEventType.PLAYER_LEFT]: void;
+  [GameEventType.ROOM_STATE_CHANGED]: void;
 }
 
 /**

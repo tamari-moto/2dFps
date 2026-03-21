@@ -1,5 +1,5 @@
 import { Graph } from './Graph';
-import { node } from './node';
+import { Node } from './node';
 import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, ObstacleConfig, ComplexMapConfig, CalculatedConfig } from '../config/GameConfig';
@@ -135,7 +135,7 @@ export class MapGenerator {
    * @param nodeList - List of all nodes
    * @param lines - Line segments representing obstacles
    */
-  public static applyObstaclesToGraph(edges: Graph, nodeList: node[], lines: LineSegment[]): void {
+  public static applyObstaclesToGraph(edges: Graph, nodeList: Node[], lines: LineSegment[]): void {
     removeEdgesIfIntersected(edges, nodeList, lines);
   }
 

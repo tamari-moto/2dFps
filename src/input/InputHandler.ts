@@ -16,6 +16,8 @@ export class InputHandler {
   private eventBus: GameEventBus;
   private playerIds: string[];
   private activePlayerId: string;
+  private readonly handleCanvasClickBound: (e: MouseEvent) => void;
+  private readonly handleKeyDownBound: (e: KeyboardEvent) => void;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -34,6 +36,8 @@ export class InputHandler {
     this.raycaster = new THREE.Raycaster();
     this.playerIds = playerIds;
     this.activePlayerId = activePlayerId;
+    this.handleCanvasClickBound = this.handleCanvasClick.bind(this);
+    this.handleKeyDownBound = this.handleKeyDown.bind(this);
 
     this.setupEventListeners();
   }
@@ -47,8 +51,8 @@ export class InputHandler {
    * Sets up DOM event listeners
    */
   private setupEventListeners(): void {
-    this.canvas.addEventListener('click', this.handleCanvasClick.bind(this), false);
-    window.addEventListener('keydown', this.handleKeyDown.bind(this), false);
+    this.canvas.addEventListener('click', this.handleCanvasClickBound, false);
+    window.addEventListener('keydown', this.handleKeyDownBound, false);
   }
 
   /**
@@ -122,7 +126,7 @@ export class InputHandler {
    * Cleans up event listeners
    */
   dispose(): void {
-    this.canvas.removeEventListener('click', this.handleCanvasClick.bind(this));
-    window.removeEventListener('keydown', this.handleKeyDown.bind(this));
+    this.canvas.removeEventListener('click', this.handleCanvasClickBound);
+    window.removeEventListener('keydown', this.handleKeyDownBound);
   }
 }

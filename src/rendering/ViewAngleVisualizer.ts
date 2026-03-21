@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { PlayerConfig, ViewAngleVisualizationConfig } from '../config/GameConfig';
-import { node } from '../model/node';
+import { Node } from '../model/node';
 
 /**
  * ViewAngleVisualizer class
@@ -31,27 +31,11 @@ export class ViewAngleVisualizer {
   }
 
   /**
-   * Sets the visibility of view angle edges
-   * @param visible - Whether to show or hide the edges
-   */
-  public setVisible(visible: boolean): void {
-    this.isVisible = visible;
-  }
-
-  /**
-   * Gets the current visibility state
-   * @returns Whether the edges are currently visible
-   */
-  public getVisible(): boolean {
-    return this.isVisible;
-  }
-
-  /**
    * Draws view angle edges from player position
    * @param playerPosition - The player's current position node
    * @param playerAngle - The angle the player is facing (in degrees)
    */
-  public draw(playerPosition: node, playerAngle: number): void {
+  public draw(playerPosition: Node, playerAngle: number): void {
     // Remove existing view angle lines
     this.clear();
 
@@ -110,7 +94,7 @@ export class ViewAngleVisualizer {
    * @param material - The material to use for the line
    */
   private drawEdgeLine(
-    origin: node,
+    origin: Node,
     angle: number,
     distance: number,
     material: THREE.LineBasicMaterial

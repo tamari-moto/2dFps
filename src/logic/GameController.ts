@@ -4,7 +4,7 @@ import { State, GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerConfig } from '../config/GameConfig';
 import { Player } from '../model/Player';
-import { node } from '../model/node';
+import { Node } from '../model/node';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnResult } from '../schema/types';
 
@@ -91,7 +91,7 @@ export class GameController {
   /**
    * Handles clicks in Idle state
    */
-  private handleIdleStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
+  private handleIdleStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.SelectPlayer);
       this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: clickedNode.id });
@@ -101,7 +101,7 @@ export class GameController {
   /**
    * Handles clicks in Select state
    */
-  private handleSelectStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
+  private handleSelectStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
     const canMove = activePlayer.node.id === clickedNode.id ||
                     this.model.areNodesConnected(activePlayer.node, clickedNode);
     if (canMove) {
@@ -114,14 +114,14 @@ export class GameController {
   /**
    * Handles clicks in Move state
    */
-  private handleMoveStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
+  private handleMoveStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
     this.tryShotTarget(activePlayer, clickedNode, sm);
   }
 
   /**
    * Handles clicks in Shot state
    */
-  private handleShotStateClick(activePlayer: Player, clickedNode: node, sm: StateMachine): void {
+  private handleShotStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
     if (this.currentShotNodeId === clickedNode.id) {
       this.executeTurn(sm);
     } else {
@@ -136,7 +136,7 @@ export class GameController {
   /**
    * Checks if a node is visible from the next move position and sets it as the shot target.
    */
-  private tryShotTarget(activePlayer: Player, clickedNode: node, sm: StateMachine): boolean {
+  private tryShotTarget(activePlayer: Player, clickedNode: Node, sm: StateMachine): boolean {
     if (this.currentNextNodeId === undefined) return false;
 
     const nextNode = this.model.nodeList[this.currentNextNodeId];
@@ -199,7 +199,6 @@ export class GameController {
     }
 
     for (const hit of result.hits) {
-      console.log(`🎯 ${result.movingPlayerId} HIT ${hit.targetId}!`);
       this.eventBus.emit(GameEventType.HIT_DETECTED, {
         attackerId: result.movingPlayerId,
         targetId: hit.targetId,
