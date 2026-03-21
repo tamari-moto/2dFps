@@ -9,7 +9,7 @@
  */
 export const MapConfig = {
   /** Number of nodes in grid (map will be NodesInGridSize x NodesInGridSize) */
-  NodesInGridSize: 100,
+  NodesInGridSize: 50,
 
   /** Spacing between nodes in pixels */
   NodeSpacing: 30,
@@ -80,121 +80,73 @@ export const ObstacleConfig = {
   /** Maximum obstacle height */
   MaxHeight: 150,
 
-  /** Wall thickness for maze patterns */
-  WallThickness: 20,
-
-  /** Wall thickness for room patterns */
-  RoomWallThickness: 15,
-
-  /** Room door width */
-  RoomDoorWidth: 60,
-
-  /** Corridor wall thickness */
-  CorridorWallThickness: 25,
-
-  /** Corridor width */
-  CorridorWidth: 120,
-
   /** Line color for obstacles (muted teal) */
   LineColor: 0x00bfbf,
 } as const;
 
 /**
- * Complex map generation configuration
+ * BSP map generation configuration
  */
-export const ComplexMapConfig = {
-  /** Maze pattern: number of horizontal walls */
-  MazeHorizontalWalls: 4,
+export const BSPMapConfig = {
+  /** Maximum BSP recursion depth */
+  MaxDepth: 4,
 
-  /** Maze pattern: number of vertical walls */
-  MazeVerticalWalls: 4,
+  /** Minimum cell size (px) before stopping subdivision */
+  MinCellSize: 300,
 
-  /** Maze pattern: base offset for walls */
-  MazeBaseOffset: 100,
+  /** Split ratio range minimum (prevents extreme thin cells) */
+  SplitMinRatio: 0.35,
 
-  /** Maze pattern: spacing between walls */
-  MazeWallSpacing: 150,
+  /** Split ratio range maximum */
+  SplitMaxRatio: 0.65,
 
-  /** Maze pattern: random offset range start */
-  MazeRandomOffsetStart: 60,
+  /** Minimum room width/height */
+  RoomMinSize: 180,
 
-  /** Maze pattern: random offset range */
-  MazeRandomOffsetRange: 100,
+  /** Room can be at most this fraction of cell dimension */
+  RoomMaxRatio: 0.85,
 
-  /** Maze pattern: minimum wall length */
-  MazeMinWallLength: 200,
+  /** Minimum padding from cell edge to room edge */
+  RoomPadding: 30,
 
-  /** Maze pattern: random wall length range */
-  MazeRandomWallLengthRange: 150,
+  /** Wall thickness for room boundaries */
+  WallThickness: 15,
 
-  /** Rooms pattern: number of rooms */
-  RoomCount: 3,
+  /** Door opening width in room walls */
+  DoorWidth: 90,
 
-  /** Rooms pattern: base room offset */
-  RoomBaseOffset: 60,
+  /** Corridor width (open path between rooms) */
+  CorridorWidth: 90,
 
-  /** Rooms pattern: room spacing multiplier */
-  RoomSpacingMultiplier: 250,
+  /** Corridor wall thickness */
+  CorridorWallThickness: 15,
 
-  /** Rooms pattern: room width */
-  RoomWidth: 180,
+  /** Tactical pillar size (square) */
+  PillarSize: 60,
 
-  /** Rooms pattern: room height */
-  RoomHeight: 180,
+  /** Minimum room area (px^2) to receive a pillar */
+  PillarMinRoomArea: 40000,
 
-  /** Scattered pattern: minimum number of cover points */
-  ScatteredMinCount: 8,
+  /** Maximum pillars per room */
+  PillarMaxPerRoom: 2,
 
-  /** Scattered pattern: random count range */
-  ScatteredRandomCountRange: 5,
+  /** Half-wall length (near doorways) */
+  HalfWallLength: 75,
 
-  /** Scattered pattern: minimum cover size */
-  ScatteredMinSize: 40,
+  /** Half-wall thickness */
+  HalfWallThickness: 15,
 
-  /** Scattered pattern: random size range */
-  ScatteredRandomSizeRange: 80,
+  /** Corridor cover spacing (one cover object per this many px) */
+  CorridorCoverSpacing: 300,
 
-  /** Scattered pattern: base offset */
-  ScatteredBaseOffset: 60,
+  /** Corridor cover size */
+  CorridorCoverSize: 45,
 
-  /** Scattered pattern: spacing buffer */
-  ScatteredSpacingBuffer: 120,
+  /** Central feature minimum size */
+  CentralFeatureMinSize: 60,
 
-  /** Symmetric pattern: number of obstacle groups */
-  SymmetricObstacleCount: 4,
-
-  /** Symmetric pattern: minimum obstacle size */
-  SymmetricMinSize: 60,
-
-  /** Symmetric pattern: random size range */
-  SymmetricRandomSizeRange: 60,
-
-  /** Symmetric pattern: minimum offset from center */
-  SymmetricMinOffset: 80,
-
-  /** Symmetric pattern: random offset range */
-  SymmetricRandomOffsetRange: 120,
-
-  /** Symmetric pattern: minimum central obstacle size */
-  SymmetricCentralMinSize: 60,
-
-  /** Symmetric pattern: random central size range */
-  SymmetricCentralRandomSizeRange: 40,
-
-  /** Corridors pattern: number of quadrant obstacles */
-  CorridorsQuadrantObstacles: 4,
-
-  /** Corridors pattern: quadrant obstacle base position */
-  CorridorsQuadrantBasePosition: 80,
-
-  /** Corridors pattern: quadrant obstacle offset for opposite side */
-  CorridorsQuadrantOppositeOffset: 150,
-
-  /** Corridors pattern: minimum quadrant obstacle size */
-  CorridorsQuadrantMinSize: 60,
-
-  /** Corridors pattern: random quadrant obstacle size range */
-  CorridorsQuadrantRandomSizeRange: 40,
+  /** Central feature random size range */
+  CentralFeatureRandomRange: 60,
 } as const;
 
 /**
