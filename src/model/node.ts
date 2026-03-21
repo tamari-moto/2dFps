@@ -1,5 +1,7 @@
-export class node {
-  id: number = 0;
-  x: number = 0;
-  y: number = 0;
+export class Node {
+  constructor(
+    public id: number = 0,
+    public x: number = 0,
+    public y: number = 0
+  ) {}
 }

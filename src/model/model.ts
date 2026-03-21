@@ -1,4 +1,4 @@
-import { node } from './node';
+import { Node } from './node';
 import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
@@ -8,7 +8,7 @@ import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
 
 class Model {
-  public nodeList: node[] = [];
+  public nodeList: Node[] = [];
   public players: Map<string, Player> = new Map();
   public Edges: Graph = new Graph();
   private viewAngle: number = PlayerConfig.ViewAngle;
@@ -22,7 +22,7 @@ class Model {
   }
 
   /**
-   * Initializes the grid: nodes, edges, and obstacles.
+   * Initializes the grid: Nodes, edges, and obstacles.
    * Called by the constructor and by LocalAdapter.
    */
   public initGrid(): void {
@@ -30,7 +30,7 @@ class Model {
     let count = 0;
     for (let i = 0; i < size; i++) {
       for (let j = 0; j < size; j++) {
-        let tmp = new node();
+        const tmp = new Node();
         tmp.id = count;
         tmp.x = i * MapConfig.NodeSpacing;
         tmp.y = j * MapConfig.NodeSpacing;
@@ -85,7 +85,7 @@ class Model {
    * @param node2 - The second node.
    * @returns The distance between the two nodes.
    */
-  public getNodeDistance(node1: node, node2: node): number {
+  public getNodeDistance(node1: Node, node2: Node): number {
     const dx = node1.x - node2.x;
     const dy = node1.y - node2.y;
     return Math.sqrt(dx * dx + dy * dy);
@@ -96,7 +96,7 @@ class Model {
    * @param playerId - The player ID.
    * @param newNode - The new node.
    */
-  public setPlayerRef(playerId: string, newNode: node): void {
+  public setPlayerRef(playerId: string, newNode: Node): void {
     const player = this.players.get(playerId);
     if (player) {
       player.setNode(newNode);
@@ -118,7 +118,7 @@ class Model {
    * @param node2 - The second node.
    * @returns The angle between the two nodes in degrees.
    */
-  public getAngleBetweenNodes(node1: node, node2: node): number {
+  public getAngleBetweenNodes(node1: Node, node2: Node): number {
     const dx = node2.x - node1.x;
     const dy = node2.y - node1.y;
     const angle = Math.atan2(dy, dx) * (180 / Math.PI); // Convert radians to degrees
@@ -131,7 +131,7 @@ class Model {
    * @param node2 - The second node.
    * @returns True if there is a clear line of sight, false if blocked by obstacles.
    */
-  public hasLineOfSight(node1: node, node2: node): boolean {
+  public hasLineOfSight(node1: Node, node2: Node): boolean {
     const p1 = { x: node1.x, y: node1.y };
     const p2 = { x: node2.x, y: node2.y };
 
@@ -150,8 +150,8 @@ class Model {
    * Uses dot product formula; clamps to [-1, 1] to guard against floating-point errors.
    */
   private getAngleFromDirection(
-    centerNode: node,
-    targetNode: node,
+    centerNode: Node,
+    targetNode: Node,
     dirX: number,
     dirY: number
   ): number {
@@ -171,7 +171,7 @@ class Model {
    * @param distance - The distance to search.
    * @returns An array of nodes that are visible from the center node.
    */
-  public getVisibleNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
+  public getVisibleNodesAtAngle(centerNode: Node, angle: number, distance: number): Node[] {
     const dirX = Math.cos(angle * Math.PI / 180);
     const dirY = Math.sin(angle * Math.PI / 180);
 
@@ -195,7 +195,7 @@ class Model {
   *  @description - 2つのノードが接続されているかどうかを確認します。計算量はO(1)です。
   *  @returns True if the nodes are connected, otherwise false.
   */
-  public areNodesConnected(node1: node, node2: node): boolean {
+  public areNodesConnected(node1: Node, node2: Node): boolean {
     return this.Edges.List[node1.id].includes(node2.id);
   }
 

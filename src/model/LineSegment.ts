@@ -1,5 +1,5 @@
 import { Graph } from "./Graph";
-import { node } from "./node";
+import { Node } from "./node";
 
 export class LineSegment {
   public start: { x: number, y: number };
@@ -29,7 +29,7 @@ export function createRectangleSegments(x: number, y: number, width: number, hei
 
 
 
-export function removeEdgesIfIntersected(graph: Graph, nodes: node[], segments: LineSegment[]): void {
+export function removeEdgesIfIntersected(graph: Graph, nodes: Node[], segments: LineSegment[]): void {
   for (const node1 of nodes) {
     for (const node2Id of graph.List[node1.id]) {
       const node2 = nodes.find(node => node.id === node2Id);
