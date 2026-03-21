@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { SceneManager } from './SceneManager';
 import { VisualizationSync } from './VisualizationSync';
 import { InputHandler } from '../input/InputHandler';
@@ -24,7 +23,6 @@ export class ThreeSetup {
   constructor(
     canvas: HTMLCanvasElement,
     adapter: INetworkAdapter = new LocalAdapter(),
-    gltfTemplate?: THREE.Group
   ) {
     // Initialize event bus
     this.eventBus = gameEventBus;
@@ -41,7 +39,6 @@ export class ThreeSetup {
       model,
       adapter.getMyPlayerId(),
       this.eventBus,
-      gltfTemplate
     );
 
     // Initialize input handling
@@ -52,8 +49,14 @@ export class ThreeSetup {
       this.visualizationSync.getMeshList(),
       this.visualizationSync.getMeshToNodeMap(),
       this.eventBus,
-      playerIds
+      playerIds,
+      adapter.getMyPlayerId(),
     );
+
+    // Keep InputHandler's active player in sync
+    this.eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
+      this.inputHandler.setActivePlayerId(data.playerId);
+    });
 
     // Initialize game controller
     this.gameController = new GameController(
@@ -65,7 +68,10 @@ export class ThreeSetup {
 
     // Re-apply obstacles + redraw if obstacles_ready arrives after initializeModel()
     adapter.onObstaclesReady((obstacles) => {
-      this.gameController.importObstacles(obstacles);
+      // ObstaclePayload[].segments are plain objects; importObstacles() converts
+      // them to LineSegment instances internally via MapGenerator.importObstacles().
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.gameController.importObstacles(obstacles as any);
     });
 
     // Start render loop
@@ -158,7 +164,6 @@ export class ThreeSetup {
 export function setupThree(
   canvas: HTMLCanvasElement,
   adapter?: INetworkAdapter,
-  gltfTemplate?: THREE.Group
 ): ThreeSetup {
-  return new ThreeSetup(canvas, adapter, gltfTemplate);
+  return new ThreeSetup(canvas, adapter);
 }

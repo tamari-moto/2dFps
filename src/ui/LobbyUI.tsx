@@ -3,13 +3,12 @@ import React from 'react';
 interface LobbyUIProps {
   connecting: boolean;
   errorMsg: string;
-  onOffline: (usePrimitive: boolean) => void;
-  onOnline: (serverUrl: string, usePrimitive: boolean) => void;
+  onOffline: () => void;
+  onOnline: (serverUrl: string) => void;
 }
 
 const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOnline }) => {
   const [serverUrl, setServerUrl] = React.useState('ws://localhost:2567');
-  const [usePrimitive, setUsePrimitive] = React.useState(false);
 
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
@@ -56,17 +55,6 @@ const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOn
     minWidth: '160px',
   };
 
-  const toggleButtonStyle: React.CSSProperties = {
-    padding: '8px 18px',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    border: '1px solid #555',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    backgroundColor: usePrimitive ? '#6a3fa3' : '#1a5276',
-    color: '#fff',
-  };
-
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px',
     fontSize: '14px',
@@ -102,16 +90,8 @@ const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOn
       <h1 style={titleStyle}>2D FPS</h1>
 
       <button
-        style={toggleButtonStyle}
-        onClick={() => setUsePrimitive(v => !v)}
-        disabled={connecting}
-      >
-        キャラクター: {usePrimitive ? 'プリミティブ' : 'GLTF'}
-      </button>
-
-      <button
         style={offlineButtonStyle}
-        onClick={() => onOffline(usePrimitive)}
+        onClick={() => onOffline()}
         disabled={connecting}
       >
         オフラインで遊ぶ
@@ -130,7 +110,7 @@ const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOn
         />
         <button
           style={onlineButtonStyle}
-          onClick={() => onOnline(serverUrl, usePrimitive)}
+          onClick={() => onOnline(serverUrl)}
           disabled={connecting}
         >
           {connecting ? '接続中...' : 'オンライン接続'}

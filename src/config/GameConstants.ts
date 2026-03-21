@@ -35,6 +35,8 @@ export const KEYBOARD_KEYS = {
   TOGGLE_VIEW_ANGLE_UPPER: 'V',
   SELECT_PLAYER_1: '1',
   SELECT_PLAYER_2: '2',
+  DANCE: 'd',
+  DANCE_UPPER: 'D',
 } as const;
 
 /**

@@ -1,278 +1,220 @@
 import * as THREE from 'three';
 import { RenderConfig } from '../config/GameConfig';
 
+// ── Character part name registry ──────────────────────────────────────────────
 /**
- * Creates a player mesh (arrow marker, pointing up by default)
+ * Part names used by PlayerAnimator to locate body parts via userData.partName.
+ * Each character type defines its own constant so the animator never hardcodes strings.
  */
-export function createPlayer(color: number = 0xffff00): THREE.Mesh {
-  const s = RenderConfig.PlayerMarkerSize;
-  const shape = new THREE.Shape();
-  shape.moveTo(0, s);
-  shape.lineTo(s * 0.5, 0);
-  shape.lineTo(s * 0.3, 0);
-  shape.lineTo(s * 0.3, -s);
-  shape.lineTo(-s * 0.3, -s);
-  shape.lineTo(-s * 0.3, 0);
-  shape.lineTo(-s * 0.5, 0);
-  shape.closePath();
-  const geometry = new THREE.ShapeGeometry(shape);
-  const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
-  return new THREE.Mesh(geometry, material);
+export interface CharacterPartNames {
+  readonly head: string;
+  readonly barrel: string;
+  readonly walkPartL: string;  // part animated during walk (left side)
+  readonly walkPartR: string;  // part animated during walk (right side)
 }
 
-/**
- * Creates a player mesh from a preloaded GLTF template (clones the model, tints with color)
- */
-export function createPlayerFromGLTF(template: THREE.Group, color: number): THREE.Group {
-  const clone = template.clone(true);
-  clone.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.material = (child.material as THREE.Material).clone();
-      if ('color' in child.material) {
-        (child.material as THREE.MeshStandardMaterial).color.setHex(color);
-      }
-    }
+export const SCOUT_PART_NAMES: CharacterPartNames = {
+  head:      'head',
+  barrel:    'barrel',
+  walkPartL: 'leftArm',
+  walkPartR: 'rightArm',
+} as const;
+
+// ── Scout character definition ────────────────────────────────────────────────
+const SCOUT_DEF = {
+  torsoW: 0.90, torsoH: 0.9, hipW: 0.78, headR: 0.46, armW: 0.09, legW: 0.14,
+} as const;
+
+// ── Helper: standard body material (color-tinted) ────────────────────────────
+function bodyMat(color: number): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: RenderConfig.PlayerBodyRoughness,
+    metalness: RenderConfig.PlayerBodyMetalness,
   });
-  return clone;
 }
 
+// ── Leg group: thigh + shin + foot ───────────────────────────────────────────
+function buildLegGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE.Material): THREE.Group {
+  const g = new THREE.Group();
+  const sign = side === 'left' ? -1 : 1;
+  const lx = sign * SCOUT_DEF.hipW * s * 0.38;
+
+  const thigh = new THREE.Mesh(
+    new THREE.CylinderGeometry(SCOUT_DEF.legW * s * 0.5, SCOUT_DEF.legW * s * 0.4, HS * 1.0, 5),
+    mat
+  );
+  thigh.position.set(lx, HS * -1.35, 0);
+  g.add(thigh);
+
+  const shin = new THREE.Mesh(
+    new THREE.CylinderGeometry(SCOUT_DEF.legW * s * 0.38, SCOUT_DEF.legW * s * 0.32, HS * 1.0, 5),
+    mat
+  );
+  shin.position.set(lx, HS * -2.3, 0);
+  g.add(shin);
+
+  const foot = new THREE.Mesh(
+    new THREE.BoxGeometry(SCOUT_DEF.legW * s * 1.3, HS * 0.22, s * 0.3),
+    mat
+  );
+  foot.position.set(lx, HS * -3.1, s * 0.07);
+  g.add(foot);
+
+  return g;
+}
+
+// ── Hips ─────────────────────────────────────────────────────────────────────
+function buildHips(s: number, HS: number, mat: THREE.Material): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(SCOUT_DEF.hipW * s, HS * 0.48, s * 0.62),
+    mat
+  );
+  mesh.position.y = HS * -0.7;
+  return mesh;
+}
+
+// ── Torso ─────────────────────────────────────────────────────────────────────
+function buildTorso(s: number, HS: number, mat: THREE.Material): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(SCOUT_DEF.torsoW * s, HS * SCOUT_DEF.torsoH, s * 0.68),
+    mat
+  );
+  mesh.position.y = HS * 0.2;
+  return mesh;
+}
+
+// ── Neck ──────────────────────────────────────────────────────────────────────
+function buildNeck(s: number, HS: number, mat: THREE.Material): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(s * 0.17, s * 0.21, HS * 0.42, 5),
+    mat
+  );
+  mesh.position.y = HS * 0.95;
+  return mesh;
+}
+
+// ── Head (partName='head') ────────────────────────────────────────────────────
+function buildHead(s: number, HS: number, color: number): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(SCOUT_DEF.headR * s, 6, 4),
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: RenderConfig.PlayerHeadRoughness,
+      metalness: RenderConfig.PlayerHeadMetalness,
+    })
+  );
+  mesh.userData.partName = 'head';
+  mesh.position.y = HS * 1.3;
+  return mesh;
+}
+
+// ── Arm group: upper + forearm + hand ────────────────────────────────────────
+function buildArmGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE.Material): THREE.Group {
+  const g = new THREE.Group();
+  const sign = side === 'left' ? -1 : 1;
+  const ax = sign * (SCOUT_DEF.torsoW * s * 0.54 + SCOUT_DEF.armW * s * 0.5);
+
+  const ua = new THREE.Mesh(
+    new THREE.CylinderGeometry(SCOUT_DEF.armW * s, SCOUT_DEF.armW * s * 0.85, HS * 1.15, 5),
+    mat
+  );
+  ua.position.set(ax, HS * 0.35, 0);
+  g.add(ua);
+
+  const fa = new THREE.Mesh(
+    new THREE.CylinderGeometry(SCOUT_DEF.armW * s * 0.78, SCOUT_DEF.armW * s, HS * 1.05, 5),
+    mat
+  );
+  fa.position.set(ax, HS * -0.35, 0);
+  g.add(fa);
+
+  const hand = new THREE.Mesh(
+    new THREE.BoxGeometry(SCOUT_DEF.armW * s * 1.8, HS * 0.32, s * 0.13),
+    mat
+  );
+  hand.position.set(ax, HS * -1.0, 0);
+  g.add(hand);
+
+  return g;
+}
+
+// ── Gear: handgun (SCOUT) ─────────────────────────────────────────────────────
+// 座標系: VisualizationSync が rotation.x = π/2 を適用するため
+//   ローカル +Y → 前方（プレイヤーが向く方向）
+//   ローカル +X → 右
+//   ローカル +Z → カメラ向き（上から見える面）
+// CylinderGeometry はデフォルトで +Y 向き → 銃身に rotation 不要
+function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.Group {
+  const g = new THREE.Group();
+  const x = rx + s * 0.06;
+
+  // グリップ（手の高さに配置）
+  const grip = new THREE.Mesh(
+    new THREE.BoxGeometry(s * 0.12, HS * 0.8, s * 0.10),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+  );
+  grip.position.set(x, HS * -1.0, 0);
+  g.add(grip);
+
+  // スライド（グリップ上部の銃本体）
+  const slide = new THREE.Mesh(
+    new THREE.BoxGeometry(s * 0.16, HS * 1.0, s * 0.11),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.6 })
+  );
+  slide.position.set(x, HS * -0.3, 0);
+  g.add(slide);
+
+  // 銃身（スライド上端から前方 +Y へ突き出る）
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(s * 0.03, s * 0.03, HS * 0.7, 6),
+    new THREE.MeshStandardMaterial({ color: RenderConfig.PlayerGunBarrelColor, roughness: 0.3, metalness: 0.85 })
+  );
+  barrel.userData.fixedColor = true;
+  barrel.userData.partName = 'barrel';
+  barrel.position.set(x, HS * 0.5, 0);
+  g.add(barrel);
+
+  return g;
+}
+
+// ── Public: create player (SCOUT) ────────────────────────────────────────────
 /**
- * Creates a primitive humanoid player character:
- * body (cylinder) + head (sphere) + arms + nose + eyes + pupils + glow ring
+ * Creates a humanoid Scout player character.
  *
  * Coordinate note: VisualizationSync applies rotation.x = π/2 to lay the group flat.
  * After that rotation:
  *   local +Y → screen forward (player facing direction)
  *   local ±X → screen left/right
  *   local +Z → toward camera (visible from above)
- * Eyes and nose are placed using +Y (front) and +Z (toward camera) offsets.
  */
-export function createPrimitivePlayer(color: number = 0xffff00): THREE.Group {
+export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   const group = new THREE.Group();
   const s = RenderConfig.PlayerMarkerSize;
+  const HS = s / 6.4;
+  const bMat = bodyMat(color);
 
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: RenderConfig.PlayerBodyRoughness,
-    metalness: RenderConfig.PlayerBodyMetalness,
-  });
+  group.add(buildLegGroup(s, HS, 'left', bMat));
+  group.add(buildLegGroup(s, HS, 'right', bMat));
+  group.add(buildHips(s, HS, bMat));
+  group.add(buildTorso(s, HS, bMat));
+  group.add(buildNeck(s, HS, bMat));
+  group.add(buildHead(s, HS, color));
 
-  // --- Legs (added before body so they render behind it) ---
-  const legGeo = new THREE.CylinderGeometry(
-    s * RenderConfig.PlayerLegTopRadius,
-    s * RenderConfig.PlayerLegBottomRadius,
-    s * RenderConfig.PlayerLegLength,
-    RenderConfig.PlayerLegSegments
-  );
-  const leftLeg = new THREE.Mesh(legGeo, bodyMat);
-  leftLeg.userData.partName = 'leftLeg';
-  leftLeg.position.set(-s * RenderConfig.PlayerLegOffsetX, s * RenderConfig.PlayerLegOffsetY, 0);
-  group.add(leftLeg);
+  const rx = SCOUT_DEF.torsoW * s * 0.54 + SCOUT_DEF.armW * s * 0.5;
 
-  const rightLeg = new THREE.Mesh(legGeo, bodyMat);
-  rightLeg.userData.partName = 'rightLeg';
-  rightLeg.position.set(s * RenderConfig.PlayerLegOffsetX, s * RenderConfig.PlayerLegOffsetY, 0);
-  group.add(rightLeg);
-
-  // --- Body ---
-  const bodyGeo = new THREE.CylinderGeometry(
-    s * 0.15, s * 0.15, s * 0.5,
-    RenderConfig.PlayerBodySegments
-  );
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.userData.partName = 'body';
-  body.position.y = s * 0.25;
-  group.add(body);
-
-  // --- Head ---
-  const headR = s * 0.2;
-  const headGeo = new THREE.SphereGeometry(headR, RenderConfig.PlayerHeadSegments, RenderConfig.PlayerHeadSegments);
-  const headMat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: RenderConfig.PlayerHeadRoughness,
-    metalness: RenderConfig.PlayerHeadMetalness,
-  });
-  const head = new THREE.Mesh(headGeo, headMat);
-  head.userData.partName = 'head';
-  head.position.y = s * 0.65;
-  group.add(head);
-
-  // --- Left arm ---
-  const armGeo = new THREE.CylinderGeometry(
-    s * RenderConfig.PlayerArmRadius,
-    s * RenderConfig.PlayerArmRadius,
-    s * RenderConfig.PlayerArmLength,
-    RenderConfig.PlayerArmSegments
-  );
-  const armMat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: RenderConfig.PlayerArmRoughness,
-    metalness: RenderConfig.PlayerArmMetalness,
-  });
-  const leftArm = new THREE.Mesh(armGeo, armMat);
+  const leftArm = buildArmGroup(s, HS, 'left', bMat);
   leftArm.userData.partName = 'leftArm';
-  leftArm.rotation.z = Math.PI / 2;
-  leftArm.position.set(-s * RenderConfig.PlayerArmOffsetX, s * RenderConfig.PlayerArmOffsetY, 0);
   group.add(leftArm);
 
-  // --- Right arm ---
-  const rightArm = new THREE.Mesh(armGeo, armMat);
+  const rightArm = buildArmGroup(s, HS, 'right', bMat);
   rightArm.userData.partName = 'rightArm';
-  rightArm.rotation.z = Math.PI / 2;
-  rightArm.position.set(s * RenderConfig.PlayerArmOffsetX, s * RenderConfig.PlayerArmOffsetY, 0);
   group.add(rightArm);
 
-  // --- Hands ---
-  const handGeo = new THREE.SphereGeometry(
-    s * RenderConfig.PlayerHandRadius,
-    RenderConfig.PlayerHandSegments,
-    RenderConfig.PlayerHandSegments
-  );
-  const leftHand = new THREE.Mesh(handGeo, armMat);
-  leftHand.userData.partName = 'leftHand';
-  leftHand.position.set(-s * RenderConfig.PlayerHandOffsetX, s * RenderConfig.PlayerHandOffsetY, 0);
-  group.add(leftHand);
+  group.add(buildGearGun(s, HS, rx, color));
 
-  const rightHand = new THREE.Mesh(handGeo, armMat);
-  rightHand.userData.partName = 'rightHand';
-  rightHand.position.set(s * RenderConfig.PlayerHandOffsetX, s * RenderConfig.PlayerHandOffsetY, 0);
-  group.add(rightHand);
-
-  // --- Nose (small cone pointing in +Y = forward direction) ---
-  const noseGeo = new THREE.ConeGeometry(
-    s * RenderConfig.PlayerNoseRadiusRatio,
-    s * RenderConfig.PlayerNoseHeightRatio,
-    RenderConfig.PlayerNoseSegments
-  );
-  const noseMat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: RenderConfig.PlayerNoseRoughness,
-    metalness: RenderConfig.PlayerNoseMetalness,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: 0.15,
-  });
-  const nose = new THREE.Mesh(noseGeo, noseMat);
-  nose.userData.partName = 'nose';
-  // Nose sits at the front (+Y) of the head surface
-  nose.position.set(0, s * 0.65 + headR, 0);
-  group.add(nose);
-
-  // --- Eyes (white sclera) ---
-  const eyeGeo = new THREE.SphereGeometry(
-    s * RenderConfig.PlayerEyeRadius,
-    RenderConfig.PlayerEyeSegments,
-    RenderConfig.PlayerEyeSegments
-  );
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0 });
-
-  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(
-    -s * RenderConfig.PlayerEyeOffsetX,
-    s * RenderConfig.PlayerEyeOffsetY,
-    s * RenderConfig.PlayerEyeOffsetZ
-  );
-  group.add(leftEye);
-
-  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(
-    s * RenderConfig.PlayerEyeOffsetX,
-    s * RenderConfig.PlayerEyeOffsetY,
-    s * RenderConfig.PlayerEyeOffsetZ
-  );
-  group.add(rightEye);
-
-  // --- Pupils (dark) ---
-  const pupilGeo = new THREE.SphereGeometry(
-    s * RenderConfig.PlayerPupilRadius,
-    RenderConfig.PlayerPupilSegments,
-    RenderConfig.PlayerPupilSegments
-  );
-  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8, metalness: 0 });
-
-  const leftPupil = new THREE.Mesh(pupilGeo, pupilMat);
-  leftPupil.position.set(
-    -s * RenderConfig.PlayerEyeOffsetX,
-    s * RenderConfig.PlayerEyeOffsetY,
-    s * RenderConfig.PlayerPupilOffsetZ
-  );
-  group.add(leftPupil);
-
-  const rightPupil = new THREE.Mesh(pupilGeo, pupilMat);
-  rightPupil.position.set(
-    s * RenderConfig.PlayerEyeOffsetX,
-    s * RenderConfig.PlayerEyeOffsetY,
-    s * RenderConfig.PlayerPupilOffsetZ
-  );
-  group.add(rightPupil);
-
-  // --- Neck ---
-  const neckGeo = new THREE.CylinderGeometry(
-    s * RenderConfig.PlayerNeckTopRadius,
-    s * RenderConfig.PlayerNeckBottomRadius,
-    s * RenderConfig.PlayerNeckHeight,
-    RenderConfig.PlayerNeckSegments
-  );
-  const neck = new THREE.Mesh(neckGeo, bodyMat);
-  neck.userData.partName = 'neck';
-  neck.position.set(0, s * RenderConfig.PlayerNeckOffsetY, 0);
-  group.add(neck);
-
-  // --- Tactical Helmet ---
-  const helmetMat = new THREE.MeshStandardMaterial({
-    color: RenderConfig.PlayerHelmetColor,
-    roughness: RenderConfig.PlayerHelmetRoughness,
-    metalness: RenderConfig.PlayerHelmetMetalness,
-  });
-  const helmetGeo = new THREE.SphereGeometry(
-    s * RenderConfig.PlayerHelmetRadius,
-    RenderConfig.PlayerHelmetSegments,
-    RenderConfig.PlayerHelmetSegments
-  );
-  const helmet = new THREE.Mesh(helmetGeo, helmetMat);
-  helmet.userData.partName = 'helmet';
-  helmet.userData.fixedColor = true;
-  helmet.position.set(0, s * RenderConfig.PlayerHelmetOffsetY, 0);
-  helmet.scale.set(1.0, RenderConfig.PlayerHelmetScaleY, 1.0);
-  helmet.renderOrder = 1;
-  group.add(helmet);
-
-  // --- Weapon / Rifle ---
-  const weaponMat = new THREE.MeshStandardMaterial({
-    color: RenderConfig.PlayerWeaponColor,
-    roughness: RenderConfig.PlayerWeaponRoughness,
-    metalness: RenderConfig.PlayerWeaponMetalness,
-  });
-  const weaponGeo = new THREE.BoxGeometry(
-    s * RenderConfig.PlayerWeaponWidth,
-    s * RenderConfig.PlayerWeaponLength,
-    s * RenderConfig.PlayerWeaponDepth
-  );
-  const weapon = new THREE.Mesh(weaponGeo, weaponMat);
-  weapon.userData.partName = 'weapon';
-  weapon.userData.fixedColor = true;
-  weapon.position.set(s * RenderConfig.PlayerWeaponOffsetX, s * RenderConfig.PlayerWeaponOffsetY, 0);
-  group.add(weapon);
-
-  // --- Glow ring at base ---
-  const ringGeo = new THREE.RingGeometry(
-    s * RenderConfig.PlayerGlowRingInnerRatio,
-    s * RenderConfig.PlayerGlowRingOuterRatio,
-    RenderConfig.PlayerGlowRingSegments
-  );
-  const ringMat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: RenderConfig.PlayerGlowRingRoughness,
-    metalness: RenderConfig.PlayerGlowRingMetalness,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: RenderConfig.PlayerGlowRingEmissiveIntensity,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.6,
-  });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.userData.partName = 'ring';
-  ring.position.y = 0;
-  group.add(ring);
+  group.userData.partNames = SCOUT_PART_NAMES;
 
   return group;
 }
+

@@ -216,31 +216,37 @@ export const AnimationConfig = {
   /** Shot pulse ease function */
   ShotPulseEase: "elastic.out(1, 0.3)",
 
-  // --- Primitive character body animations ---
-  /** local-Z oscillation amplitude for idle head bob */
-  IdleHeadBobAmplitude: 0.3,
-  /** seconds per full breath cycle */
-  IdleHeadBobDuration: 1.5,
-  /** radians for idle arm gentle sway (rotation.y) */
-  IdleArmSwayAngle: 0.12,
-  /** seconds per full arm sway cycle */
-  IdleArmSwayDuration: 2.0,
-  /** ring material opacity at minimum during idle pulse */
-  IdleRingOpacityMin: 0.25,
-  /** ring material opacity at maximum during idle pulse */
-  IdleRingOpacityMax: 0.75,
-  /** seconds per ring opacity pulse cycle */
-  IdleRingPulseDuration: 1.2,
-  /** radians for arm swing during walk (rotation.x) */
-  WalkArmSwingAngle: 0.55,
-  /** seconds per half-swing during walk animation */
-  WalkArmSwingHalfDuration: 0.20,
-  /** arm thrust forward distance = PlayerMarkerSize × this ratio */
-  AttackArmThrustRatio: 0.20,
-  /** seconds for arm thrust out */
-  AttackThrustOutDuration: 0.12,
-  /** seconds for arm return after thrust */
-  AttackThrustReturnDuration: 0.30,
+  // --- Scout (humanoid) body animations ---
+  /** head Y-bob amplitude in HS units during idle */
+  IdleHeadBobAmount: 0.15,
+  /** seconds per idle head-bob half-period */
+  IdleCockpitPulseDuration: 1.2,
+  /** arm Y sway amplitude in world units during walk */
+  WalkArmSwayY: 1.5,
+  /** seconds per half-period of arm sway during walk */
+  WalkArmSwayHalfDuration: 0.15,
+  /** barrel forward recoil distance = PlayerMarkerSize × this ratio */
+  AttackBarrelForwardRatio: 0.30,
+  /** seconds for barrel thrust out */
+  AttackBarrelOutDuration: 0.10,
+  /** seconds for barrel return after recoil */
+  AttackBarrelReturnDuration: 0.25,
+
+  // --- Dance (full-body bop) ---
+  /** body Y bounce amplitude in world units */
+  DanceBodyBounceAmount: 2.0,
+  /** seconds per half-period of body bounce */
+  DanceBodyBounceDuration: 0.25,
+  /** head nod amplitude in HS units (≈2× idle bob) */
+  DanceHeadNodAmount: 0.35,
+  /** seconds per half-period of head nod */
+  DanceHeadNodDuration: 0.25,
+  /** arm sway amplitude in world units (≈2.5× walk sway) */
+  DanceArmSwayAmount: 4.0,
+  /** seconds per half-period of arm sway */
+  DanceArmSwayDuration: 0.25,
+  /** number of full bounce loops before reverting to idle */
+  DanceLoopCount: 2,
 } as const;
 
 /**
@@ -261,6 +267,30 @@ export const CameraConfig = {
 
   /** Enable rotation control */
   EnableRotate: false,
+
+  /** 3D斜め視点: カメラの target に対する X オフセット（横ずれ、0=真後ろ） */
+  OffsetX: 0,
+
+  /** 3D斜め視点: カメラの target に対する Y オフセット（手前引き）。負値でプレイヤー後方から */
+  OffsetY: -150,
+
+  /** 3D斜め視点: カメラの Z オフセット（高さ）。大きいほど俯瞰 */
+  OffsetZ: 150,
+
+  /** パン操作を無効化（カメラは自動追従） */
+  EnablePan: false,
+
+  /** プレイヤー切り替え時のカメラパン秒数 */
+  FollowPanDuration: 0.8,
+
+  /** 移動追従時のカメラパン秒数（MovementDuration と同値） */
+  FollowMoveDuration: 1.0,
+
+  /** プレイヤー切り替え時の ease */
+  FollowPanEase: 'power2.inOut',
+
+  /** 移動追従時の ease */
+  FollowMoveEase: 'power2.out',
 } as const;
 
 /**
@@ -296,160 +326,61 @@ export const RenderConfig = {
   /** Player diamond marker size */
   PlayerMarkerSize: 20,
 
-  /** GLTF player model scale factor */
-  PlayerModelScale: 15,
-
-  /** GLTF player model Z rotation offset in radians */
-  PlayerModelRotationZ: Math.PI / 2,
-
   /** Y rotation offset applied to all player models so the face points forward (radians) */
   PlayerFacingOffset: Math.PI / 2,
 
-  // --- Primitive player geometry ---
-  /** Radial segments for player body cylinder (smoother = higher) */
-  PlayerBodySegments: 24,
-  /** Radial/height segments for player head sphere */
-  PlayerHeadSegments: 24,
-  /** PBR roughness for player body */
-  PlayerBodyRoughness: 0.55,
-  /** PBR metalness for player body */
-  PlayerBodyMetalness: 0.05,
-  /** PBR roughness for player head */
-  PlayerHeadRoughness: 0.45,
-  /** PBR metalness for player head */
-  PlayerHeadMetalness: 0.10,
+  /** Z offset applied to player mesh groups to vertically center the Scout model over the node circle.
+   *  After rotation.x = π/2, local Y maps to world Z. The model's visual center is below Y=0,
+   *  so we lift by HS * 0.7 (HS = PlayerMarkerSize / 6.4). */
+  PlayerZOffset: (20 / 6.4) * 3.21,
 
-  // --- Nose (small cone on face front) ---
-  /** Nose cone base radius = PlayerMarkerSize * this */
-  PlayerNoseRadiusRatio: 0.04,
-  /** Nose cone height = PlayerMarkerSize * this */
-  PlayerNoseHeightRatio: 0.12,
-  /** Radial segments for nose cone */
-  PlayerNoseSegments: 8,
-  /** PBR roughness for nose */
-  PlayerNoseRoughness: 0.50,
-  /** PBR metalness for nose */
-  PlayerNoseMetalness: 0.05,
+  // --- Primitive drone player geometry ---
+  /** Radial segments for body octagon */
+  PlayerBodySegments: 8,
+  /** Body radius = PlayerMarkerSize * this */
+  PlayerBodyRadius: 0.45,
+  /** Body height (thin slab) = PlayerMarkerSize * this */
+  PlayerBodyThickness: 0.05,
+  /** PBR roughness for body */
+  PlayerBodyRoughness: 0.6,
+  /** PBR metalness for body */
+  PlayerBodyMetalness: 0.3,
 
-  // --- Arms ---
-  /** Arm cylinder radius = PlayerMarkerSize * this */
-  PlayerArmRadius: 0.04,
-  /** Arm cylinder length = PlayerMarkerSize * this */
-  PlayerArmLength: 0.35,
-  /** Radial segments for arms */
-  PlayerArmSegments: 8,
-  /** PBR roughness for arms */
-  PlayerArmRoughness: 0.55,
-  /** PBR metalness for arms */
-  PlayerArmMetalness: 0.05,
-  /** Arm X offset from center = PlayerMarkerSize * this */
-  PlayerArmOffsetX: 0.22,
-  /** Arm Y position = PlayerMarkerSize * this */
-  PlayerArmOffsetY: 0.30,
+  // --- Cockpit (forward direction indicator) ---
+  /** Cockpit circle radius = PlayerMarkerSize * this */
+  PlayerCockpitRadius: 0.15,
+  /** Cockpit Y offset toward front = PlayerMarkerSize * this */
+  PlayerCockpitOffsetY: 0.20,
+  /** Cockpit emissive glow intensity */
+  PlayerCockpitEmissiveIntensity: 1.5,
 
-  // --- Eyes (white sclera) ---
-  /** Eye sphere radius = PlayerMarkerSize * this */
-  PlayerEyeRadius: 0.055,
-  /** Segments for eye sphere */
-  PlayerEyeSegments: 8,
-  /** Eye X offset (left/right) = PlayerMarkerSize * this */
-  PlayerEyeOffsetX: 0.08,
-  /** Eye Y position = PlayerMarkerSize * this */
-  PlayerEyeOffsetY: 0.70,
-  /** Eye Z offset (forward on head) = PlayerMarkerSize * this */
-  PlayerEyeOffsetZ: 0.12,
+  // --- Barrel (gun pointing forward) ---
+  /** Barrel width = PlayerMarkerSize * this */
+  PlayerBarrelWidth: 0.10,
+  /** Barrel length along Y = PlayerMarkerSize * this */
+  PlayerBarrelLength: 0.55,
+  /** Barrel Y center offset = PlayerMarkerSize * this */
+  PlayerBarrelOffsetY: 0.55,
+  /** Barrel color (fixed dark metallic, independent of player color) */
+  PlayerBarrelColor: 0x1a1a2e,
 
-  // --- Pupils ---
-  /** Pupil sphere radius = PlayerMarkerSize * this */
-  PlayerPupilRadius: 0.03,
-  /** Segments for pupil sphere */
-  PlayerPupilSegments: 6,
-  /** Pupil Z offset (in front of eye) = PlayerMarkerSize * this */
-  PlayerPupilOffsetZ: 0.165,
+  // --- Thrusters (left & right) ---
+  /** Thruster width = PlayerMarkerSize * this */
+  PlayerThrusterWidth: 0.18,
+  /** Thruster length = PlayerMarkerSize * this */
+  PlayerThrusterLength: 0.30,
+  /** Thruster X offset from center = PlayerMarkerSize * this */
+  PlayerThrusterOffsetX: 0.48,
 
-  // --- Glow ring ---
-  /** Ring inner radius = PlayerMarkerSize * this */
-  PlayerGlowRingInnerRatio: 0.17,
-  /** Ring outer radius = PlayerMarkerSize * this */
-  PlayerGlowRingOuterRatio: 0.28,
-  /** Radial segments for glow ring */
-  PlayerGlowRingSegments: 32,
-  /** Emissive intensity for glow ring */
-  PlayerGlowRingEmissiveIntensity: 0.8,
-  /** PBR roughness for glow ring */
-  PlayerGlowRingRoughness: 0.30,
-  /** PBR metalness for glow ring */
-  PlayerGlowRingMetalness: 0.0,
+  // --- Humanoid variant: handgun ---
+  /** Handgun barrel color (dark metallic) */
+  PlayerGunBarrelColor: 0x222233,
 
-  // --- Neck ---
-  /** Neck cylinder top radius = PlayerMarkerSize * this */
-  PlayerNeckTopRadius: 0.08,
-  /** Neck cylinder bottom radius = PlayerMarkerSize * this */
-  PlayerNeckBottomRadius: 0.10,
-  /** Neck cylinder height = PlayerMarkerSize * this */
-  PlayerNeckHeight: 0.10,
-  /** Radial segments for neck cylinder */
-  PlayerNeckSegments: 12,
-  /** Neck Y offset = PlayerMarkerSize * this */
-  PlayerNeckOffsetY: 0.50,
-
-  // --- Legs ---
-  /** Leg cylinder top radius = PlayerMarkerSize * this */
-  PlayerLegTopRadius: 0.07,
-  /** Leg cylinder bottom radius = PlayerMarkerSize * this */
-  PlayerLegBottomRadius: 0.06,
-  /** Leg cylinder length = PlayerMarkerSize * this */
-  PlayerLegLength: 0.40,
-  /** Radial segments for leg cylinders */
-  PlayerLegSegments: 8,
-  /** Leg X offset from center = PlayerMarkerSize * this */
-  PlayerLegOffsetX: 0.09,
-  /** Leg Y center offset = PlayerMarkerSize * this */
-  PlayerLegOffsetY: -0.20,
-
-  // --- Hands ---
-  /** Hand sphere radius = PlayerMarkerSize * this */
-  PlayerHandRadius: 0.065,
-  /** Segments for hand sphere */
-  PlayerHandSegments: 8,
-  /** Hand X offset = PlayerMarkerSize * this (= ArmOffsetX + ArmLength/2) */
-  PlayerHandOffsetX: 0.395,
-  /** Hand Y position = PlayerMarkerSize * this (same as arm Y) */
-  PlayerHandOffsetY: 0.30,
-
-  // --- Helmet ---
-  /** Helmet sphere radius = PlayerMarkerSize * this */
-  PlayerHelmetRadius: 0.225,
-  /** Segments for helmet sphere */
-  PlayerHelmetSegments: 16,
-  /** Helmet Y offset = PlayerMarkerSize * this */
-  PlayerHelmetOffsetY: 0.72,
-  /** Helmet Y scale (flatten into dome shape) */
-  PlayerHelmetScaleY: 0.55,
-  /** Helmet color (fixed dark gray armor, independent of player color) */
-  PlayerHelmetColor: 0x334455,
-  /** PBR roughness for helmet */
-  PlayerHelmetRoughness: 0.35,
-  /** PBR metalness for helmet */
-  PlayerHelmetMetalness: 0.40,
-
-  // --- Weapon ---
-  /** Weapon box width = PlayerMarkerSize * this */
-  PlayerWeaponWidth: 0.04,
-  /** Weapon box length (along Y = forward) = PlayerMarkerSize * this */
-  PlayerWeaponLength: 0.55,
-  /** Weapon box depth = PlayerMarkerSize * this */
-  PlayerWeaponDepth: 0.05,
-  /** Weapon X offset = PlayerMarkerSize * this */
-  PlayerWeaponOffsetX: 0.44,
-  /** Weapon Y center offset = PlayerMarkerSize * this */
-  PlayerWeaponOffsetY: 0.575,
-  /** Weapon color (fixed dark metallic, independent of player color) */
-  PlayerWeaponColor: 0x1a1a2e,
-  /** PBR roughness for weapon */
-  PlayerWeaponRoughness: 0.25,
-  /** PBR metalness for weapon */
-  PlayerWeaponMetalness: 0.75,
+  // --- Humanoid variant: head ---
+  /** PBR roughness for head sphere */
+  PlayerHeadRoughness: 0.7,
+  /** PBR metalness for head sphere */
+  PlayerHeadMetalness: 0.1,
 } as const;
 
 /**

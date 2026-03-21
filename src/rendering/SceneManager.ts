@@ -33,7 +33,11 @@ export class SceneManager {
     // Setup camera
     this.camera = new THREE.PerspectiveCamera(CameraConfig.FOV, 1.0);
     this.camera.aspect = width / height;
-    this.camera.position.set(0, 0, CameraConfig.InitialZPosition);
+    this.camera.position.set(
+      CameraConfig.OffsetX,
+      CameraConfig.OffsetY,
+      CameraConfig.OffsetZ,
+    );
     this.camera.updateProjectionMatrix();
 
     // Setup controls
@@ -42,6 +46,7 @@ export class SceneManager {
     this.orbitControls.minDistance = CameraConfig.MinDistance;
     this.orbitControls.maxDistance = CameraConfig.MaxDistance;
     this.orbitControls.enableRotate = CameraConfig.EnableRotate;
+    this.orbitControls.enablePan = CameraConfig.EnablePan;
 
     // Add background grid
     this.createBackgroundGrid();
