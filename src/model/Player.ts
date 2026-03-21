@@ -30,18 +30,4 @@ export class Player extends Entity {
     }
   }
 
-  /**
-   * Heals the player
-   */
-  heal(amount: number): void {
-    if (!this.isAlive) return;
-    this.health = Math.min(this.maxHealth, this.health + amount);
-  }
-
-  /**
-   * Gets the health percentage (0-1)
-   */
-  getHealthPercentage(): number {
-    return this.health / this.maxHealth;
-  }
 }

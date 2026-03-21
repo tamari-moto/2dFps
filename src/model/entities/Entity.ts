@@ -51,17 +51,4 @@ export abstract class Entity {
     this.angle = angle;
   }
 
-  /**
-   * Gets the entity's current position
-   */
-  getPosition(): { x: number; y: number } {
-    return { x: this.node.x, y: this.node.y };
-  }
-
-  /**
-   * Checks if this entity is at the same position as another entity
-   */
-  isAtSamePositionAs(other: Entity): boolean {
-    return this.node.id === other.node.id;
-  }
 }

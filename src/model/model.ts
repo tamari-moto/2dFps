@@ -92,34 +92,6 @@ class Model {
   }
 
   /**
-   * Finds the closest node in a given direction from the origin node.
-   * @param origin - The origin node.
-   * @param angle - The angle in degrees.
-   * @param distance - The distance to search.
-   * @returns The closest node in the given direction, or null if no node is found.
-   */
-  public getNodeInDirection(origin: node, angle: number, distance: number): node | null {
-    const targetX = origin.x + distance * Math.cos(angle);
-    const targetY = origin.y + distance * Math.sin(angle);
-
-    let closestNode: node | null = null;
-    let minDistance = Infinity;
-
-    for (const n of this.nodeList) {
-      const dx = n.x - targetX;
-      const dy = n.y - targetY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist < minDistance) {
-        minDistance = dist;
-        closestNode = n;
-      }
-    }
-
-    return closestNode;
-  }
-
-  /**
    * Sets the player reference to a new node.
    * @param playerId - The player ID.
    * @param newNode - The new node.
@@ -141,20 +113,6 @@ class Model {
   }
 
   /**
-   * Gets nodes at a specific angle and distance from the center node.
-   * @param centerNode - The center node.
-   * @param angle - The angle in degrees.
-   * @param distance - The distance to search.
-   * @returns An array of nodes that are at the specified angle and distance from the center node.
-   */
-  public getNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
-    return this.nodeList.filter(node => {
-      const nodeAngle = this.getAngleBetweenNodes(centerNode, node);
-      return Math.abs(nodeAngle - angle) < this.viewAngle && this.getNodeDistance(centerNode, node) <= distance;
-    });
-  }
-
-  /**
    * Calculates the angle between two nodes.
    * @param node1 - The first node.
    * @param node2 - The second node.
@@ -165,23 +123,6 @@ class Model {
     const dy = node2.y - node1.y;
     const angle = Math.atan2(dy, dx) * (180 / Math.PI); // Convert radians to degrees
     return angle;
-  }
-
-  /**
-   * Gets nodes that are connected to the target node.
-   * @param targetNode - The target node.
-   * @returns An array of nodes that are connected to the target node.
-   */
-  public getConnectedNodes(targetNode: node): node[] {
-    const connectedNodes: node[] = [];
-    const edges = this.Edges.List[targetNode.id];
-    for (const nodeId of edges) {
-      const connectedNode = this.nodeList.find(node => node.id === nodeId);
-      if (connectedNode) {
-        connectedNodes.push(connectedNode);
-      }
-    }
-    return connectedNodes;
   }
 
   /**
@@ -220,25 +161,6 @@ class Model {
     if (nodeDistance === 0) return 0;
     const dot = (dx * dirX + dy * dirY) / nodeDistance;
     return Math.acos(Math.max(-1, Math.min(1, dot))) * (180 / Math.PI);
-  }
-
-  /**
-   * Gets nodes that are connected to the center node and are at a specific angle and distance.
-   * @param centerNode - The center node.
-   * @param angle - The angle in degrees.
-   * @param distance - The distance to search.
-   * @returns An array of nodes that are connected to the center node and are at the specified angle and distance.
-   */
-  public getConnectedNodesAtAngle(centerNode: node, angle: number, distance: number): node[] {
-    const connectedNodes = this.getConnectedNodes(centerNode);
-    const dirX = Math.cos(angle * Math.PI / 180);
-    const dirY = Math.sin(angle * Math.PI / 180);
-
-    return connectedNodes.filter(node => {
-      const nodeDistance = this.getNodeDistance(centerNode, node);
-      const nodeAngle = this.getAngleFromDirection(centerNode, node, dirX, dirY);
-      return nodeAngle < this.viewAngle && nodeDistance <= distance;
-    });
   }
 
   /**

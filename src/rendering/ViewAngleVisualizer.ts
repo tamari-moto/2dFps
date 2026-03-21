@@ -31,22 +31,6 @@ export class ViewAngleVisualizer {
   }
 
   /**
-   * Sets the visibility of view angle edges
-   * @param visible - Whether to show or hide the edges
-   */
-  public setVisible(visible: boolean): void {
-    this.isVisible = visible;
-  }
-
-  /**
-   * Gets the current visibility state
-   * @returns Whether the edges are currently visible
-   */
-  public getVisible(): boolean {
-    return this.isVisible;
-  }
-
-  /**
    * Draws view angle edges from player position
    * @param playerPosition - The player's current position node
    * @param playerAngle - The angle the player is facing (in degrees)
