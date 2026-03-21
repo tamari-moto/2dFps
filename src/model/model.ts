@@ -15,6 +15,11 @@ class Model {
   private NodesInGridSize: number = MapConfig.NodesInGridSize;
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
+  private lastSeed: string = '';
+
+  public getLastSeed(): string {
+    return this.lastSeed;
+  }
 
   constructor() {
     this.initGrid();
@@ -37,7 +42,6 @@ class Model {
         count++;
       }
     }
-    this.connectNearNodes();
     this.addDirectionalEdges();
 
     // ランダムな障害物を生成
@@ -53,20 +57,6 @@ class Model {
     for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
       const playerId = createPlayerId(i);
       this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i]));
-    }
-  }
-
-  /**
-   * Connects nodes that are within a certain distance of each other.
-   */
-  private connectNearNodes() {
-    for (let i = 0; i < this.nodeList.length; i++) {
-      for (let j = i + 1; j < this.nodeList.length; j++) {
-        if(this.getNodeDistance(this.nodeList[i], this.nodeList[j]) < PlayerConfig.MaxViewDistance) {
-          this.Edges.addEdgeDirected(this.nodeList[i].id, this.nodeList[j].id);
-          this.Edges.addEdgeDirected(this.nodeList[j].id, this.nodeList[i].id);
-        }
-      }
     }
   }
 
@@ -165,18 +155,39 @@ class Model {
   public getVisibleNodesAtAngle(centerNode: Node, angle: number, distance: number): Node[] {
     const dirX = Math.cos(angle * Math.PI / 180);
     const dirY = Math.sin(angle * Math.PI / 180);
+    const gridSize = this.NodesInGridSize;
+    const spacing = MapConfig.NodeSpacing;
 
-    return this.nodeList.filter(node => {
-      if (node.id === centerNode.id) return false;
+    // グリッド座標を算出（initGrid: id = col * gridSize + row）
+    const centerCol = Math.floor(centerNode.id / gridSize);
+    const centerRow = centerNode.id % gridSize;
+    const maxSteps = Math.ceil(distance / spacing);
 
-      const nodeDistance = this.getNodeDistance(centerNode, node);
-      if (nodeDistance > distance) return false;
+    // 視野範囲のバウンディングボックス内のノードだけを走査
+    const colMin = Math.max(0, centerCol - maxSteps);
+    const colMax = Math.min(gridSize - 1, centerCol + maxSteps);
+    const rowMin = Math.max(0, centerRow - maxSteps);
+    const rowMax = Math.min(gridSize - 1, centerRow + maxSteps);
 
-      const nodeAngle = this.getAngleFromDirection(centerNode, node, dirX, dirY);
-      if (nodeAngle >= this.viewAngle) return false;
+    const result: Node[] = [];
+    for (let c = colMin; c <= colMax; c++) {
+      for (let r = rowMin; r <= rowMax; r++) {
+        const nodeId = c * gridSize + r;
+        if (nodeId === centerNode.id) continue;
 
-      return this.hasLineOfSight(centerNode, node);
-    });
+        const node = this.nodeList[nodeId];
+        const nodeDistance = this.getNodeDistance(centerNode, node);
+        if (nodeDistance > distance) continue;
+
+        const nodeAngle = this.getAngleFromDirection(centerNode, node, dirX, dirY);
+        if (nodeAngle >= this.viewAngle) continue;
+
+        if (this.hasLineOfSight(centerNode, node)) {
+          result.push(node);
+        }
+      }
+    }
+    return result;
   }
   /**
 
@@ -232,6 +243,7 @@ class Model {
    */
   private generateRandomObstaclesInternal(): void {
     const result = MapGenerator.generateRandomObstacles();
+    this.lastSeed = result.seed;
     this.obstacles = result.obstacles;
     this.Lines = result.lines;
 
@@ -258,9 +270,12 @@ class Model {
     minWidth?: number,
     maxWidth?: number,
     minHeight?: number,
-    maxHeight?: number
+    maxHeight?: number,
+    seed?: string
   ): void {
-    this.applyObstacleLayout(MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight));
+    const result = MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight, seed);
+    this.lastSeed = result.seed;
+    this.applyObstacleLayout(result);
   }
 
   /**
@@ -275,8 +290,10 @@ class Model {
    * Generates a complex map with various obstacle patterns.
    * Patterns include: maze-like corridors, rooms, scattered obstacles, and strategic cover points.
    */
-  public generateComplexMap(): void {
-    this.applyObstacleLayout(MapGenerator.generateComplexMap());
+  public generateComplexMap(seed?: string): void {
+    const result = MapGenerator.generateComplexMap(seed);
+    this.lastSeed = result.seed;
+    this.applyObstacleLayout(result);
   }
 
   /**

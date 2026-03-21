@@ -103,8 +103,8 @@ export class ThreeSetup {
   /**
    * Regenerates obstacles randomly
    */
-  regenerateObstacles(): void {
-    this.gameController.regenerateObstacles();
+  regenerateObstacles(seed?: string): string {
+    return this.gameController.regenerateObstacles(seed);
   }
 
   /**
@@ -117,8 +117,8 @@ export class ThreeSetup {
   /**
    * Generates a complex map
    */
-  generateComplexMap(): void {
-    this.gameController.generateComplexMap();
+  generateComplexMap(seed?: string): string {
+    return this.gameController.generateComplexMap(seed);
   }
 
   /**

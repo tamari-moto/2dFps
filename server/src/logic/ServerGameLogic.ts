@@ -83,16 +83,6 @@ export class ServerGameLogic {
       if (n.id - size >= 0) adj[n.id].push(n.id - size);
     }
 
-    // Long-range connections (mirrors connectNearNodes in model.ts)
-    for (let i = 0; i < this.nodes.length; i++) {
-      for (let j = i + 1; j < this.nodes.length; j++) {
-        if (this.distance(this.nodes[i], this.nodes[j]) < MAX_VIEW_DISTANCE) {
-          if (!adj[i].includes(j)) adj[i].push(j);
-          if (!adj[j].includes(i)) adj[j].push(i);
-        }
-      }
-    }
-
     return adj;
   }
 

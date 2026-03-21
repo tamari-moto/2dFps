@@ -8,6 +8,16 @@ interface ExportMenuProps {
 
 const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [currentSeed, setCurrentSeed] = React.useState<string>('');
+  const [seedInput, setSeedInput] = React.useState<string>('');
+
+  React.useEffect(() => {
+    if (threeSetup) {
+      const s = threeSetup.getModel().getLastSeed();
+      setCurrentSeed(s);
+      setSeedInput(s);
+    }
+  }, [threeSetup]);
 
   const handleExportObstacles = () => {
     if (!threeSetup) return;
@@ -26,14 +36,30 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
 
   const handleRandomizeObstacles = () => {
     if (threeSetup) {
-      threeSetup.regenerateObstacles();
+      const usedSeed = threeSetup.regenerateObstacles();
+      setCurrentSeed(usedSeed);
+      setSeedInput(usedSeed);
     }
   };
 
   const handleComplexMap = () => {
     if (threeSetup) {
-      threeSetup.generateComplexMap();
+      const usedSeed = threeSetup.generateComplexMap();
+      setCurrentSeed(usedSeed);
+      setSeedInput(usedSeed);
     }
+  };
+
+  const handleSeedRegenerate = () => {
+    if (!threeSetup || !seedInput.trim()) return;
+    const usedSeed = threeSetup.regenerateObstacles(seedInput.trim());
+    setCurrentSeed(usedSeed);
+  };
+
+  const handleComplexMapWithSeed = () => {
+    if (!threeSetup || !seedInput.trim()) return;
+    const usedSeed = threeSetup.generateComplexMap(seedInput.trim());
+    setCurrentSeed(usedSeed);
   };
 
   const handleImportClick = () => {
@@ -136,6 +162,43 @@ const ExportMenu: React.FC<ExportMenuProps> = ({ threeSetup }) => {
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
+      <div style={{
+        position: 'absolute',
+        top: '210px',
+        right: '10px',
+        backgroundColor: 'rgba(0,0,0,0.75)',
+        color: 'white',
+        padding: '8px',
+        borderRadius: '5px',
+        zIndex: 1000,
+        width: '170px',
+        fontSize: '12px',
+      }}>
+        <div style={{ marginBottom: '4px', wordBreak: 'break-all' }}>
+          シード: {currentSeed || '未生成'}
+        </div>
+        <input
+          type="text"
+          value={seedInput}
+          onChange={(e) => setSeedInput(e.target.value)}
+          placeholder="シード文字列を入力"
+          style={{ width: '100%', padding: '3px', fontSize: '12px', boxSizing: 'border-box' }}
+        />
+        <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+          <button
+            onClick={handleSeedRegenerate}
+            style={{ flex: 1, padding: '4px', fontSize: '11px', cursor: 'pointer' }}
+          >
+            ランダム
+          </button>
+          <button
+            onClick={handleComplexMapWithSeed}
+            style={{ flex: 1, padding: '4px', fontSize: '11px', cursor: 'pointer' }}
+          >
+            複雑
+          </button>
+        </div>
+      </div>
     </>
   );
 };

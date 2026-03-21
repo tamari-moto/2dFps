@@ -2,13 +2,63 @@ import { Graph } from './Graph';
 import { Node } from './node';
 import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
-import { MapConfig, ObstacleConfig, ComplexMapConfig, CalculatedConfig } from '../config/GameConfig';
+import { MapConfig, ObstacleConfig, BSPMapConfig, CalculatedConfig } from '../config/GameConfig';
+
+/** BSP ツリーのノード */
+interface BSPNode {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  left?: BSPNode;
+  right?: BSPNode;
+  room?: Room;
+}
+
+/** 部屋の矩形情報 */
+interface Room {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 障害物追加用のカウンタ（参照渡しで ID を管理） */
+interface IdCounter {
+  value: number;
+}
 
 /**
  * MapGenerator class handles all map and obstacle generation logic.
- * This class is responsible for creating various map patterns and obstacle configurations.
+ * Uses BSP (Binary Space Partitioning) for complex map generation.
  */
 export class MapGenerator {
+  /** FNV-1a: 文字列 → uint32 */
+  private static hashString(seed: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  /** mulberry32: uint32 → () => float [0,1) */
+  private static makePrng(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => {
+      s += 0x6D2B79F5;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** ランダムなシード文字列を生成する（唯一の Math.random() 呼び出し） */
+  public static generateSeed(): string {
+    return String(Math.floor(Math.random() * 0xFFFFFFFF));
+  }
+
   /**
    * Generates random obstacles on the map.
    * @param count - Number of obstacles to generate
@@ -16,15 +66,19 @@ export class MapGenerator {
    * @param maxWidth - Maximum width of obstacles
    * @param minHeight - Minimum height of obstacles
    * @param maxHeight - Maximum height of obstacles
-   * @returns Object containing generated obstacles and line segments
+   * @param seed - Optional seed string for reproducible generation
+   * @returns Object containing generated obstacles, line segments, and used seed
    */
   public static generateRandomObstacles(
     count: number = ObstacleConfig.DefaultCount,
     minWidth: number = ObstacleConfig.MinWidth,
     maxWidth: number = ObstacleConfig.MaxWidth,
     minHeight: number = ObstacleConfig.MinHeight,
-    maxHeight: number = ObstacleConfig.MaxHeight
-  ): { obstacles: ObstacleData[], lines: LineSegment[] } {
+    maxHeight: number = ObstacleConfig.MaxHeight,
+    seed?: string
+  ): { obstacles: ObstacleData[], lines: LineSegment[], seed: string } {
+    const resolvedSeed = seed ?? MapGenerator.generateSeed();
+    const rng = MapGenerator.makePrng(MapGenerator.hashString(resolvedSeed));
     const obstacles: ObstacleData[] = [];
     const lines: LineSegment[] = [];
 
@@ -34,12 +88,12 @@ export class MapGenerator {
 
     // Generate random obstacles
     for (let i = 0; i < count; i++) {
-      const width = Math.floor(Math.random() * (maxWidth - minWidth + 1)) + minWidth;
-      const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+      const width = Math.floor(rng() * (maxWidth - minWidth + 1)) + minWidth;
+      const height = Math.floor(rng() * (maxHeight - minHeight + 1)) + minHeight;
 
       // Ensure obstacles don't overlap with edges
-      const x = Math.floor(Math.random() * (mapSize - width - margin * 2)) + margin;
-      const y = Math.floor(Math.random() * (mapSize - height - margin * 2)) + margin;
+      const x = Math.floor(rng() * (mapSize - width - margin * 2)) + margin;
+      const y = Math.floor(rng() * (mapSize - height - margin * 2)) + margin;
 
       const obstacleSegments = createRectangleSegments(x, y, width, height);
       obstacles.push({ id: i + 1, segments: obstacleSegments });
@@ -49,58 +103,56 @@ export class MapGenerator {
       });
     }
 
-    return { obstacles, lines };
+    return { obstacles, lines, seed: resolvedSeed };
   }
 
   /**
-   * Generates a complex map with various obstacle patterns.
-   * Patterns include: maze-like corridors, rooms, scattered obstacles, and strategic cover points.
-   * @returns Object containing generated obstacles, line segments, and pattern name
+   * BSP アルゴリズムによるマップ生成。
+   * 左半分を BSP で分割・部屋配置・通路接続し、右半分にミラーリング。
+   * 中央チョークポイントと戦術要素（ピラー・ハーフウォール）を追加。
    */
-  public static generateComplexMap(): { obstacles: ObstacleData[], lines: LineSegment[], pattern: string } {
+  public static generateComplexMap(seed?: string): { obstacles: ObstacleData[], lines: LineSegment[], pattern: string, seed: string } {
+    const resolvedSeed = seed ?? MapGenerator.generateSeed();
+    const rng = MapGenerator.makePrng(MapGenerator.hashString(resolvedSeed));
+
     const obstacles: ObstacleData[] = [];
     const lines: LineSegment[] = [];
     const mapSize = CalculatedConfig.MapSize;
-    let obstacleId = 1;
+    const margin = MapConfig.ObstacleMargin;
+    const idCounter: IdCounter = { value: 1 };
 
-    // Choose a random map pattern
-    const patterns = ['maze', 'rooms', 'scattered', 'symmetric', 'corridors'] as const;
-    const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
+    const centerX = mapSize / 2;
 
-    switch (selectedPattern) {
-      case 'maze':
-        // Maze-like pattern with multiple walls
-        this.generateMazePattern(obstacleId, mapSize, obstacles, lines);
-        break;
+    // Phase 1: BSP で左半分を分割
+    const leftHalfWidth = centerX - margin;
+    const root = this.buildBSPTree(margin, margin, leftHalfWidth, mapSize - margin * 2, 0, rng);
 
-      case 'rooms':
-        // Multiple rooms with doorways
-        this.generateRoomsPattern(obstacleId, mapSize, obstacles, lines);
-        break;
+    // Phase 2: リーフセルに部屋を配置
+    this.placeRooms(root, rng);
 
-      case 'scattered':
-        // Scattered cover points
-        this.generateScatteredPattern(obstacleId, mapSize, obstacles, lines);
-        break;
-
-      case 'symmetric':
-        // Symmetric obstacle placement
-        this.generateSymmetricPattern(obstacleId, mapSize, obstacles, lines);
-        break;
-
-      case 'corridors':
-        // Long corridors with intersections
-        this.generateCorridorsPattern(obstacleId, mapSize, obstacles, lines);
-        break;
+    // Phase 3: 部屋の壁を生成（ドア付き）
+    const allRooms = this.getAllRooms(root);
+    for (const room of allRooms) {
+      this.addRoomWalls(room, obstacles, lines, idCounter);
     }
 
-    return { obstacles, lines, pattern: selectedPattern };
+    // Phase 4: 兄弟サブツリー間を通路で接続
+    this.connectRooms(root, obstacles, lines, idCounter, rng);
+
+    // Phase 5: 戦術要素（ピラー・ハーフウォール）を左半分に追加
+    this.addTacticalElements(allRooms, obstacles, lines, idCounter, rng);
+
+    // Phase 6: 左半分を右半分にミラーリング
+    this.mirrorObstacles(obstacles, lines, centerX, idCounter);
+
+    // Phase 7: 中央チョークポイントを追加
+    this.addCentralFeature(obstacles, lines, mapSize, idCounter, rng);
+
+    return { obstacles, lines, pattern: 'bsp', seed: resolvedSeed };
   }
 
   /**
    * Converts imported obstacle data to internal format.
-   * @param obstaclesData - Array of obstacle data to import
-   * @returns Object containing obstacles and line segments
    */
   public static importObstacles(obstaclesData: ObstacleData[]): { obstacles: ObstacleData[], lines: LineSegment[] } {
     const obstacles: ObstacleData[] = [];
@@ -131,238 +183,353 @@ export class MapGenerator {
 
   /**
    * Applies obstacles to the graph by removing intersecting edges.
-   * @param edges - The graph to modify
-   * @param nodeList - List of all nodes
-   * @param lines - Line segments representing obstacles
    */
   public static applyObstaclesToGraph(edges: Graph, nodeList: Node[], lines: LineSegment[]): void {
     removeEdgesIfIntersected(edges, nodeList, lines);
   }
 
-  /**
-   * Generates a maze-like pattern
-   * @private
-   */
-  private static generateMazePattern(
-    startId: number,
-    _mapSize: number,
-    obstacles: ObstacleData[],
-    lines: LineSegment[]
-  ): void {
-    let id = startId;
-    const wallThickness = ObstacleConfig.WallThickness;
+  // ─── BSP Private Methods ─────────────────────────────────────
 
-    // Horizontal walls
-    for (let i = 0; i < ComplexMapConfig.MazeHorizontalWalls; i++) {
-      const y = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
-      const startX = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
-      const width = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
+  /** 再帰的に空間を二分割して BSP ツリーを構築 */
+  private static buildBSPTree(
+    x: number, y: number, width: number, height: number,
+    depth: number, rng: () => number
+  ): BSPNode {
+    const node: BSPNode = { x, y, width, height };
 
-      const segments = createRectangleSegments(startX, y, width, wallThickness);
-      obstacles.push({ id: id++, segments });
-      segments.forEach(s => lines.push(s));
+    if (depth >= BSPMapConfig.MaxDepth ||
+        width < BSPMapConfig.MinCellSize * 2 ||
+        height < BSPMapConfig.MinCellSize * 2) {
+      return node; // リーフ
     }
 
-    // Vertical walls
-    for (let i = 0; i < ComplexMapConfig.MazeVerticalWalls; i++) {
-      const x = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
-      const startY = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
-      const height = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
+    // 長い方の軸で分割（同等ならランダム）
+    const splitHorizontally = height > width ? true : width > height ? false : rng() > 0.5;
 
-      const segments = createRectangleSegments(x, startY, wallThickness, height);
-      obstacles.push({ id: id++, segments });
-      segments.forEach(s => lines.push(s));
+    const ratio = BSPMapConfig.SplitMinRatio + rng() * (BSPMapConfig.SplitMaxRatio - BSPMapConfig.SplitMinRatio);
+
+    if (splitHorizontally) {
+      const splitH = height * ratio;
+      node.left = this.buildBSPTree(x, y, width, splitH, depth + 1, rng);
+      node.right = this.buildBSPTree(x, y + splitH, width, height - splitH, depth + 1, rng);
+    } else {
+      const splitW = width * ratio;
+      node.left = this.buildBSPTree(x, y, splitW, height, depth + 1, rng);
+      node.right = this.buildBSPTree(x + splitW, y, width - splitW, height, depth + 1, rng);
     }
+
+    return node;
   }
 
-  /**
-   * Generates rooms with doorways
-   * @private
-   */
-  private static generateRoomsPattern(
-    startId: number,
-    _mapSize: number,
-    obstacles: ObstacleData[],
-    lines: LineSegment[]
-  ): void {
-    let id = startId;
-    const roomCount = ComplexMapConfig.RoomCount;
-
-    for (let i = 0; i < roomCount; i++) {
-      const roomX = ComplexMapConfig.RoomBaseOffset + (i % 2) * ComplexMapConfig.RoomSpacingMultiplier;
-      const roomY = ComplexMapConfig.RoomBaseOffset + Math.floor(i / 2) * ComplexMapConfig.RoomSpacingMultiplier;
-      const roomWidth = ComplexMapConfig.RoomWidth;
-      const roomHeight = ComplexMapConfig.RoomHeight;
-      const wallThickness = ObstacleConfig.RoomWallThickness;
-      const doorWidth = ObstacleConfig.RoomDoorWidth;
-
-      // Top wall with doorway
-      const topLeftWidth = (roomWidth - doorWidth) / 2;
-      const topRightStart = roomX + topLeftWidth + doorWidth;
-      const topRightWidth = roomWidth - topLeftWidth - doorWidth;
-
-      const topLeft = { id: id++, segments: createRectangleSegments(roomX, roomY, topLeftWidth, wallThickness) };
-      obstacles.push(topLeft);
-      lines.push(...topLeft.segments);
-
-      const topRight = { id: id++, segments: createRectangleSegments(topRightStart, roomY, topRightWidth, wallThickness) };
-      obstacles.push(topRight);
-      lines.push(...topRight.segments);
-
-      // Right wall
-      const rightWall = { id: id++, segments: createRectangleSegments(roomX + roomWidth - wallThickness, roomY, wallThickness, roomHeight) };
-      obstacles.push(rightWall);
-      lines.push(...rightWall.segments);
-
-      // Bottom wall
-      const bottomWall = { id: id++, segments: createRectangleSegments(roomX, roomY + roomHeight - wallThickness, roomWidth, wallThickness) };
-      obstacles.push(bottomWall);
-      lines.push(...bottomWall.segments);
-
-      // Left wall with doorway
-      const leftTopHeight = (roomHeight - doorWidth) / 2;
-      const leftBottomStart = roomY + leftTopHeight + doorWidth;
-      const leftBottomHeight = roomHeight - leftTopHeight - doorWidth;
-
-      const leftTop = { id: id++, segments: createRectangleSegments(roomX, roomY, wallThickness, leftTopHeight) };
-      obstacles.push(leftTop);
-      lines.push(...leftTop.segments);
-
-      const leftBottom = { id: id++, segments: createRectangleSegments(roomX, leftBottomStart, wallThickness, leftBottomHeight) };
-      obstacles.push(leftBottom);
-      lines.push(...leftBottom.segments);
+  /** リーフセルに部屋を配置 */
+  private static placeRooms(node: BSPNode, rng: () => number): void {
+    if (node.left && node.right) {
+      this.placeRooms(node.left, rng);
+      this.placeRooms(node.right, rng);
+      return;
     }
+
+    // リーフノード: 部屋を配置
+    const padding = BSPMapConfig.RoomPadding;
+    const minSize = BSPMapConfig.RoomMinSize;
+    const maxRatio = BSPMapConfig.RoomMaxRatio;
+
+    const maxW = node.width * maxRatio;
+    const maxH = node.height * maxRatio;
+    const roomW = Math.max(minSize, minSize + rng() * (maxW - minSize));
+    const roomH = Math.max(minSize, minSize + rng() * (maxH - minSize));
+
+    const availX = node.width - roomW - padding * 2;
+    const availY = node.height - roomH - padding * 2;
+    const roomX = node.x + padding + (availX > 0 ? rng() * availX : 0);
+    const roomY = node.y + padding + (availY > 0 ? rng() * availY : 0);
+
+    node.room = { x: roomX, y: roomY, width: roomW, height: roomH };
   }
 
-  /**
-   * Generates scattered cover points
-   * @private
-   */
-  private static generateScatteredPattern(
-    startId: number,
-    mapSize: number,
-    obstacles: ObstacleData[],
-    lines: LineSegment[]
-  ): void {
-    let id = startId;
-    const coverCount = ComplexMapConfig.ScatteredMinCount + Math.floor(Math.random() * ComplexMapConfig.ScatteredRandomCountRange);
-
-    for (let i = 0; i < coverCount; i++) {
-      const width = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
-      const height = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
-      const x = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - width - ComplexMapConfig.ScatteredSpacingBuffer);
-      const y = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - height - ComplexMapConfig.ScatteredSpacingBuffer);
-
-      const segments = createRectangleSegments(x, y, width, height);
-      obstacles.push({ id: id++, segments });
-      segments.forEach(s => lines.push(s));
-    }
+  /** サブツリーから全部屋を収集 */
+  private static getAllRooms(node: BSPNode): Room[] {
+    if (node.room) return [node.room];
+    const rooms: Room[] = [];
+    if (node.left) rooms.push(...this.getAllRooms(node.left));
+    if (node.right) rooms.push(...this.getAllRooms(node.right));
+    return rooms;
   }
 
-  /**
-   * Generates symmetric obstacle placement
-   * @private
-   */
-  private static generateSymmetricPattern(
-    startId: number,
-    mapSize: number,
-    obstacles: ObstacleData[],
-    lines: LineSegment[]
-  ): void {
-    let id = startId;
-    const centerX = mapSize / 2;
-    const centerY = mapSize / 2;
-    const obstacleCount = ComplexMapConfig.SymmetricObstacleCount;
+  /** 2 つの部屋リストから最も近いペアを探索 */
+  private static findClosestRoomPair(roomsA: Room[], roomsB: Room[]): [Room, Room] {
+    let bestDist = Infinity;
+    let bestA = roomsA[0];
+    let bestB = roomsB[0];
 
-    for (let i = 0; i < obstacleCount; i++) {
-      const width = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
-      const height = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
-      const offsetX = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
-      const offsetY = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
-
-      // Four symmetric positions
-      const positions = [
-        { x: centerX + offsetX, y: centerY + offsetY },
-        { x: centerX - offsetX - width, y: centerY + offsetY },
-        { x: centerX + offsetX, y: centerY - offsetY - height },
-        { x: centerX - offsetX - width, y: centerY - offsetY - height }
-      ];
-
-      positions.forEach(pos => {
-        if (pos.x >= MapConfig.ObstacleMargin && pos.y >= MapConfig.ObstacleMargin && pos.x + width <= mapSize - MapConfig.ObstacleMargin && pos.y + height <= mapSize - MapConfig.ObstacleMargin) {
-          const segments = createRectangleSegments(pos.x, pos.y, width, height);
-          obstacles.push({ id: id++, segments });
-          segments.forEach(s => lines.push(s));
+    for (const a of roomsA) {
+      const acx = a.x + a.width / 2;
+      const acy = a.y + a.height / 2;
+      for (const b of roomsB) {
+        const bcx = b.x + b.width / 2;
+        const bcy = b.y + b.height / 2;
+        const dist = (acx - bcx) ** 2 + (acy - bcy) ** 2;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestA = a;
+          bestB = b;
         }
-      });
+      }
     }
 
-    // Central obstacle
-    const centralSize = ComplexMapConfig.SymmetricCentralMinSize + Math.random() * ComplexMapConfig.SymmetricCentralRandomSizeRange;
-    const centralSegments = createRectangleSegments(centerX - centralSize / 2, centerY - centralSize / 2, centralSize, centralSize);
-    obstacles.push({ id: id++, segments: centralSegments });
-    centralSegments.forEach(s => lines.push(s));
+    return [bestA, bestB];
   }
 
-  /**
-   * Generates corridors with intersections
-   * @private
-   */
-  private static generateCorridorsPattern(
-    startId: number,
-    mapSize: number,
+  /** 兄弟サブツリー間を L 字型通路で接続（再帰） */
+  private static connectRooms(
+    node: BSPNode,
     obstacles: ObstacleData[],
-    lines: LineSegment[]
+    lines: LineSegment[],
+    idCounter: IdCounter,
+    rng: () => number
   ): void {
-    let id = startId;
-    const wallThickness = ObstacleConfig.CorridorWallThickness;
+    if (!node.left || !node.right) return;
 
-    // Main cross corridors
-    const corridorWidth = ObstacleConfig.CorridorWidth;
-    const centerX = mapSize / 2;
-    const centerY = mapSize / 2;
+    // 子ノードを先に再帰処理
+    this.connectRooms(node.left, obstacles, lines, idCounter, rng);
+    this.connectRooms(node.right, obstacles, lines, idCounter, rng);
 
-    // Vertical corridor walls
-    const vLeftX = centerX - corridorWidth / 2;
-    const vRightX = centerX + corridorWidth / 2;
+    // 左右サブツリーの最近接部屋ペアを探索
+    const leftRooms = this.getAllRooms(node.left);
+    const rightRooms = this.getAllRooms(node.right);
+    const [roomA, roomB] = this.findClosestRoomPair(leftRooms, rightRooms);
 
-    const vLeftWall = { id: id++, segments: createRectangleSegments(vLeftX - wallThickness, MapConfig.ObstacleMargin, wallThickness, mapSize - MapConfig.ObstacleMargin * 2) };
-    obstacles.push(vLeftWall);
-    lines.push(...vLeftWall.segments);
+    // 部屋の中心点
+    const ax = roomA.x + roomA.width / 2;
+    const ay = roomA.y + roomA.height / 2;
+    const bx = roomB.x + roomB.width / 2;
+    const by = roomB.y + roomB.height / 2;
 
-    const vRightWall = { id: id++, segments: createRectangleSegments(vRightX, MapConfig.ObstacleMargin, wallThickness, mapSize - MapConfig.ObstacleMargin * 2) };
-    obstacles.push(vRightWall);
-    lines.push(...vRightWall.segments);
+    const cw = BSPMapConfig.CorridorWidth;
+    const ct = BSPMapConfig.CorridorWallThickness;
 
-    // Horizontal corridor walls
-    const hTopY = centerY - corridorWidth / 2;
-    const hBottomY = centerY + corridorWidth / 2;
+    // L 字型通路: ランダムに水平→垂直 or 垂直→水平
+    if (rng() > 0.5) {
+      // 水平 → 垂直
+      this.addCorridorSegment(ax, ay, bx, ay, cw, ct, obstacles, lines, idCounter);
+      this.addCorridorSegment(bx, ay, bx, by, cw, ct, obstacles, lines, idCounter);
+    } else {
+      // 垂直 → 水平
+      this.addCorridorSegment(ax, ay, ax, by, cw, ct, obstacles, lines, idCounter);
+      this.addCorridorSegment(ax, by, bx, by, cw, ct, obstacles, lines, idCounter);
+    }
+  }
 
-    const hTopWall = { id: id++, segments: createRectangleSegments(MapConfig.ObstacleMargin, hTopY - wallThickness, mapSize - MapConfig.ObstacleMargin * 2, wallThickness) };
-    obstacles.push(hTopWall);
-    lines.push(...hTopWall.segments);
+  /** 2 点間の通路壁を生成（水平 or 垂直セグメント） */
+  private static addCorridorSegment(
+    x1: number, y1: number, x2: number, y2: number,
+    corridorWidth: number, wallThickness: number,
+    obstacles: ObstacleData[], lines: LineSegment[], idCounter: IdCounter
+  ): void {
+    const halfCW = corridorWidth / 2;
 
-    const hBottomWall = { id: id++, segments: createRectangleSegments(MapConfig.ObstacleMargin, hBottomY, mapSize - MapConfig.ObstacleMargin * 2, wallThickness) };
-    obstacles.push(hBottomWall);
-    lines.push(...hBottomWall.segments);
+    if (Math.abs(y1 - y2) < 1) {
+      // 水平通路
+      const minX = Math.min(x1, x2);
+      const maxX = Math.max(x1, x2);
+      const length = maxX - minX;
+      if (length < 1) return;
 
-    // Add some obstacles in the quadrants
-    const quadrantObstacles = ComplexMapConfig.CorridorsQuadrantObstacles;
-    for (let i = 0; i < quadrantObstacles; i++) {
-      const quadrant = i % 4;
-      let qx, qy;
+      // 上壁
+      const topSegs = createRectangleSegments(minX - halfCW, y1 - halfCW - wallThickness, length + corridorWidth, wallThickness);
+      obstacles.push({ id: idCounter.value++, segments: topSegs });
+      lines.push(...topSegs);
 
-      switch (quadrant) {
-        case 0: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition; break;
-        case 1: qx = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; qy = ComplexMapConfig.CorridorsQuadrantBasePosition; break;
-        case 2: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; break;
-        case 3: qx = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; qy = mapSize - ComplexMapConfig.CorridorsQuadrantOppositeOffset; break;
-        default: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition;
+      // 下壁
+      const botSegs = createRectangleSegments(minX - halfCW, y1 + halfCW, length + corridorWidth, wallThickness);
+      obstacles.push({ id: idCounter.value++, segments: botSegs });
+      lines.push(...botSegs);
+    } else {
+      // 垂直通路
+      const minY = Math.min(y1, y2);
+      const maxY = Math.max(y1, y2);
+      const length = maxY - minY;
+      if (length < 1) return;
+
+      // 左壁
+      const leftSegs = createRectangleSegments(x1 - halfCW - wallThickness, minY - halfCW, wallThickness, length + corridorWidth);
+      obstacles.push({ id: idCounter.value++, segments: leftSegs });
+      lines.push(...leftSegs);
+
+      // 右壁
+      const rightSegs = createRectangleSegments(x1 + halfCW, minY - halfCW, wallThickness, length + corridorWidth);
+      obstacles.push({ id: idCounter.value++, segments: rightSegs });
+      lines.push(...rightSegs);
+    }
+  }
+
+  /** 部屋の壁をドア付きで生成（各壁の中央にドア開口） */
+  private static addRoomWalls(
+    room: Room,
+    obstacles: ObstacleData[],
+    lines: LineSegment[],
+    idCounter: IdCounter
+  ): void {
+    const { x, y, width, height } = room;
+    const t = BSPMapConfig.WallThickness;
+    const door = BSPMapConfig.DoorWidth;
+
+    // 上壁（中央にドア）
+    const topLeftW = (width - door) / 2;
+    if (topLeftW > 0) {
+      const s1 = createRectangleSegments(x, y, topLeftW, t);
+      obstacles.push({ id: idCounter.value++, segments: s1 });
+      lines.push(...s1);
+
+      const s2 = createRectangleSegments(x + topLeftW + door, y, width - topLeftW - door, t);
+      obstacles.push({ id: idCounter.value++, segments: s2 });
+      lines.push(...s2);
+    }
+
+    // 下壁（中央にドア）
+    const botY = y + height - t;
+    if (topLeftW > 0) {
+      const s1 = createRectangleSegments(x, botY, topLeftW, t);
+      obstacles.push({ id: idCounter.value++, segments: s1 });
+      lines.push(...s1);
+
+      const s2 = createRectangleSegments(x + topLeftW + door, botY, width - topLeftW - door, t);
+      obstacles.push({ id: idCounter.value++, segments: s2 });
+      lines.push(...s2);
+    }
+
+    // 左壁（中央にドア）
+    const leftTopH = (height - door) / 2;
+    if (leftTopH > 0) {
+      const s1 = createRectangleSegments(x, y, t, leftTopH);
+      obstacles.push({ id: idCounter.value++, segments: s1 });
+      lines.push(...s1);
+
+      const s2 = createRectangleSegments(x, y + leftTopH + door, t, height - leftTopH - door);
+      obstacles.push({ id: idCounter.value++, segments: s2 });
+      lines.push(...s2);
+    }
+
+    // 右壁（中央にドア）
+    const rightX = x + width - t;
+    if (leftTopH > 0) {
+      const s1 = createRectangleSegments(rightX, y, t, leftTopH);
+      obstacles.push({ id: idCounter.value++, segments: s1 });
+      lines.push(...s1);
+
+      const s2 = createRectangleSegments(rightX, y + leftTopH + door, t, height - leftTopH - door);
+      obstacles.push({ id: idCounter.value++, segments: s2 });
+      lines.push(...s2);
+    }
+  }
+
+  /** 戦術要素: ピラーとハーフウォールを部屋内に追加 */
+  private static addTacticalElements(
+    rooms: Room[],
+    obstacles: ObstacleData[],
+    lines: LineSegment[],
+    idCounter: IdCounter,
+    rng: () => number
+  ): void {
+    for (const room of rooms) {
+      const area = room.width * room.height;
+      if (area < BSPMapConfig.PillarMinRoomArea) continue;
+
+      // ピラー配置
+      const pillarCount = 1 + Math.floor(rng() * BSPMapConfig.PillarMaxPerRoom);
+      const pillarSize = BSPMapConfig.PillarSize;
+      const inset = BSPMapConfig.WallThickness + BSPMapConfig.DoorWidth; // ドア付近を避ける
+
+      for (let i = 0; i < pillarCount; i++) {
+        const px = room.x + inset + rng() * (room.width - inset * 2 - pillarSize);
+        const py = room.y + inset + rng() * (room.height - inset * 2 - pillarSize);
+
+        const segs = createRectangleSegments(px, py, pillarSize, pillarSize);
+        obstacles.push({ id: idCounter.value++, segments: segs });
+        lines.push(...segs);
       }
 
-      const segments = createRectangleSegments(qx, qy, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange);
-      obstacles.push({ id: id++, segments });
-      segments.forEach(s => lines.push(s));
+      // ハーフウォール（各ドア付近に 1 つ）
+      const hw = BSPMapConfig.HalfWallLength;
+      const ht = BSPMapConfig.HalfWallThickness;
+      const doorCenter = room.width / 2;
+
+      // 上ドア横にハーフウォール
+      if (rng() > 0.4) {
+        const hx = room.x + doorCenter + BSPMapConfig.DoorWidth / 2 + 10;
+        const hy = room.y + BSPMapConfig.WallThickness + 10;
+        if (hx + hw < room.x + room.width - BSPMapConfig.WallThickness) {
+          const segs = createRectangleSegments(hx, hy, hw, ht);
+          obstacles.push({ id: idCounter.value++, segments: segs });
+          lines.push(...segs);
+        }
+      }
+    }
+  }
+
+  /** 左半分の障害物を右半分にミラーリング */
+  private static mirrorObstacles(
+    obstacles: ObstacleData[],
+    lines: LineSegment[],
+    centerX: number,
+    idCounter: IdCounter
+  ): void {
+    const originalCount = obstacles.length;
+
+    for (let i = 0; i < originalCount; i++) {
+      const original = obstacles[i];
+      const mirroredSegments: LineSegment[] = [];
+
+      for (const seg of original.segments) {
+        // 各線分の X 座標をミラーリング（start と end を入れ替えて方向を維持）
+        const mirroredSeg = new LineSegment(
+          2 * centerX - seg.end.x, seg.end.y,
+          2 * centerX - seg.start.x, seg.start.y
+        );
+        mirroredSegments.push(mirroredSeg);
+        lines.push(mirroredSeg);
+      }
+
+      obstacles.push({ id: idCounter.value++, segments: mirroredSegments });
+    }
+  }
+
+  /** 中央チョークポイントを追加（十字型障害物） */
+  private static addCentralFeature(
+    obstacles: ObstacleData[],
+    lines: LineSegment[],
+    mapSize: number,
+    idCounter: IdCounter,
+    rng: () => number
+  ): void {
+    const cx = mapSize / 2;
+    const cy = mapSize / 2;
+    const size = BSPMapConfig.CentralFeatureMinSize + rng() * BSPMapConfig.CentralFeatureRandomRange;
+    const t = BSPMapConfig.WallThickness;
+
+    // 十字型: 水平バー + 垂直バー
+    const hBar = createRectangleSegments(cx - size, cy - t / 2, size * 2, t);
+    obstacles.push({ id: idCounter.value++, segments: hBar });
+    lines.push(...hBar);
+
+    const vBar = createRectangleSegments(cx - t / 2, cy - size, t, size * 2);
+    obstacles.push({ id: idCounter.value++, segments: vBar });
+    lines.push(...vBar);
+
+    // 4 隅にガード（チョークポイント強化）
+    const guardSize = size * 0.4;
+    const guardOffset = size * 0.6;
+    const guardPositions = [
+      { x: cx - guardOffset - guardSize, y: cy - guardOffset - guardSize },
+      { x: cx + guardOffset, y: cy - guardOffset - guardSize },
+      { x: cx - guardOffset - guardSize, y: cy + guardOffset },
+      { x: cx + guardOffset, y: cy + guardOffset },
+    ];
+
+    for (const pos of guardPositions) {
+      const segs = createRectangleSegments(pos.x, pos.y, guardSize, guardSize);
+      obstacles.push({ id: idCounter.value++, segments: segs });
+      lines.push(...segs);
     }
   }
 }

@@ -6,7 +6,7 @@ import { SceneManager } from './SceneManager';
 import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
 import { createUndefinedMesh, setNodeColor } from './MeshUtils';
 import {
-  NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig, WallConfig,
+  NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig,
 } from '../config/GameConfig';
 
 /**
@@ -20,6 +20,9 @@ export class NodeVisualizationManager {
   private meshList:       THREE.Mesh[]        = [];
   private meshToNodeMap:  Map<number, number> = new Map();
   private nodeToMeshMap:  Map<number, number> = new Map();
+  private meshById:       Map<number, THREE.Mesh> = new Map();
+  private wallMeshes:     THREE.Mesh[]        = [];
+  private dirtyNodeIds:   Set<number>         = new Set();
 
   private playerSelectMesh: THREE.Mesh;
   private playerNextMesh:   THREE.Mesh;
@@ -42,6 +45,7 @@ export class NodeVisualizationManager {
       this.meshList.push(mesh);
       this.meshToNodeMap.set(mesh.id, node.id);
       this.nodeToMeshMap.set(node.id, mesh.id);
+      this.meshById.set(mesh.id, mesh);
     }
   }
 
@@ -49,22 +53,20 @@ export class NodeVisualizationManager {
     for (const line of this.model.Lines) {
       const wall = createWallMesh(line.start.x, line.start.y, line.end.x, line.end.y);
       this.sceneManager.addToScene(wall);
+      this.wallMeshes.push(wall);
     }
   }
 
   rebuildWalls(): void {
-    const scene = this.sceneManager.getScene();
-    const wallsToRemove: THREE.Mesh[] = [];
-    scene.traverse(obj => {
-      if (obj instanceof THREE.Mesh && obj.userData[WallConfig.UserDataTag]) {
-        wallsToRemove.push(obj);
-      }
-    });
-    wallsToRemove.forEach(w => this.sceneManager.removeFromScene(w));
+    for (const w of this.wallMeshes) {
+      this.sceneManager.removeFromScene(w);
+    }
+    this.wallMeshes.length = 0;
 
     for (const line of this.model.Lines) {
       const wall = createWallMesh(line.start.x, line.start.y, line.end.x, line.end.y);
       this.sceneManager.addToScene(wall);
+      this.wallMeshes.push(wall);
     }
   }
 
@@ -115,13 +117,24 @@ export class NodeVisualizationManager {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private findMeshByNodeId(nodeId: number): THREE.Mesh | undefined {
-    return this.meshList.find(m => this.meshToNodeMap.get(m.id) === nodeId);
+    const threeMeshId = this.nodeToMeshMap.get(nodeId);
+    if (threeMeshId === undefined) return undefined;
+    return this.meshById.get(threeMeshId);
   }
 
   private resetNodeColors(): void {
-    this.meshList.forEach(mesh => {
-      setNodeColor(mesh, NodeConfig.DefaultColor, NodeVisualConfig.EmissiveDefaultIntensity);
-    });
+    // ダーティノード（前回色変更されたノード）だけリセット
+    for (const nodeId of this.dirtyNodeIds) {
+      const mesh = this.findMeshByNodeId(nodeId);
+      if (mesh) {
+        setNodeColor(mesh, NodeConfig.DefaultColor, NodeVisualConfig.EmissiveDefaultIntensity);
+      }
+    }
+    this.dirtyNodeIds.clear();
+  }
+
+  private markDirty(nodeId: number): void {
+    this.dirtyNodeIds.add(nodeId);
   }
 
   private updateVisibleNodes(activePlayer: Player): void {
@@ -132,9 +145,10 @@ export class NodeVisualizationManager {
     );
 
     for (const node of visibleNodes) {
-      const mesh = this.meshList.find(m => this.meshToNodeMap.get(m.id) === node.id);
+      const mesh = this.findMeshByNodeId(node.id);
       if (mesh) {
         setNodeColor(mesh, NodeConfig.VisibleColor, NodeVisualConfig.EmissiveVisibleIntensity);
+        this.markDirty(node.id);
       }
     }
   }
@@ -142,6 +156,8 @@ export class NodeVisualizationManager {
   private updateSpecialNodes(): void {
     if (this.playerShotMesh && this.playerShotMesh !== this.undefinedMesh) {
       setNodeColor(this.playerShotMesh, NodeConfig.ShotTargetColor, NodeVisualConfig.EmissiveShotIntensity);
+      const nodeId = this.meshToNodeMap.get(this.playerShotMesh.id);
+      if (nodeId !== undefined) this.markDirty(nodeId);
       gsap.fromTo(
         this.playerShotMesh.scale,
         { x: 1, y: 1 },
@@ -160,10 +176,14 @@ export class NodeVisualizationManager {
 
     if (this.playerSelectMesh && this.playerSelectMesh !== this.undefinedMesh) {
       setNodeColor(this.playerSelectMesh, NodeConfig.SelectedColor, NodeVisualConfig.EmissiveSelectedIntensity);
+      const nodeId = this.meshToNodeMap.get(this.playerSelectMesh.id);
+      if (nodeId !== undefined) this.markDirty(nodeId);
     }
 
     if (this.playerNextMesh && this.playerNextMesh !== this.undefinedMesh) {
       setNodeColor(this.playerNextMesh, NodeConfig.NextMoveColor, NodeVisualConfig.EmissiveNextIntensity);
+      const nodeId = this.meshToNodeMap.get(this.playerNextMesh.id);
+      if (nodeId !== undefined) this.markDirty(nodeId);
     }
   }
 }
