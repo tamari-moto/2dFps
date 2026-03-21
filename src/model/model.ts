@@ -30,10 +30,7 @@ class Model {
     let count = 0;
     for (let i = 0; i < size; i++) {
       for (let j = 0; j < size; j++) {
-        const tmp = new Node();
-        tmp.id = count;
-        tmp.x = i * MapConfig.NodeSpacing;
-        tmp.y = j * MapConfig.NodeSpacing;
+        const tmp = new Node(count, i * MapConfig.NodeSpacing, j * MapConfig.NodeSpacing);
 
         this.nodeList.push(tmp);
         this.Edges.addVertex(count);
@@ -41,13 +38,7 @@ class Model {
       }
     }
     this.connectNearNodes();
-
-    for (const node of this.nodeList) {
-      if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
-      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
-      if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
-      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
-    }
+    this.addDirectionalEdges();
 
     // ランダムな障害物を生成
     this.generateRandomObstaclesInternal();
@@ -218,12 +209,20 @@ class Model {
       this.Edges.addVertex(i);
     }
 
+    this.addDirectionalEdges();
+  }
+
+  /**
+   * Adds directed edges for the 4 cardinal directions between grid nodes.
+   * Shared by initGrid() and resetGraphEdges().
+   */
+  private addDirectionalEdges(): void {
     const size = this.NodesInGridSize;
     for (const node of this.nodeList) {
       if ((node.id + 1) % size != 0) this.Edges.addEdgeDirected(node.id, node.id + 1);
-      if (node.id % size != 0) this.Edges.addEdgeDirected(node.id, node.id - 1);
+      if (node.id % size != 0)       this.Edges.addEdgeDirected(node.id, node.id - 1);
       if (node.id + size < size * size) this.Edges.addEdgeDirected(node.id, node.id + size);
-      if (node.id - size >= 0) this.Edges.addEdgeDirected(node.id, node.id - size);
+      if (node.id - size >= 0)       this.Edges.addEdgeDirected(node.id, node.id - size);
     }
   }
 

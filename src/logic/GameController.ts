@@ -199,7 +199,6 @@ export class GameController {
     }
 
     for (const hit of result.hits) {
-      console.log(`🎯 ${result.movingPlayerId} HIT ${hit.targetId}!`);
       this.eventBus.emit(GameEventType.HIT_DETECTED, {
         attackerId: result.movingPlayerId,
         targetId: hit.targetId,
