@@ -49,8 +49,14 @@ export class ThreeSetup {
       this.visualizationSync.getMeshList(),
       this.visualizationSync.getMeshToNodeMap(),
       this.eventBus,
-      playerIds
+      playerIds,
+      adapter.getMyPlayerId(),
     );
+
+    // Keep InputHandler's active player in sync
+    this.eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
+      this.inputHandler.setActivePlayerId(data.playerId);
+    });
 
     // Initialize game controller
     this.gameController = new GameController(

@@ -144,5 +144,9 @@ export class VisualizationSync {
     });
 
     eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
+
+    eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {
+      this.animator.startDance(data.playerId);
+    });
   }
 }

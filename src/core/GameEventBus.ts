@@ -42,6 +42,7 @@ export enum GameEventType {
   VIS_HIDE_PLAYER = 'vis:hide_player',
   VIS_TOGGLE_VIEW_ANGLE = 'vis:toggle_view_angle',
   VIS_UPDATE_OBSTACLES = 'vis:update_obstacles',
+  VIS_PLAY_DANCE = 'vis:play_dance',
 
   // Map events
   MAP_GENERATED = 'map:generated',

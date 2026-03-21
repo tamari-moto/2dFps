@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { KEYBOARD_KEYS } from '../config/GameConstants';
 
+
 /**
  * Handles all user input (mouse and keyboard)
  * Emits events through the GameEventBus
@@ -14,6 +15,7 @@ export class InputHandler {
   private meshToNodeMap: Map<number, number>;
   private eventBus: GameEventBus;
   private playerIds: string[];
+  private activePlayerId: string;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -21,7 +23,8 @@ export class InputHandler {
     meshList: THREE.Mesh[],
     meshToNodeMap: Map<number, number>,
     eventBus: GameEventBus,
-    playerIds: string[]
+    playerIds: string[],
+    activePlayerId: string,
   ) {
     this.canvas = canvas;
     this.camera = camera;
@@ -30,8 +33,14 @@ export class InputHandler {
     this.eventBus = eventBus;
     this.raycaster = new THREE.Raycaster();
     this.playerIds = playerIds;
+    this.activePlayerId = activePlayerId;
 
     this.setupEventListeners();
+  }
+
+  /** Updates the active player ID (call when the active player changes). */
+  setActivePlayerId(id: string): void {
+    this.activePlayerId = id;
   }
 
   /**
@@ -73,6 +82,11 @@ export class InputHandler {
     if (event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE ||
         event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE_UPPER) {
       this.eventBus.emit(GameEventType.VIEW_ANGLE_TOGGLED, { isVisible: true });
+    }
+    // Handle dance animation
+    else if (event.key === KEYBOARD_KEYS.DANCE ||
+             event.key === KEYBOARD_KEYS.DANCE_UPPER) {
+      this.eventBus.emit(GameEventType.VIS_PLAY_DANCE, { playerId: this.activePlayerId });
     }
     // Handle dynamic player selection (keys 1-9)
     else if (event.key >= '1' && event.key <= '9') {

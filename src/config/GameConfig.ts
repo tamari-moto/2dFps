@@ -231,6 +231,22 @@ export const AnimationConfig = {
   AttackBarrelOutDuration: 0.10,
   /** seconds for barrel return after recoil */
   AttackBarrelReturnDuration: 0.25,
+
+  // --- Dance (full-body bop) ---
+  /** body Y bounce amplitude in world units */
+  DanceBodyBounceAmount: 2.0,
+  /** seconds per half-period of body bounce */
+  DanceBodyBounceDuration: 0.25,
+  /** head nod amplitude in HS units (≈2× idle bob) */
+  DanceHeadNodAmount: 0.35,
+  /** seconds per half-period of head nod */
+  DanceHeadNodDuration: 0.25,
+  /** arm sway amplitude in world units (≈2.5× walk sway) */
+  DanceArmSwayAmount: 4.0,
+  /** seconds per half-period of arm sway */
+  DanceArmSwayDuration: 0.25,
+  /** number of full bounce loops before reverting to idle */
+  DanceLoopCount: 2,
 } as const;
 
 /**

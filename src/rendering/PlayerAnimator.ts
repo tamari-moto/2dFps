@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import { AnimationConfig, RenderConfig } from '../config/GameConfig';
 import type { CharacterPartNames } from './PlayerMeshFactory';
 
-type AnimState = 'idle' | 'walk' | 'attack';
+type AnimState = 'idle' | 'walk' | 'attack' | 'dance';
 
 /**
  * Manages body part animations (idle / walk / attack) for all player meshes.
@@ -124,6 +124,60 @@ export class PlayerAnimator {
     if (barrel) {
       tl.to(barrel.position, { y: `+=${thrust}`, duration: outDur, ease: 'power3.out' }, 0)
         .to(barrel.position, { y: `-=${thrust}`, duration: retDur, ease: 'power2.in' });
+    }
+
+    this.bodyAnims.set(playerId, [tl]);
+  }
+
+  startDance(playerId: string): void {
+    this.killAll(playerId);
+    this.animStates.set(playerId, 'dance');
+
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const parts      = this.getPartNames(obj);
+    const s          = RenderConfig.PlayerMarkerSize;
+    const HS         = s / 6.4;
+    const loops      = AnimationConfig.DanceLoopCount;
+    const bounceAmt  = AnimationConfig.DanceBodyBounceAmount;
+    const bounceDur  = AnimationConfig.DanceBodyBounceDuration;
+    const headAmt    = HS * AnimationConfig.DanceHeadNodAmount;
+    const headDur    = AnimationConfig.DanceHeadNodDuration;
+    const armAmt     = AnimationConfig.DanceArmSwayAmount;
+    const armDur     = AnimationConfig.DanceArmSwayDuration;
+    const repeatCount = loops * 2 - 1;  // yoyo なので half-period の回数
+
+    const startY = obj.position.y;
+
+    const tl = gsap.timeline({ onComplete: () => this.startIdle(playerId) });
+
+    // 体全体バウンス
+    tl.fromTo(obj.position, { y: startY },
+      { y: startY + bounceAmt, duration: bounceDur,
+        ease: 'sine.inOut', yoyo: true, repeat: repeatCount }, 0);
+
+    // 頭ボブ (idle の約 2×)
+    const head = this.getPart(obj, parts?.head ?? 'head');
+    if (head) {
+      const baseY = HS * 1.3;
+      tl.fromTo(head.position, { y: baseY },
+        { y: baseY + headAmt, duration: headDur,
+          ease: 'sine.inOut', yoyo: true, repeat: repeatCount }, 0);
+    }
+
+    // 両腕スウェイ (逆位相)
+    const partL = this.getPart(obj, parts?.walkPartL ?? '');
+    const partR = this.getPart(obj, parts?.walkPartR ?? '');
+    if (partL) {
+      tl.fromTo(partL.position, { y: -armAmt },
+        { y: armAmt, duration: armDur,
+          ease: 'sine.inOut', yoyo: true, repeat: repeatCount }, 0);
+    }
+    if (partR) {
+      tl.fromTo(partR.position, { y: armAmt },
+        { y: -armAmt, duration: armDur,
+          ease: 'sine.inOut', yoyo: true, repeat: repeatCount }, 0);
     }
 
     this.bodyAnims.set(playerId, [tl]);
