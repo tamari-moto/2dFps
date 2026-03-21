@@ -221,10 +221,10 @@ export const AnimationConfig = {
   IdleHeadBobAmount: 0.15,
   /** seconds per idle head-bob half-period */
   IdleCockpitPulseDuration: 1.2,
-  /** thruster Y sway amplitude in world units during walk */
-  WalkThrusterSwayY: 1.5,
-  /** seconds per half-period of thruster sway during walk */
-  WalkThrusterSwayHalfDuration: 0.15,
+  /** arm Y sway amplitude in world units during walk */
+  WalkArmSwayY: 1.5,
+  /** seconds per half-period of arm sway during walk */
+  WalkArmSwayHalfDuration: 0.15,
   /** barrel forward recoil distance = PlayerMarkerSize × this ratio */
   AttackBarrelForwardRatio: 0.30,
   /** seconds for barrel thrust out */

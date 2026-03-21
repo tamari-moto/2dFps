@@ -1,6 +1,25 @@
 import * as THREE from 'three';
 import { RenderConfig } from '../config/GameConfig';
 
+// ── Character part name registry ──────────────────────────────────────────────
+/**
+ * Part names used by PlayerAnimator to locate body parts via userData.partName.
+ * Each character type defines its own constant so the animator never hardcodes strings.
+ */
+export interface CharacterPartNames {
+  readonly head: string;
+  readonly barrel: string;
+  readonly walkPartL: string;  // part animated during walk (left side)
+  readonly walkPartR: string;  // part animated during walk (right side)
+}
+
+export const SCOUT_PART_NAMES: CharacterPartNames = {
+  head:      'head',
+  barrel:    'barrel',
+  walkPartL: 'leftArm',
+  walkPartR: 'rightArm',
+} as const;
+
 // ── Scout character definition ────────────────────────────────────────────────
 const SCOUT_DEF = {
   torsoW: 0.90, torsoH: 0.9, hipW: 0.78, headR: 0.46, armW: 0.09, legW: 0.14,
@@ -193,6 +212,8 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   group.add(rightArm);
 
   group.add(buildGearGun(s, HS, rx, color));
+
+  group.userData.partNames = SCOUT_PART_NAMES;
 
   return group;
 }
