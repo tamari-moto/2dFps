@@ -30,17 +30,26 @@ export function createRectangleSegments(x: number, y: number, width: number, hei
 
 
 export function removeEdgesIfIntersected(graph: Graph, nodes: Node[], segments: LineSegment[]): void {
+  // 削除対象を収集してから一括削除（イテレーション中の変更を回避）
+  const edgesToRemove: [number, number][] = [];
+
   for (const node1 of nodes) {
+    const p1 = { x: node1.x, y: node1.y };
     for (const node2Id of graph.List[node1.id]) {
-      const node2 = nodes.find(node => node.id === node2Id);
+      const node2 = nodes[node2Id]; // O(1) 直接アクセス（IDは0始まり連番）
       if (node2) {
+        const p2 = { x: node2.x, y: node2.y };
         for (const segment of segments) {
-          if (segment.intersects({ x: node1.x, y: node1.y }, { x: node2.x, y: node2.y })) {
-            graph.removeEdge(node1.id, node2.id);
+          if (segment.intersects(p1, p2)) {
+            edgesToRemove.push([node1.id, node2Id]);
             break;
           }
         }
       }
     }
+  }
+
+  for (const [v1, v2] of edgesToRemove) {
+    graph.removeEdge(v1, v2);
   }
 }

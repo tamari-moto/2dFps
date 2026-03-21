@@ -283,9 +283,10 @@ export class GameController {
   /**
    * Regenerates obstacles
    */
-  regenerateObstacles(): void {
-    this.model.generateRandomObstacles();
+  regenerateObstacles(seed?: string): string {
+    this.model.generateRandomObstacles(undefined, undefined, undefined, undefined, undefined, seed);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
+    return this.model.getLastSeed();
   }
 
   /**
@@ -299,8 +300,9 @@ export class GameController {
   /**
    * Generates complex map
    */
-  generateComplexMap(): void {
-    this.model.generateComplexMap();
+  generateComplexMap(seed?: string): string {
+    this.model.generateComplexMap(seed);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
+    return this.model.getLastSeed();
   }
 }

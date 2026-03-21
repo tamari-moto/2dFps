@@ -9,7 +9,7 @@
  */
 export const MapConfig = {
   /** Number of nodes in grid (map will be NodesInGridSize x NodesInGridSize) */
-  NodesInGridSize: 20,
+  NodesInGridSize: 100,
 
   /** Spacing between nodes in pixels */
   NodeSpacing: 30,

@@ -9,6 +9,32 @@ import { MapConfig, ObstacleConfig, ComplexMapConfig, CalculatedConfig } from '.
  * This class is responsible for creating various map patterns and obstacle configurations.
  */
 export class MapGenerator {
+  /** FNV-1a: 文字列 → uint32 */
+  private static hashString(seed: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  /** mulberry32: uint32 → () => float [0,1) */
+  private static makePrng(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => {
+      s += 0x6D2B79F5;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** ランダムなシード文字列を生成する（唯一の Math.random() 呼び出し） */
+  public static generateSeed(): string {
+    return String(Math.floor(Math.random() * 0xFFFFFFFF));
+  }
+
   /**
    * Generates random obstacles on the map.
    * @param count - Number of obstacles to generate
@@ -16,15 +42,19 @@ export class MapGenerator {
    * @param maxWidth - Maximum width of obstacles
    * @param minHeight - Minimum height of obstacles
    * @param maxHeight - Maximum height of obstacles
-   * @returns Object containing generated obstacles and line segments
+   * @param seed - Optional seed string for reproducible generation
+   * @returns Object containing generated obstacles, line segments, and used seed
    */
   public static generateRandomObstacles(
     count: number = ObstacleConfig.DefaultCount,
     minWidth: number = ObstacleConfig.MinWidth,
     maxWidth: number = ObstacleConfig.MaxWidth,
     minHeight: number = ObstacleConfig.MinHeight,
-    maxHeight: number = ObstacleConfig.MaxHeight
-  ): { obstacles: ObstacleData[], lines: LineSegment[] } {
+    maxHeight: number = ObstacleConfig.MaxHeight,
+    seed?: string
+  ): { obstacles: ObstacleData[], lines: LineSegment[], seed: string } {
+    const resolvedSeed = seed ?? MapGenerator.generateSeed();
+    const rng = MapGenerator.makePrng(MapGenerator.hashString(resolvedSeed));
     const obstacles: ObstacleData[] = [];
     const lines: LineSegment[] = [];
 
@@ -34,12 +64,12 @@ export class MapGenerator {
 
     // Generate random obstacles
     for (let i = 0; i < count; i++) {
-      const width = Math.floor(Math.random() * (maxWidth - minWidth + 1)) + minWidth;
-      const height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+      const width = Math.floor(rng() * (maxWidth - minWidth + 1)) + minWidth;
+      const height = Math.floor(rng() * (maxHeight - minHeight + 1)) + minHeight;
 
       // Ensure obstacles don't overlap with edges
-      const x = Math.floor(Math.random() * (mapSize - width - margin * 2)) + margin;
-      const y = Math.floor(Math.random() * (mapSize - height - margin * 2)) + margin;
+      const x = Math.floor(rng() * (mapSize - width - margin * 2)) + margin;
+      const y = Math.floor(rng() * (mapSize - height - margin * 2)) + margin;
 
       const obstacleSegments = createRectangleSegments(x, y, width, height);
       obstacles.push({ id: i + 1, segments: obstacleSegments });
@@ -49,7 +79,7 @@ export class MapGenerator {
       });
     }
 
-    return { obstacles, lines };
+    return { obstacles, lines, seed: resolvedSeed };
   }
 
   /**
@@ -57,7 +87,10 @@ export class MapGenerator {
    * Patterns include: maze-like corridors, rooms, scattered obstacles, and strategic cover points.
    * @returns Object containing generated obstacles, line segments, and pattern name
    */
-  public static generateComplexMap(): { obstacles: ObstacleData[], lines: LineSegment[], pattern: string } {
+  public static generateComplexMap(seed?: string): { obstacles: ObstacleData[], lines: LineSegment[], pattern: string, seed: string } {
+    const resolvedSeed = seed ?? MapGenerator.generateSeed();
+    const rng = MapGenerator.makePrng(MapGenerator.hashString(resolvedSeed));
+
     const obstacles: ObstacleData[] = [];
     const lines: LineSegment[] = [];
     const mapSize = CalculatedConfig.MapSize;
@@ -65,12 +98,12 @@ export class MapGenerator {
 
     // Choose a random map pattern
     const patterns = ['maze', 'rooms', 'scattered', 'symmetric', 'corridors'] as const;
-    const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
+    const selectedPattern = patterns[Math.floor(rng() * patterns.length)];
 
     switch (selectedPattern) {
       case 'maze':
         // Maze-like pattern with multiple walls
-        this.generateMazePattern(obstacleId, mapSize, obstacles, lines);
+        this.generateMazePattern(obstacleId, mapSize, obstacles, lines, rng);
         break;
 
       case 'rooms':
@@ -80,21 +113,21 @@ export class MapGenerator {
 
       case 'scattered':
         // Scattered cover points
-        this.generateScatteredPattern(obstacleId, mapSize, obstacles, lines);
+        this.generateScatteredPattern(obstacleId, mapSize, obstacles, lines, rng);
         break;
 
       case 'symmetric':
         // Symmetric obstacle placement
-        this.generateSymmetricPattern(obstacleId, mapSize, obstacles, lines);
+        this.generateSymmetricPattern(obstacleId, mapSize, obstacles, lines, rng);
         break;
 
       case 'corridors':
         // Long corridors with intersections
-        this.generateCorridorsPattern(obstacleId, mapSize, obstacles, lines);
+        this.generateCorridorsPattern(obstacleId, mapSize, obstacles, lines, rng);
         break;
     }
 
-    return { obstacles, lines, pattern: selectedPattern };
+    return { obstacles, lines, pattern: selectedPattern, seed: resolvedSeed };
   }
 
   /**
@@ -147,7 +180,8 @@ export class MapGenerator {
     startId: number,
     _mapSize: number,
     obstacles: ObstacleData[],
-    lines: LineSegment[]
+    lines: LineSegment[],
+    rng: () => number
   ): void {
     let id = startId;
     const wallThickness = ObstacleConfig.WallThickness;
@@ -155,8 +189,8 @@ export class MapGenerator {
     // Horizontal walls
     for (let i = 0; i < ComplexMapConfig.MazeHorizontalWalls; i++) {
       const y = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
-      const startX = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
-      const width = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
+      const startX = ComplexMapConfig.MazeRandomOffsetStart + rng() * ComplexMapConfig.MazeRandomOffsetRange;
+      const width = ComplexMapConfig.MazeMinWallLength + rng() * ComplexMapConfig.MazeRandomWallLengthRange;
 
       const segments = createRectangleSegments(startX, y, width, wallThickness);
       obstacles.push({ id: id++, segments });
@@ -166,8 +200,8 @@ export class MapGenerator {
     // Vertical walls
     for (let i = 0; i < ComplexMapConfig.MazeVerticalWalls; i++) {
       const x = ComplexMapConfig.MazeBaseOffset + i * ComplexMapConfig.MazeWallSpacing;
-      const startY = ComplexMapConfig.MazeRandomOffsetStart + Math.random() * ComplexMapConfig.MazeRandomOffsetRange;
-      const height = ComplexMapConfig.MazeMinWallLength + Math.random() * ComplexMapConfig.MazeRandomWallLengthRange;
+      const startY = ComplexMapConfig.MazeRandomOffsetStart + rng() * ComplexMapConfig.MazeRandomOffsetRange;
+      const height = ComplexMapConfig.MazeMinWallLength + rng() * ComplexMapConfig.MazeRandomWallLengthRange;
 
       const segments = createRectangleSegments(x, startY, wallThickness, height);
       obstacles.push({ id: id++, segments });
@@ -242,16 +276,17 @@ export class MapGenerator {
     startId: number,
     mapSize: number,
     obstacles: ObstacleData[],
-    lines: LineSegment[]
+    lines: LineSegment[],
+    rng: () => number
   ): void {
     let id = startId;
-    const coverCount = ComplexMapConfig.ScatteredMinCount + Math.floor(Math.random() * ComplexMapConfig.ScatteredRandomCountRange);
+    const coverCount = ComplexMapConfig.ScatteredMinCount + Math.floor(rng() * ComplexMapConfig.ScatteredRandomCountRange);
 
     for (let i = 0; i < coverCount; i++) {
-      const width = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
-      const height = ComplexMapConfig.ScatteredMinSize + Math.random() * ComplexMapConfig.ScatteredRandomSizeRange;
-      const x = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - width - ComplexMapConfig.ScatteredSpacingBuffer);
-      const y = ComplexMapConfig.ScatteredBaseOffset + Math.random() * (mapSize - height - ComplexMapConfig.ScatteredSpacingBuffer);
+      const width = ComplexMapConfig.ScatteredMinSize + rng() * ComplexMapConfig.ScatteredRandomSizeRange;
+      const height = ComplexMapConfig.ScatteredMinSize + rng() * ComplexMapConfig.ScatteredRandomSizeRange;
+      const x = ComplexMapConfig.ScatteredBaseOffset + rng() * (mapSize - width - ComplexMapConfig.ScatteredSpacingBuffer);
+      const y = ComplexMapConfig.ScatteredBaseOffset + rng() * (mapSize - height - ComplexMapConfig.ScatteredSpacingBuffer);
 
       const segments = createRectangleSegments(x, y, width, height);
       obstacles.push({ id: id++, segments });
@@ -267,7 +302,8 @@ export class MapGenerator {
     startId: number,
     mapSize: number,
     obstacles: ObstacleData[],
-    lines: LineSegment[]
+    lines: LineSegment[],
+    rng: () => number
   ): void {
     let id = startId;
     const centerX = mapSize / 2;
@@ -275,10 +311,10 @@ export class MapGenerator {
     const obstacleCount = ComplexMapConfig.SymmetricObstacleCount;
 
     for (let i = 0; i < obstacleCount; i++) {
-      const width = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
-      const height = ComplexMapConfig.SymmetricMinSize + Math.random() * ComplexMapConfig.SymmetricRandomSizeRange;
-      const offsetX = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
-      const offsetY = ComplexMapConfig.SymmetricMinOffset + Math.random() * ComplexMapConfig.SymmetricRandomOffsetRange;
+      const width = ComplexMapConfig.SymmetricMinSize + rng() * ComplexMapConfig.SymmetricRandomSizeRange;
+      const height = ComplexMapConfig.SymmetricMinSize + rng() * ComplexMapConfig.SymmetricRandomSizeRange;
+      const offsetX = ComplexMapConfig.SymmetricMinOffset + rng() * ComplexMapConfig.SymmetricRandomOffsetRange;
+      const offsetY = ComplexMapConfig.SymmetricMinOffset + rng() * ComplexMapConfig.SymmetricRandomOffsetRange;
 
       // Four symmetric positions
       const positions = [
@@ -298,7 +334,7 @@ export class MapGenerator {
     }
 
     // Central obstacle
-    const centralSize = ComplexMapConfig.SymmetricCentralMinSize + Math.random() * ComplexMapConfig.SymmetricCentralRandomSizeRange;
+    const centralSize = ComplexMapConfig.SymmetricCentralMinSize + rng() * ComplexMapConfig.SymmetricCentralRandomSizeRange;
     const centralSegments = createRectangleSegments(centerX - centralSize / 2, centerY - centralSize / 2, centralSize, centralSize);
     obstacles.push({ id: id++, segments: centralSegments });
     centralSegments.forEach(s => lines.push(s));
@@ -312,7 +348,8 @@ export class MapGenerator {
     startId: number,
     mapSize: number,
     obstacles: ObstacleData[],
-    lines: LineSegment[]
+    lines: LineSegment[],
+    rng: () => number
   ): void {
     let id = startId;
     const wallThickness = ObstacleConfig.CorridorWallThickness;
@@ -360,7 +397,7 @@ export class MapGenerator {
         default: qx = ComplexMapConfig.CorridorsQuadrantBasePosition; qy = ComplexMapConfig.CorridorsQuadrantBasePosition;
       }
 
-      const segments = createRectangleSegments(qx, qy, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange, ComplexMapConfig.CorridorsQuadrantMinSize + Math.random() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange);
+      const segments = createRectangleSegments(qx, qy, ComplexMapConfig.CorridorsQuadrantMinSize + rng() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange, ComplexMapConfig.CorridorsQuadrantMinSize + rng() * ComplexMapConfig.CorridorsQuadrantRandomSizeRange);
       obstacles.push({ id: id++, segments });
       segments.forEach(s => lines.push(s));
     }
