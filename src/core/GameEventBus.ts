@@ -54,6 +54,11 @@ export enum GameEventType {
   GAME_RESUMED = 'game:resumed',
   GAME_OVER = 'game:over',
 
+  // NPC events
+  NPC_TURN_STARTED = 'npc:turn_started',
+  NPC_TURNS_COMPLETE = 'npc:turns_complete',
+  INPUT_LOCKED = 'input:locked',
+
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
   NETWORK_DISCONNECTED = 'network:disconnected',
@@ -163,6 +168,15 @@ export interface GameEventData {
   [GameEventType.GAME_PAUSED]: void;
   [GameEventType.GAME_RESUMED]: void;
   [GameEventType.GAME_OVER]: void;
+
+  // NPC events
+  [GameEventType.NPC_TURN_STARTED]: {
+    playerId: string;
+  };
+  [GameEventType.NPC_TURNS_COMPLETE]: void;
+  [GameEventType.INPUT_LOCKED]: {
+    locked: boolean;
+  };
 
   // Network events
   [GameEventType.NETWORK_CONNECTED]: void;

@@ -7,6 +7,7 @@ import { Player } from '../model/Player';
 import { Node } from '../model/node';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnResult } from '../schema/types';
+import { TurnManager } from './TurnManager';
 
 /**
  * Controls game logic and state transitions
@@ -18,6 +19,8 @@ export class GameController {
   private activePlayerId: string;
   private networkAdapter: INetworkAdapter;
   private stateMachines: Map<string, StateMachine> = new Map();
+  private turnManager: TurnManager;
+  private inputLocked: boolean = false;
 
   constructor(
     model: Model,
@@ -35,6 +38,12 @@ export class GameController {
       this.stateMachines.set(playerId, new StateMachine());
     }
 
+    this.turnManager = new TurnManager(
+      model,
+      eventBus,
+      networkAdapter,
+    );
+
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
     this.setupEventListeners();
@@ -49,6 +58,9 @@ export class GameController {
     this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
     this.eventBus.on(GameEventType.VIEW_ANGLE_TOGGLED, this.handleViewAngleToggle.bind(this));
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
+    this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
+      this.inputLocked = data.locked;
+    });
   }
 
   /**
@@ -65,6 +77,8 @@ export class GameController {
    * Handles node click events
    */
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
+    if (this.inputLocked) return;
+
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
@@ -178,6 +192,9 @@ export class GameController {
       moveToNodeId: nextNodeId,
       shotAtNodeId: shotNodeId,
     });
+
+    // After human turn, trigger NPC turns
+    this.turnManager.processNPCTurns();
   }
 
   /**
@@ -217,6 +234,8 @@ export class GameController {
    * Handles empty canvas clicks (cancel action)
    */
   private handleCanvasEmptyClick(): void {
+    if (this.inputLocked) return;
+
     const sm = this.getStateMachine(this.activePlayerId);
     sm.transition(GameEvent.Cancel);
     this.currentShotNodeId = undefined;
@@ -231,6 +250,12 @@ export class GameController {
    * Handles player switching
    */
   private handlePlayerSwitch(data: { currentPlayerId: string }): void {
+    if (this.inputLocked) return;
+
+    // Block switching to NPC-controlled players
+    const targetPlayer = this.model.getPlayer(data.currentPlayerId);
+    if (targetPlayer?.isNPC) return;
+
     this.activePlayerId = data.currentPlayerId;
     this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
     console.log(`Switched to ${data.currentPlayerId}`);

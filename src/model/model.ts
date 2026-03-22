@@ -56,7 +56,8 @@ class Model {
     const playerColors = this.generatePlayerColors(LOCAL_PLAYER_COUNT);
     for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
       const playerId = createPlayerId(i);
-      this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i]));
+      const isNPC = i > 0;
+      this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i], 100, isNPC));
     }
   }
 

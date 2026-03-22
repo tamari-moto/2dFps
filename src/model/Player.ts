@@ -8,12 +8,14 @@ export class Player extends Entity {
   health: number;
   maxHealth: number;
   isAlive: boolean;
+  isNPC: boolean;
 
-  constructor(id: string, initialNode: Node, color: number, maxHealth: number = 100) {
+  constructor(id: string, initialNode: Node, color: number, maxHealth: number = 100, isNPC: boolean = false) {
     super(id, EntityType.PLAYER, initialNode, color, 0);
     this.maxHealth = maxHealth;
     this.health = maxHealth;
     this.isAlive = true;
+    this.isNPC = isNPC;
   }
 
   /**
