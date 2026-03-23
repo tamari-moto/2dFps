@@ -1,5 +1,6 @@
 import { Model } from '../../model/model';
 import { Player } from '../../model/Player';
+import { PlayerConfig } from '../../config/GameConfig';
 import { TurnAction } from '../../schema/types';
 import { scoreNode } from './NodeScorer';
 import { selectShotTarget } from './ShotSelector';
@@ -11,9 +12,9 @@ import { selectShotTarget } from './ShotSelector';
 export function decideTurn(model: Model, npc: Player): TurnAction {
   const enemies = getAliveEnemies(model, npc.id);
 
-  // 1. Evaluate candidate move nodes: adjacent + current (stay)
-  const adjacentIds = model.Edges.List[npc.node.id] ?? [];
-  const candidates = [npc.node.id, ...adjacentIds];
+  // 1. Evaluate candidate move nodes: reachable within MoveRange + current (stay)
+  const reachable = model.getReachableNodes(npc.node.id, PlayerConfig.MoveRange);
+  const candidates = [npc.node.id, ...reachable];
 
   let bestNodeId = npc.node.id;
   let bestScore = -Infinity;

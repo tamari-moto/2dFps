@@ -43,6 +43,8 @@ export enum GameEventType {
   VIS_TOGGLE_VIEW_ANGLE = 'vis:toggle_view_angle',
   VIS_UPDATE_OBSTACLES = 'vis:update_obstacles',
   VIS_PLAY_DANCE = 'vis:play_dance',
+  VIS_SET_REACHABLE_NODES = 'vis:set_reachable_nodes',
+  VIS_CLEAR_REACHABLE_NODES = 'vis:clear_reachable_nodes',
 
   // Map events
   MAP_GENERATED = 'map:generated',
@@ -158,6 +160,10 @@ export interface GameEventData {
   [GameEventType.VIS_PLAY_DANCE]: {
     playerId: string;
   };
+  [GameEventType.VIS_SET_REACHABLE_NODES]: {
+    nodeIds: number[];
+  };
+  [GameEventType.VIS_CLEAR_REACHABLE_NODES]: void;
 
   // Map events
   [GameEventType.MAP_GENERATED]: void;

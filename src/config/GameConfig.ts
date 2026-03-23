@@ -33,6 +33,9 @@ export const PlayerConfig = {
 
   /** Damage dealt per shot (3 shots to eliminate a player with 100 HP) */
   DamagePerShot: 34,
+
+  /** Maximum number of grid steps a player can move per turn */
+  MoveRange: 3,
 } as const;
 
 /**
@@ -59,6 +62,9 @@ export const NodeConfig = {
 
   /** Shot target node color (red) */
   ShotTargetColor: 0xff2020,
+
+  /** Reachable node color (soft teal) */
+  ReachableColor: 0x2a7a6a,
 } as const;
 
 /**
@@ -409,6 +415,8 @@ export const NodeVisualConfig = {
   EmissiveNextIntensity: 0.3,
   /** Emissive intensity for shot-target node */
   EmissiveShotIntensity: 0.5,
+  /** Emissive intensity for reachable nodes */
+  EmissiveReachableIntensity: 0.15,
 } as const;
 
 /**

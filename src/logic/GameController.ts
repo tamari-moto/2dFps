@@ -21,6 +21,7 @@ export class GameController {
   private stateMachines: Map<string, StateMachine> = new Map();
   private turnManager: TurnManager;
   private inputLocked: boolean = false;
+  private reachableNodes: Set<number> = new Set();
 
   constructor(
     model: Model,
@@ -109,6 +110,12 @@ export class GameController {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.SelectPlayer);
       this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: clickedNode.id });
+
+      // Compute and emit reachable nodes
+      this.reachableNodes = this.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
+      this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+        nodeIds: Array.from(this.reachableNodes),
+      });
     }
   }
 
@@ -117,7 +124,7 @@ export class GameController {
    */
   private handleSelectStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
     const canMove = activePlayer.node.id === clickedNode.id ||
-                    this.model.areNodesConnected(activePlayer.node, clickedNode);
+                    this.reachableNodes.has(clickedNode.id);
     if (canMove) {
       sm.transition(GameEvent.MovePlayer);
       this.currentNextNodeId = clickedNode.id;
@@ -186,6 +193,12 @@ export class GameController {
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
 
+    // Recompute reachable nodes from the new position
+    this.reachableNodes = this.model.getReachableNodes(nextNodeId, PlayerConfig.MoveRange);
+    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+      nodeIds: Array.from(this.reachableNodes),
+    });
+
     // Delegate logic to adapter; result is applied via applyTurnResult callback
     this.networkAdapter.sendTurnAction({
       playerId: this.activePlayerId,
@@ -242,6 +255,16 @@ export class GameController {
     this.currentNextNodeId = undefined;
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
+
+    // Recompute reachable nodes from current position
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (activePlayer) {
+      this.reachableNodes = this.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
+      this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+        nodeIds: Array.from(this.reachableNodes),
+      });
+    }
+
     sm.transition(GameEvent.SelectPlayer);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }

@@ -23,6 +23,7 @@ export class NodeVisualizationManager {
   private meshById:       Map<number, THREE.Mesh> = new Map();
   private wallMeshes:     THREE.Mesh[]        = [];
   private dirtyNodeIds:   Set<number>         = new Set();
+  private reachableNodeIds: Set<number>      = new Set();
 
   private playerSelectMesh: THREE.Mesh;
   private playerNextMesh:   THREE.Mesh;
@@ -95,11 +96,20 @@ export class NodeVisualizationManager {
     this.playerShotMesh = this.undefinedMesh;
   }
 
+  setReachableNodes(nodeIds: number[]): void {
+    this.reachableNodeIds = new Set(nodeIds);
+  }
+
+  clearReachableNodes(): void {
+    this.reachableNodeIds.clear();
+  }
+
   // ── Node color update ──────────────────────────────────────────────────────
 
-  /** Full node color pass: reset → visible → special. Call once per updateView. */
+  /** Full node color pass: reset → reachable → visible → special. Call once per updateView. */
   updateNodeColors(activePlayer: Player): void {
     this.resetNodeColors();
+    this.updateReachableNodes();
     this.updateVisibleNodes(activePlayer);
     this.updateSpecialNodes();
   }
@@ -135,6 +145,16 @@ export class NodeVisualizationManager {
 
   private markDirty(nodeId: number): void {
     this.dirtyNodeIds.add(nodeId);
+  }
+
+  private updateReachableNodes(): void {
+    for (const nodeId of this.reachableNodeIds) {
+      const mesh = this.findMeshByNodeId(nodeId);
+      if (mesh) {
+        setNodeColor(mesh, NodeConfig.ReachableColor, NodeVisualConfig.EmissiveReachableIntensity);
+        this.markDirty(nodeId);
+      }
+    }
   }
 
   private updateVisibleNodes(activePlayer: Player): void {
