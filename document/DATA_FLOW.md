@@ -26,7 +26,7 @@
                    ↓
 ┌───────────────────────────────────────────────────────┐
 │  UI 層 (ui/)                                           │
-│  GRF_main.tsx, LobbyUI, GameHUD, ExportMenu, Logger  │
+│  GRF_main.tsx, LobbyUI, GameHUD, ConsoleLogger        │
 └──────────────────┬────────────────────────────────────┘
                    ↓
 ┌───────────────────────────────────────────────────────┐
@@ -35,10 +35,12 @@
 └──────┬────────────────────────────────────────────────┘
        ↓
 ┌──────────────┬──────────────────┬─────────────────────┐
-│ Input        │ Logic            │ Network              │
-│ (input/)     │ (logic/)         │ (network/)           │
-│ InputHandler │ GameController   │ LocalAdapter         │
-│              │ StateMachine     │ ColyseusAdapter      │
+│ Input        │ Logic                  │ Network              │
+│ (input/)     │ (logic/)               │ (network/)           │
+│ InputHandler │ GameController         │ LocalAdapter         │
+│              │ StateMachine           │ ColyseusAdapter      │
+│              │ TurnManager            │                      │
+│              │ ai/(NPCBrain, etc.)    │                      │
 └──────┬───────┴────────┬─────────┴─────────────────────┘
        ↓                ↓
 ┌───────────────────────────────────────────────────────┐
@@ -83,6 +85,8 @@ graph TD
     G --> G4[CameraFollowController.snapTo 初期位置]
     D --> H[InputHandler 生成]
     D --> I[GameController 生成]
+    I --> I1[各プレイヤー用 StateMachine 作成]
+    I --> I2[TurnManager 生成]
     D --> J[startRenderLoop]
 ```
 
@@ -105,7 +109,7 @@ graph TD
    - `CameraFollowController` で初期プレイヤー位置にカメラをスナップ
    - `GameEventBus` の `VIS_*` イベントを購読
 7. **InputHandler 生成**: canvas のクリック・キーボードイベントをリスン
-8. **GameController 生成**: 各プレイヤー用の `StateMachine` を作成、イベント購読を設定
+8. **GameController 生成**: 各プレイヤー用の `StateMachine` と `TurnManager` を作成、イベント購読を設定
 9. **startRenderLoop**: アニメーションループを開始
 
 ### 2. ユーザー入力からレンダリングまでのフロー
@@ -318,14 +322,60 @@ graph TD
    - 交差がある場合は視線が遮られている
 7. **フィルタリング**: すべてのチェックをパスしたノードのみを返す
 
+### BFS 経路探索 (model.ts)
+
+`feature/npc-tactical-ai` で追加された BFS ベースの複数マス移動機能。
+
+```typescript
+// 到達可能ノードを BFS で取得
+getReachableNodes(fromNodeId: number, maxSteps: number): Set<number>
+
+// BFS 最短経路
+getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] | null
+```
+
+**フロー**:
+1. キューに開始ノードを積む
+2. グラフ隣接リストを BFS 探索（障害物で削除済みエッジはスキップ）
+3. `maxSteps` ステップ以内の全ノードを `Set<number>` で返す
+4. `VIS_SET_REACHABLE_NODES` イベントで可視化層に通知 → ノード色でハイライト表示
+
+### NPC ターン実行フロー (TurnManager + ai/)
+
+```mermaid
+graph TD
+    A[GameController.executeTurn] --> B[TurnManager.processNPCTurns]
+    B --> C[生存 NPC 一覧を取得]
+    C --> D{NPC が残っているか}
+    D -->|Yes| E[NPCBrain.decideTurn model, npc]
+    E --> E1[getReachableNodes で候補ノード列挙]
+    E --> E2[NodeScorer.scoreNode で各候補を評価]
+    E2 --> E3[最高スコアノードを移動先に決定]
+    E --> E4[ShotSelector.selectShotTarget で射撃対象決定]
+    E3 --> F[TurnAction 生成]
+    E4 --> F
+    F --> G[networkAdapter.sendTurnAction]
+    G --> H[NPCTurnDelayMs 待機]
+    H --> D
+    D -->|No| I[人間プレイヤーに制御を戻す]
+```
+
+**NodeScorer のスコア計算要素**:
+
+| 要素 | 設定値 | 説明 |
+|------|--------|------|
+| カバー評価 | `CoverWeight=30` | 隣接エッジが少ない（壁に囲まれている）ほど加点 |
+| 敵 LOS ペナルティ | `EnemyLOSPenalty=-20` | 敵に見えるノードにペナルティ |
+| アンブッシュボーナス | `AmbushBonus=15` | NPC が見えて敵が見えない状況に加点 |
+| 距離評価 | `DistanceWeight=-2` | 高HP→接近、低HP（`RetreatHPThreshold=40`）→退却 |
+
 ### 障害物管理フロー
 
 ```mermaid
 graph TD
-    A[ユーザーがUI操作] --> B{操作タイプ}
-    B -->|再生成| C[GameController.regenerateObstacles]
+    A[ゲーム初期化] --> B{操作タイプ}
     B -->|インポート| D[GameController.importObstacles]
-    B -->|BSPマップ| E[GameController.generateComplexMap]
+    B -->|BSPマップ| E[Model.generateComplexMap]
     C --> F[Model 更新]
     D --> F
     E --> F
@@ -341,11 +391,9 @@ graph TD
 
 #### 詳細ステップ
 
-1. **ユーザー操作**: ExportMenu からボタンクリック
+1. **トリガー**: ゲーム初期化時に `Model.generateComplexMap()` でマップ生成、または `importObstacles(data)` でインポート
 2. **GameController メソッド呼び出し**:
-   - `regenerateObstacles()`: 障害物をランダム再生成
    - `importObstacles(data)`: JSON から障害物をインポート
-   - `generateComplexMap(seed?)`: BSP アルゴリズムでマップ生成
 3. **Model の更新** (`MapGenerator` 経由):
    - `Lines[]` と `obstacles[]` を空にする
    - `Edges` をグリッド接続状態にリセット
@@ -398,7 +446,7 @@ removeEdgesIfIntersected(): void {
 
 | ライブラリ | バージョン | 使用目的 | 主な使用箇所 |
 |-----------|-----------|---------|-------------|
-| **React** | 19 | コンポーネント構造、ライフサイクル管理 | ui/ (GRF_main, LobbyUI, GameHUD, ExportMenu) |
+| **React** | 19 | コンポーネント構造、ライフサイクル管理 | ui/ (GRF_main, LobbyUI, GameHUD, ConsoleLogger) |
 | **Three.js** | 0.174 | 3D シーングラフ、WebGL レンダリング、Raycaster | rendering/ 全ファイル |
 | **three-stdlib** | 2.35 | OrbitControls (カメラ操作) | SceneManager.ts |
 | **GSAP** | 3.12 | スムーズなアニメーション、タイムライン制御 | PlayerAnimator.ts, PlayerLifecycleManager.ts, CameraFollowController.ts |
@@ -571,11 +619,6 @@ const meshId = nodeToMeshMap.get(nodeId)
 - ゲーム中のHUD表示
 - 体力表示、ターン情報、プレイヤー切替
 
-#### `src/ui/ExportMenu.tsx`
-- マップ管理用の UI コントロール
-- 障害物のエクスポート/インポート・ダウンロード処理
-- マップ生成/再生成のトリガー
-
 #### `src/ui/ConsoleLogger.tsx`
 - ゲームログのコンソール表示
 
@@ -593,6 +636,23 @@ const meshId = nodeToMeshMap.get(nodeId)
 - State パターンによる有限状態機械
 - `IState` インターフェースと具象状態クラス (`IdleState`, `SelectState`, `MoveState`, `ShotState`)
 - 各プレイヤーが独立した `StateMachine` インスタンスを持つ
+
+#### `src/logic/TurnManager.ts`
+- NPC ターンを `processNPCTurns()` で順番に自動実行
+- `NPCBrain.decideTurn()` で行動決定 → `networkAdapter.sendTurnAction()` で実行
+- `NPCTurnDelayMs` 間隔でアニメーション表示に配慮した逐次処理
+
+#### `src/logic/ai/NPCBrain.ts`
+- `decideTurn(model, npc): TurnAction` — NPC 行動決定のエントリポイント（Facade パターン）
+- NodeScorer・ShotSelector を組み合わせて移動先と射撃対象を決定
+
+#### `src/logic/ai/NodeScorer.ts`
+- `scoreNode(model, npc, candidateNodeId, enemies): number`
+- カバー・LOS 露出・アンブッシュ・距離でノードをスコアリング
+
+#### `src/logic/ai/ShotSelector.ts`
+- `selectShotTarget(model, npc, moveToNode, angle, enemies): number | undefined`
+- 視野内の生存敵を HP・距離でランク付けして射撃対象を選択
 
 #### `src/logic/GameController.ts`
 - ゲーム全体の制御（ターン入力受付、Model 更新、`VIS_*` イベント発火）
@@ -780,7 +840,7 @@ const meshId = nodeToMeshMap.get(nodeId)
 ### 障害物管理サイクル
 
 ```
-UI アクション (再生成/インポート/BSPマップ)
+ゲーム初期化 / importObstacles
          ↓
 GameController メソッド呼び出し
          ↓
@@ -806,10 +866,11 @@ Render (新しい障害物表示)
 
 1. **イベント駆動の疎結合設計**: GameEventBus を介した全レイヤー間通信で、循環依存なし
 2. **オーケストレーター委譲パターン**: VisualizationSync が4つの専門マネージャに処理を委譲し、責務を明確に分離
-3. **設定駆動の柔軟性**: すべてのパラメータが GameConfig に集約
+3. **設定駆動の柔軟性**: すべてのパラメータが GameConfig に集約（AIConfig 含む）
 4. **State パターン**: StateMachine が具象状態クラスで遷移を管理
-5. **効率的なグラフ管理**: 隣接リストによる高速な接続性チェック
-6. **スムーズなアニメーション**: GSAP による宣言的アニメーション定義
-7. **型安全性**: TypeScript によるコンパイル時の型チェック
+5. **効率的なグラフ管理**: 隣接リストによる高速な接続性チェック・BFS による到達可能範囲計算
+6. **戦術 NPC AI**: Facade（NPCBrain）+ Strategy（NodeScorer・ShotSelector）パターンで評価ロジックを分離
+7. **スムーズなアニメーション**: GSAP による宣言的アニメーション定義
+8. **型安全性**: TypeScript によるコンパイル時の型チェック
 
 データは **一方向フロー** (Config → Model → Rendering) で初期化され、ユーザーインタラクションは **イベント駆動サイクル** (Input → GameEventBus → GameController → Model → GameEventBus → VisualizationSync → Managers) で処理されます。

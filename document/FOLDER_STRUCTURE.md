@@ -47,7 +47,12 @@ src/
 │
 ├── logic/                      クライアント側ゲームロジック
 │   ├── StateMachine.ts         ゲーム状態機械 (Idle→Select→Move→Shot→Idle)
-│   └── GameController.ts       ターン制御・入力→Model 変換
+│   ├── GameController.ts       ターン制御・入力→Model 変換
+│   ├── TurnManager.ts          NPC ターン自動実行・スケジューリング
+│   └── ai/
+│       ├── NPCBrain.ts         NPC 行動決定のエントリポイント（decideTurn 関数）
+│       ├── NodeScorer.ts       移動候補ノードの評価スコアリング
+│       └── ShotSelector.ts     射撃対象の選択ロジック
 │
 ├── rendering/                  Three.js レンダリング
 │   ├── threeSetup.ts           Three.js 統合・初期化（setupThree 関数）
@@ -70,7 +75,6 @@ src/
 │   ├── GRF_main.css            スタイルシート
 │   ├── LobbyUI.tsx             ロビー画面（オフライン/オンライン選択）
 │   ├── GameHUD.tsx             ゲーム中 HUD（体力、ターン情報等）
-│   ├── ExportMenu.tsx          マップ管理 UI
 │   └── ConsoleLogger.tsx       コンソールログ表示
 │
 ├── network/                    ネットワーク層
@@ -188,11 +192,26 @@ export interface TurnResult {
 |---------|------|
 | `StateMachine.ts` | ゲーム状態機械（Idle → Select → Move → Shot） |
 | `GameController.ts` | ターン入力の受付・`Model` 更新・`GameEventBus` 経由で描画通知 |
+| `TurnManager.ts` | NPC ターンを順番に自動実行。`NPCBrain.decideTurn()` で行動決定し、`NPCTurnDelayMs` 間隔で逐次処理 |
+| `ai/NPCBrain.ts` | NPC 行動決定のエントリポイント（`decideTurn` 関数）。NodeScorer・ShotSelector を組み合わせて `TurnAction` を生成 |
+| `ai/NodeScorer.ts` | 移動候補ノードをカバー・LOS 露出・アンブッシュ・距離でスコアリング |
+| `ai/ShotSelector.ts` | 視野内の生存敵を HP・距離でランク付けし最適射撃対象を選択 |
 
 **状態遷移**:
 ```
 Idle → [SelectPlayer] → Select → [MovePlayer] → Move → [ShotPlayer] → Shot → [Complete] → Idle
                                               ↑________________________________[Cancel]___________|
+```
+
+**NPC ターン実行フロー**:
+```
+GameController.executeTurn()
+  ↓ TurnManager.processNPCTurns()
+  ↓ 生存 NPC を順に処理
+NPCBrain.decideTurn(model, npc)
+  ├── NodeScorer.scoreNode() — 候補ノードを評価
+  └── ShotSelector.selectShotTarget() — 射撃対象を決定
+  ↓ networkAdapter.sendTurnAction()
 ```
 
 ### `rendering/` — Three.js レンダリング
@@ -240,7 +259,7 @@ this.eventBus.emit(GameEventType.NODE_CLICKED, { nodeId, position });
 
 ### `ui/` — React UIコンポーネント
 
-ゲームのオーバーレイUI（ロビー画面、マップ管理メニュー等）。
+ゲームのオーバーレイUI（ロビー画面、HUD等）。
 
 | ファイル | 役割 |
 |---------|------|
@@ -248,7 +267,6 @@ this.eventBus.emit(GameEventType.NODE_CLICKED, { nodeId, position });
 | `GRF_main.css` | スタイルシート |
 | `LobbyUI.tsx` | ゲーム開始前のロビー画面（オフライン/オンライン選択） |
 | `GameHUD.tsx` | ゲーム中 HUD（体力、ターン情報、プレイヤー切替等） |
-| `ExportMenu.tsx` | 障害物のエクスポート/インポート・マップ生成 UI |
 | `ConsoleLogger.tsx` | ゲームログのコンソール表示 |
 
 **AppState フロー**:
@@ -299,8 +317,12 @@ ui/
       ├── rendering/ViewAngleVisualizer.ts → config/, model/node.ts
       ├── input/InputHandler.ts           → core/GameEventBus.ts, config/
       ├── logic/GameController.ts         → model/, logic/StateMachine.ts,
-      │                                      core/GameEventBus.ts, schema/types.ts,
+      │                                      logic/TurnManager.ts, core/GameEventBus.ts,
+      │                                      schema/types.ts, network/INetworkAdapter.ts
+      ├── logic/TurnManager.ts            → model/, logic/ai/NPCBrain.ts,
       │                                      network/INetworkAdapter.ts
+      ├── logic/ai/NPCBrain.ts            → model/, logic/ai/NodeScorer.ts,
+      │                                      logic/ai/ShotSelector.ts, schema/types.ts
       └── network/                        → model/, schema/types.ts
 
 model/ → config/ のみ
@@ -350,3 +372,4 @@ model/ → config/ のみ
 | `GRF/`（略称） | `logic/`, `rendering/`, `input/`, `ui/` | 役割別に分割して意図を明確化 |
 | `network/types.ts` | `schema/types.ts` | サーバーの `schema/` フォルダと対称 |
 | `core/events/GameEventBus.ts` | `core/GameEventBus.ts` | 不要なサブフォルダを除去してフラット化 |
+| `ui/ExportMenu.tsx`（削除） | ー | マップ管理 UI を削除（2026-03-24） |
