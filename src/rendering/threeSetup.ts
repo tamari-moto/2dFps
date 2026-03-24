@@ -3,7 +3,6 @@ import { VisualizationSync } from './VisualizationSync';
 import { InputHandler } from '../input/InputHandler';
 import { GameController } from '../logic/GameController';
 import { GameEventBus, GameEventType, gameEventBus } from '../core/GameEventBus';
-import type { ObstacleData } from '../model/ObstacleExporter';
 import type { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from '../network/INetworkAdapter';
@@ -98,27 +97,6 @@ export class ThreeSetup {
    */
   getModel(): Model {
     return this.gameController.getModel();
-  }
-
-  /**
-   * Regenerates obstacles randomly
-   */
-  regenerateObstacles(seed?: string): string {
-    return this.gameController.regenerateObstacles(seed);
-  }
-
-  /**
-   * Imports obstacles from data
-   */
-  importObstacles(obstaclesData: ObstacleData[]): void {
-    this.gameController.importObstacles(obstaclesData);
-  }
-
-  /**
-   * Generates a complex map
-   */
-  generateComplexMap(seed?: string): string {
-    return this.gameController.generateComplexMap(seed);
   }
 
   /**

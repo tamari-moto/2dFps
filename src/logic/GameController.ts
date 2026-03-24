@@ -329,28 +329,10 @@ export class GameController {
   }
 
   /**
-   * Regenerates obstacles
-   */
-  regenerateObstacles(seed?: string): string {
-    this.model.generateRandomObstacles(undefined, undefined, undefined, undefined, undefined, seed);
-    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-    return this.model.getLastSeed();
-  }
-
-  /**
    * Imports obstacles
    */
   importObstacles(obstaclesData: ObstacleData[]): void {
     this.model.importObstacles(obstaclesData);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-  }
-
-  /**
-   * Generates complex map
-   */
-  generateComplexMap(seed?: string): string {
-    this.model.generateComplexMap(seed);
-    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-    return this.model.getLastSeed();
   }
 }
