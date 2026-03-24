@@ -109,11 +109,13 @@ Idle → Select → Move → Shot → Idle
 ├── src/
 │   ├── config/        定数（GameConfig.ts, GameConstants.ts）
 │   ├── schema/        型定義（TurnAction, TurnResult）
-│   ├── model/         ゲームロジック（model, Graph, Player, node, ...）
+│   ├── model/         データモデル（Model, Graph, Player, Node, MapGenerator, LineSegment, entities/）
 │   ├── logic/         StateMachine, GameController
-│   ├── rendering/     threeSetup, SceneManager, MeshFactory, VisualizationSync, ViewAngleVisualizer
+│   ├── rendering/     threeSetup, SceneManager, VisualizationSync, PlayerMeshFactory, PlayerAnimator,
+│   │                  PlayerLifecycleManager, CameraFollowController, NodeVisualizationManager,
+│   │                  NodeWallMeshFactory, ViewAngleVisualizer, MeshUtils
 │   ├── input/         InputHandler
-│   ├── ui/            GRF_main, LobbyUI, ExportMenu, ConsoleLogger
+│   ├── ui/            GRF_main, GRF_main.css, LobbyUI, GameHUD, ExportMenu, ConsoleLogger
 │   ├── network/       INetworkAdapter, LocalAdapter, ColyseusAdapter
 │   └── core/          GameEventBus
 ├── server/
