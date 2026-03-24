@@ -58,24 +58,31 @@ src/
 │   ├── MapGenerator.ts         # マップ生成
 │   ├── ObstacleExporter.ts     # 障害物 JSON エクスポート/インポート
 │   └── entities/
-│       ├── Entity.ts
-│       └── EntityManager.ts
+│       └── Entity.ts           # エンティティ基底クラス
 ├── logic/                      # ← server/src/logic/ と対称
 │   ├── StateMachine.ts         # ゲーム状態機械
 │   └── GameController.ts       # ゲームロジックコントローラ
 ├── rendering/                  # Three.js 描画（クライアント固有）
 │   ├── threeSetup.ts           # Three.js 統合・オーケストレーション
 │   ├── SceneManager.ts         # シーン管理
-│   ├── MeshFactory.ts          # Three.js メッシュ生成
+│   ├── PlayerMeshFactory.ts    # プレイヤーメッシュ生成
+│   ├── PlayerAnimator.ts       # GSAP によるプレイヤーアニメーション
+│   ├── PlayerLifecycleManager.ts # プレイヤーの生成・破棄・状態遷移
+│   ├── CameraFollowController.ts # カメラ追従制御
 │   ├── VisualizationSync.ts    # モデル↔描画の同期
-│   └── ViewAngleVisualizer.ts  # 視野角の可視化
+│   ├── ViewAngleVisualizer.ts  # 視野角の可視化
+│   ├── NodeVisualizationManager.ts # ノードの色状態管理
+│   ├── NodeWallMeshFactory.ts  # 障害物の3D壁メッシュ生成
+│   └── MeshUtils.ts            # メッシュユーティリティ
 ├── input/                      # 入力処理（クライアント固有）
 │   └── InputHandler.ts
 ├── ui/                         # React UI コンポーネント（クライアント固有）
 │   ├── GRF_main.tsx            # ルート React コンポーネント（AppState 管理）
+│   ├── GRF_main.css            # スタイルシート
 │   ├── LobbyUI.tsx             # ロビー画面（オフライン/オンライン選択）
+│   ├── GameHUD.tsx             # ゲーム中 HUD（体力、ターン情報等）
 │   ├── ExportMenu.tsx          # マップ管理 UI
-│   └── ConsoleLogger.tsx
+│   └── ConsoleLogger.tsx       # デバッグコンソール
 ├── network/                    # ← server/src/rooms/ と対称（通信抽象化）
 │   ├── INetworkAdapter.ts      # アダプターインターフェース
 │   ├── LocalAdapter.ts         # オフライン用（プロセス内処理）
@@ -172,6 +179,7 @@ GameState:   { players: MapSchema<PlayerState>, currentTurnPlayerId, gameStarted
 | ライブラリ | 用途 |
 |-----------|------|
 | Three.js 0.174 | WebGL レンダリング、Raycaster |
+| three-stdlib 2.35 | Three.js 拡張ユーティリティ |
 | GSAP 3.12 | アニメーション (移動、点滅) |
 | React 19 | UI コンポーネント |
 | Vite 6.2 | ビルドツール・HMR |
