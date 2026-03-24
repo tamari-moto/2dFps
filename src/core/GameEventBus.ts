@@ -43,6 +43,8 @@ export enum GameEventType {
   VIS_TOGGLE_VIEW_ANGLE = 'vis:toggle_view_angle',
   VIS_UPDATE_OBSTACLES = 'vis:update_obstacles',
   VIS_PLAY_DANCE = 'vis:play_dance',
+  VIS_SET_REACHABLE_NODES = 'vis:set_reachable_nodes',
+  VIS_CLEAR_REACHABLE_NODES = 'vis:clear_reachable_nodes',
 
   // Map events
   MAP_GENERATED = 'map:generated',
@@ -53,6 +55,11 @@ export enum GameEventType {
   GAME_PAUSED = 'game:paused',
   GAME_RESUMED = 'game:resumed',
   GAME_OVER = 'game:over',
+
+  // NPC events
+  NPC_TURN_STARTED = 'npc:turn_started',
+  NPC_TURNS_COMPLETE = 'npc:turns_complete',
+  INPUT_LOCKED = 'input:locked',
 
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
@@ -153,6 +160,10 @@ export interface GameEventData {
   [GameEventType.VIS_PLAY_DANCE]: {
     playerId: string;
   };
+  [GameEventType.VIS_SET_REACHABLE_NODES]: {
+    nodeIds: number[];
+  };
+  [GameEventType.VIS_CLEAR_REACHABLE_NODES]: void;
 
   // Map events
   [GameEventType.MAP_GENERATED]: void;
@@ -163,6 +174,15 @@ export interface GameEventData {
   [GameEventType.GAME_PAUSED]: void;
   [GameEventType.GAME_RESUMED]: void;
   [GameEventType.GAME_OVER]: void;
+
+  // NPC events
+  [GameEventType.NPC_TURN_STARTED]: {
+    playerId: string;
+  };
+  [GameEventType.NPC_TURNS_COMPLETE]: void;
+  [GameEventType.INPUT_LOCKED]: {
+    locked: boolean;
+  };
 
   // Network events
   [GameEventType.NETWORK_CONNECTED]: void;

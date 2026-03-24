@@ -43,27 +43,38 @@ src/
 │   ├── MapGenerator.ts         マップ生成ユーティリティ
 │   ├── ObstacleExporter.ts     障害物の JSON エクスポート/インポート
 │   └── entities/
-│       ├── Entity.ts           エンティティ基底クラス
-│       └── EntityManager.ts    エンティティ管理
+│       └── Entity.ts           エンティティ基底クラス
 │
 ├── logic/                      クライアント側ゲームロジック
 │   ├── StateMachine.ts         ゲーム状態機械 (Idle→Select→Move→Shot→Idle)
-│   └── GameController.ts       ターン制御・入力→Model 変換
+│   ├── GameController.ts       ターン制御・入力→Model 変換
+│   ├── TurnManager.ts          NPC ターン自動実行・スケジューリング
+│   └── ai/
+│       ├── NPCBrain.ts         NPC 行動決定のエントリポイント（decideTurn 関数）
+│       ├── NodeScorer.ts       移動候補ノードの評価スコアリング
+│       └── ShotSelector.ts     射撃対象の選択ロジック
 │
 ├── rendering/                  Three.js レンダリング
 │   ├── threeSetup.ts           Three.js 統合・初期化（setupThree 関数）
 │   ├── SceneManager.ts         シーン・カメラ・レンダラー管理
-│   ├── MeshFactory.ts          Three.js メッシュ生成
-│   ├── VisualizationSync.ts    Model ↔ 描画の同期（updateView）
-│   └── ViewAngleVisualizer.ts  視野角の可視化（エッジライン描画）
+│   ├── PlayerMeshFactory.ts    プレイヤーメッシュ生成
+│   ├── PlayerAnimator.ts       GSAP によるプレイヤーアニメーション
+│   ├── PlayerLifecycleManager.ts プレイヤーメッシュの生成・破棄・状態遷移
+│   ├── CameraFollowController.ts カメラ追従・パンアニメーション
+│   ├── VisualizationSync.ts    オーケストレーター（4マネージャへ委譲）
+│   ├── ViewAngleVisualizer.ts  視野角の可視化（エッジライン描画）
+│   ├── NodeVisualizationManager.ts ノードの色状態・双方向マッピング管理
+│   ├── NodeWallMeshFactory.ts  ノード円形メッシュ・障害物3D壁メッシュ生成
+│   └── MeshUtils.ts            メッシュユーティリティ
 │
 ├── input/                      入力処理
 │   └── InputHandler.ts         マウスクリック・キーボード入力処理
 │
 ├── ui/                         React UIコンポーネント
 │   ├── GRF_main.tsx            ルート React コンポーネント（AppState 管理）
+│   ├── GRF_main.css            スタイルシート
 │   ├── LobbyUI.tsx             ロビー画面（オフライン/オンライン選択）
-│   ├── ExportMenu.tsx          マップ管理 UI
+│   ├── GameHUD.tsx             ゲーム中 HUD（体力、ターン情報等）
 │   └── ConsoleLogger.tsx       コンソールログ表示
 │
 ├── network/                    ネットワーク層
@@ -166,27 +177,41 @@ export interface TurnResult {
 | `Graph.ts` | 隣接リスト（ノード間の移動可否） |
 | `node.ts` | ノードデータ型 (`{ id, x, y }`) |
 | `LineSegment.ts` | 障害物の線分・交差判定 (CCW アルゴリズム) |
-| `Player.ts` | プレイヤー状態（HP、生死、StateMachine） |
-| `MapGenerator.ts` | マップ自動生成 |
+| `Player.ts` | プレイヤーエンティティ（HP、生死） |
+| `MapGenerator.ts` | マップ生成（ランダム障害物 / BSP ダンジョン生成、シード付きPRNG対応） |
 | `ObstacleExporter.ts` | 障害物の JSON エクスポート/インポート |
 | `entities/Entity.ts` | エンティティ基底クラス（位置・角度） |
-| `entities/EntityManager.ts` | 全エンティティの管理 |
 
 **依存関係**: `model/` は `config/` のみに依存する（rendering, network, ui に依存しない）
 
 ### `logic/` — クライアント側ゲームロジック
 
-ターン制御やゲームイベント処理を担う層。`model/` のデータを操作し、`rendering/` に更新を通知する。
+ターン制御やゲームイベント処理を担う層。`model/` のデータを操作し、`GameEventBus` 経由で `rendering/` に更新を通知する。
 
 | ファイル | 役割 |
 |---------|------|
 | `StateMachine.ts` | ゲーム状態機械（Idle → Select → Move → Shot） |
-| `GameController.ts` | ターン入力の受付・`Model` 更新・`VisualizationSync` 呼び出し |
+| `GameController.ts` | ターン入力の受付・`Model` 更新・`GameEventBus` 経由で描画通知 |
+| `TurnManager.ts` | NPC ターンを順番に自動実行。`NPCBrain.decideTurn()` で行動決定し、`NPCTurnDelayMs` 間隔で逐次処理 |
+| `ai/NPCBrain.ts` | NPC 行動決定のエントリポイント（`decideTurn` 関数）。NodeScorer・ShotSelector を組み合わせて `TurnAction` を生成 |
+| `ai/NodeScorer.ts` | 移動候補ノードをカバー・LOS 露出・アンブッシュ・距離でスコアリング |
+| `ai/ShotSelector.ts` | 視野内の生存敵を HP・距離でランク付けし最適射撃対象を選択 |
 
 **状態遷移**:
 ```
 Idle → [SelectPlayer] → Select → [MovePlayer] → Move → [ShotPlayer] → Shot → [Complete] → Idle
                                               ↑________________________________[Cancel]___________|
+```
+
+**NPC ターン実行フロー**:
+```
+GameController.executeTurn()
+  ↓ TurnManager.processNPCTurns()
+  ↓ 生存 NPC を順に処理
+NPCBrain.decideTurn(model, npc)
+  ├── NodeScorer.scoreNode() — 候補ノードを評価
+  └── ShotSelector.selectShotTarget() — 射撃対象を決定
+  ↓ networkAdapter.sendTurnAction()
 ```
 
 ### `rendering/` — Three.js レンダリング
@@ -195,13 +220,28 @@ Three.js を使った描画に関するすべてのコードを格納する。
 
 | ファイル | 役割 |
 |---------|------|
-| `threeSetup.ts` | レンダリング初期化・`setupThree()` 関数のエントリ |
+| `threeSetup.ts` | レンダリング初期化・`setupThree()` 関数のエントリ。各コンポーネントの組み立て |
 | `SceneManager.ts` | Three.js の `Scene`, `Camera`, `Renderer`, `Controls` を管理 |
-| `MeshFactory.ts` | ノード・プレイヤー用の Three.js メッシュを生成 |
-| `VisualizationSync.ts` | `Model` の状態を Three.js シーンに反映（`updateView()`） |
+| `PlayerMeshFactory.ts` | プレイヤーキャラクターの3Dメッシュ生成 |
+| `PlayerAnimator.ts` | GSAP によるプレイヤーアニメーション（移動、ダンス、被弾演出） |
+| `PlayerLifecycleManager.ts` | プレイヤーメッシュの生成・破棄・状態遷移 |
+| `CameraFollowController.ts` | カメラ追従・パンアニメーション |
+| `VisualizationSync.ts` | 薄いオーケストレーター。`VIS_*` イベントを受け取り4マネージャに委譲 |
 | `ViewAngleVisualizer.ts` | 視野角のエッジライン描画 |
+| `NodeVisualizationManager.ts` | ノードメッシュ管理・色状態・双方向マッピング |
+| `NodeWallMeshFactory.ts` | ノード円形メッシュ・障害物3D壁メッシュ生成 |
+| `MeshUtils.ts` | メッシュユーティリティ（プレースホルダメッシュ作成、ノード色設定） |
 
-**双方向マッピング** (threeSetup.ts が管理):
+**VisualizationSync の委譲構造**:
+```
+VisualizationSync (オーケストレーター)
+├── PlayerAnimator           # GSAP アニメーション
+├── PlayerLifecycleManager   # プレイヤーメッシュの生成・破棄
+├── NodeVisualizationManager # ノードの色・双方向マッピング
+└── CameraFollowController   # カメラ追従
+```
+
+**双方向マッピング** (NodeVisualizationManager が管理):
 ```
 meshToNodeMap: Map<THREE.Mesh.id, node.id>  // クリック検出 → ゲームロジック
 nodeToMeshMap: Map<node.id, THREE.Mesh.id>  // ゲームロジック → 描画更新
@@ -219,13 +259,14 @@ this.eventBus.emit(GameEventType.NODE_CLICKED, { nodeId, position });
 
 ### `ui/` — React UIコンポーネント
 
-ゲームのオーバーレイUI（ロビー画面、マップ管理メニュー等）。
+ゲームのオーバーレイUI（ロビー画面、HUD等）。
 
 | ファイル | 役割 |
 |---------|------|
 | `GRF_main.tsx` | ルートコンポーネント（`lobby → connecting → playing` の AppState 管理） |
+| `GRF_main.css` | スタイルシート |
 | `LobbyUI.tsx` | ゲーム開始前のロビー画面（オフライン/オンライン選択） |
-| `ExportMenu.tsx` | 障害物のエクスポート/インポート・マップ生成 UI |
+| `GameHUD.tsx` | ゲーム中 HUD（体力、ターン情報、プレイヤー切替等） |
 | `ConsoleLogger.tsx` | ゲームログのコンソール表示 |
 
 **AppState フロー**:
@@ -256,7 +297,7 @@ INetworkAdapter
 
 | ファイル | 役割 |
 |---------|------|
-| `GameEventBus.ts` | シングルトンのイベントバス。`input/` → `logic/` 間の疎結合通信に使用 |
+| `GameEventBus.ts` | シングルトンのイベントバス。`input/` → `logic/` → `rendering/` 間の疎結合通信。`VIS_*` イベントで描画層を駆動 |
 
 ---
 
@@ -268,17 +309,23 @@ INetworkAdapter
 ui/
  └── rendering/threeSetup.ts
       ├── rendering/SceneManager.ts
-      ├── rendering/MeshFactory.ts
-      ├── rendering/VisualizationSync.ts  → model/, config/
+      ├── rendering/VisualizationSync.ts  → model/, config/, core/GameEventBus.ts
+      │    ├── rendering/PlayerAnimator.ts
+      │    ├── rendering/PlayerLifecycleManager.ts → PlayerMeshFactory.ts
+      │    ├── rendering/NodeVisualizationManager.ts → NodeWallMeshFactory.ts
+      │    └── rendering/CameraFollowController.ts
       ├── rendering/ViewAngleVisualizer.ts → config/, model/node.ts
       ├── input/InputHandler.ts           → core/GameEventBus.ts, config/
       ├── logic/GameController.ts         → model/, logic/StateMachine.ts,
-      │                                      rendering/VisualizationSync.ts,
-      │                                      core/GameEventBus.ts, schema/types.ts
+      │                                      logic/TurnManager.ts, core/GameEventBus.ts,
+      │                                      schema/types.ts, network/INetworkAdapter.ts
+      ├── logic/TurnManager.ts            → model/, logic/ai/NPCBrain.ts,
+      │                                      network/INetworkAdapter.ts
+      ├── logic/ai/NPCBrain.ts            → model/, logic/ai/NodeScorer.ts,
+      │                                      logic/ai/ShotSelector.ts, schema/types.ts
       └── network/                        → model/, schema/types.ts
 
-model/Player.ts → logic/StateMachine.ts
-model/その他   → config/ のみ
+model/ → config/ のみ
 ```
 
 **核心ルール**: `model/` は `rendering/` や `ui/` に依存しない。
@@ -302,12 +349,11 @@ model/その他   → config/ のみ
 | `src/MODEL/MapGenerator.ts` | `src/model/MapGenerator.ts` |
 | `src/MODEL/ObstacleExporter.ts` | `src/model/ObstacleExporter.ts` |
 | `src/MODEL/entities/Entity.ts` | `src/model/entities/Entity.ts` |
-| `src/MODEL/entities/EntityManager.ts` | `src/model/entities/EntityManager.ts` |
 | `src/GRF/StateMachine.ts` | `src/logic/StateMachine.ts` |
 | `src/GRF/game/GameController.ts` | `src/logic/GameController.ts` |
 | `src/GRF/threeSetup.ts` | `src/rendering/threeSetup.ts` |
 | `src/GRF/rendering/SceneManager.ts` | `src/rendering/SceneManager.ts` |
-| `src/GRF/rendering/MeshFactory.ts` | `src/rendering/MeshFactory.ts` |
+| `src/GRF/rendering/MeshFactory.ts` | `src/rendering/PlayerMeshFactory.ts` |
 | `src/GRF/rendering/VisualizationSync.ts` | `src/rendering/VisualizationSync.ts` |
 | `src/GRF/ViewAngleVisualizer.ts` | `src/rendering/ViewAngleVisualizer.ts` |
 | `src/GRF/input/InputHandler.ts` | `src/input/InputHandler.ts` |
@@ -326,3 +372,4 @@ model/その他   → config/ のみ
 | `GRF/`（略称） | `logic/`, `rendering/`, `input/`, `ui/` | 役割別に分割して意図を明確化 |
 | `network/types.ts` | `schema/types.ts` | サーバーの `schema/` フォルダと対称 |
 | `core/events/GameEventBus.ts` | `core/GameEventBus.ts` | 不要なサブフォルダを除去してフラット化 |
+| `ui/ExportMenu.tsx`（削除） | ー | マップ管理 UI を削除（2026-03-24） |

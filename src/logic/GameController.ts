@@ -7,6 +7,7 @@ import { Player } from '../model/Player';
 import { Node } from '../model/node';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnResult } from '../schema/types';
+import { TurnManager } from './TurnManager';
 
 /**
  * Controls game logic and state transitions
@@ -18,6 +19,9 @@ export class GameController {
   private activePlayerId: string;
   private networkAdapter: INetworkAdapter;
   private stateMachines: Map<string, StateMachine> = new Map();
+  private turnManager: TurnManager;
+  private inputLocked: boolean = false;
+  private reachableNodes: Set<number> = new Set();
 
   constructor(
     model: Model,
@@ -35,6 +39,12 @@ export class GameController {
       this.stateMachines.set(playerId, new StateMachine());
     }
 
+    this.turnManager = new TurnManager(
+      model,
+      eventBus,
+      networkAdapter,
+    );
+
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
     this.setupEventListeners();
@@ -49,6 +59,9 @@ export class GameController {
     this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
     this.eventBus.on(GameEventType.VIEW_ANGLE_TOGGLED, this.handleViewAngleToggle.bind(this));
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
+    this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
+      this.inputLocked = data.locked;
+    });
   }
 
   /**
@@ -65,6 +78,8 @@ export class GameController {
    * Handles node click events
    */
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
+    if (this.inputLocked) return;
+
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     if (!activePlayer) return;
 
@@ -95,6 +110,12 @@ export class GameController {
     if (activePlayer.node.id === clickedNode.id) {
       sm.transition(GameEvent.SelectPlayer);
       this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: clickedNode.id });
+
+      // Compute and emit reachable nodes
+      this.reachableNodes = this.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
+      this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+        nodeIds: Array.from(this.reachableNodes),
+      });
     }
   }
 
@@ -103,7 +124,7 @@ export class GameController {
    */
   private handleSelectStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
     const canMove = activePlayer.node.id === clickedNode.id ||
-                    this.model.areNodesConnected(activePlayer.node, clickedNode);
+                    this.reachableNodes.has(clickedNode.id);
     if (canMove) {
       sm.transition(GameEvent.MovePlayer);
       this.currentNextNodeId = clickedNode.id;
@@ -172,12 +193,21 @@ export class GameController {
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
 
+    // Recompute reachable nodes from the new position
+    this.reachableNodes = this.model.getReachableNodes(nextNodeId, PlayerConfig.MoveRange);
+    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+      nodeIds: Array.from(this.reachableNodes),
+    });
+
     // Delegate logic to adapter; result is applied via applyTurnResult callback
     this.networkAdapter.sendTurnAction({
       playerId: this.activePlayerId,
       moveToNodeId: nextNodeId,
       shotAtNodeId: shotNodeId,
     });
+
+    // After human turn, trigger NPC turns
+    this.turnManager.processNPCTurns();
   }
 
   /**
@@ -217,12 +247,24 @@ export class GameController {
    * Handles empty canvas clicks (cancel action)
    */
   private handleCanvasEmptyClick(): void {
+    if (this.inputLocked) return;
+
     const sm = this.getStateMachine(this.activePlayerId);
     sm.transition(GameEvent.Cancel);
     this.currentShotNodeId = undefined;
     this.currentNextNodeId = undefined;
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
+
+    // Recompute reachable nodes from current position
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (activePlayer) {
+      this.reachableNodes = this.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
+      this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+        nodeIds: Array.from(this.reachableNodes),
+      });
+    }
+
     sm.transition(GameEvent.SelectPlayer);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
@@ -231,6 +273,12 @@ export class GameController {
    * Handles player switching
    */
   private handlePlayerSwitch(data: { currentPlayerId: string }): void {
+    if (this.inputLocked) return;
+
+    // Block switching to NPC-controlled players
+    const targetPlayer = this.model.getPlayer(data.currentPlayerId);
+    if (targetPlayer?.isNPC) return;
+
     this.activePlayerId = data.currentPlayerId;
     this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
     console.log(`Switched to ${data.currentPlayerId}`);
@@ -281,28 +329,10 @@ export class GameController {
   }
 
   /**
-   * Regenerates obstacles
-   */
-  regenerateObstacles(seed?: string): string {
-    this.model.generateRandomObstacles(undefined, undefined, undefined, undefined, undefined, seed);
-    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-    return this.model.getLastSeed();
-  }
-
-  /**
    * Imports obstacles
    */
   importObstacles(obstaclesData: ObstacleData[]): void {
     this.model.importObstacles(obstaclesData);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-  }
-
-  /**
-   * Generates complex map
-   */
-  generateComplexMap(seed?: string): string {
-    this.model.generateComplexMap(seed);
-    this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-    return this.model.getLastSeed();
   }
 }

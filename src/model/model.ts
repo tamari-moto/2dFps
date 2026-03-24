@@ -54,9 +54,24 @@ class Model {
    */
   public initLocalPlayers(): void {
     const playerColors = this.generatePlayerColors(LOCAL_PLAYER_COUNT);
+    const usedNodeIds = new Set<number>();
+
     for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
       const playerId = createPlayerId(i);
-      this.players.set(playerId, new Player(playerId, this.nodeList[i], playerColors[i]));
+      const isNPC = i > 0;
+
+      let nodeIndex: number;
+      if (isNPC) {
+        // NPC: pick a random unoccupied node
+        do {
+          nodeIndex = Math.floor(Math.random() * this.nodeList.length);
+        } while (usedNodeIds.has(nodeIndex));
+      } else {
+        nodeIndex = i;
+      }
+
+      usedNodeIds.add(nodeIndex);
+      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], playerColors[i], 100, isNPC));
     }
   }
 
@@ -199,6 +214,20 @@ class Model {
   */
   public areNodesConnected(node1: Node, node2: Node): boolean {
     return this.Edges.List[node1.id].includes(node2.id);
+  }
+
+  /**
+   * Returns the set of node IDs reachable from the given node within maxSteps.
+   */
+  public getReachableNodes(fromNodeId: number, maxSteps: number): Set<number> {
+    return this.Edges.getReachableNodes(fromNodeId, maxSteps);
+  }
+
+  /**
+   * Returns the shortest path (node ID array) from fromNodeId to toNodeId, or null if unreachable.
+   */
+  public getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] | null {
+    return this.Edges.getShortestPath(fromNodeId, toNodeId, maxSteps);
   }
 
   /**

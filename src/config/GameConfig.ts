@@ -33,6 +33,9 @@ export const PlayerConfig = {
 
   /** Damage dealt per shot (3 shots to eliminate a player with 100 HP) */
   DamagePerShot: 34,
+
+  /** Maximum number of grid steps a player can move per turn */
+  MoveRange: 3,
 } as const;
 
 /**
@@ -59,6 +62,9 @@ export const NodeConfig = {
 
   /** Shot target node color (red) */
   ShotTargetColor: 0xff2020,
+
+  /** Reachable node color (soft teal) */
+  ReachableColor: 0x2a7a6a,
 } as const;
 
 /**
@@ -409,6 +415,8 @@ export const NodeVisualConfig = {
   EmissiveNextIntensity: 0.3,
   /** Emissive intensity for shot-target node */
   EmissiveShotIntensity: 0.5,
+  /** Emissive intensity for reachable nodes */
+  EmissiveReachableIntensity: 0.15,
 } as const;
 
 /**
@@ -423,6 +431,35 @@ export const PostProcessConfig = {
   BloomRadius: 0.3,
   /** Bloom threshold (only pixels brighter than this bloom) */
   BloomThreshold: 0.35,
+} as const;
+
+/**
+ * NPC AI configuration
+ */
+export const AIConfig = {
+  /** Bonus for nodes adjacent to walls (fewer graph edges = more cover) */
+  CoverWeight: 30,
+
+  /** Penalty per enemy that has line of sight to the candidate node */
+  EnemyLOSPenalty: -20,
+
+  /** Penalty per grid step distance to nearest enemy (approach bias) */
+  DistanceWeight: -2,
+
+  /** Bonus when NPC has LOS to enemy but enemy lacks LOS back */
+  AmbushBonus: 15,
+
+  /** HP threshold below which NPC prioritizes cover over aggression */
+  RetreatHPThreshold: 40,
+
+  /** Cover weight multiplier when HP is below retreat threshold */
+  RetreatCoverMultiplier: 2,
+
+  /** Bonus for targeting low-HP enemies */
+  ShotLowHPPriority: 10,
+
+  /** Delay between NPC turns in ms (must exceed MovementDuration) */
+  NPCTurnDelayMs: 1200,
 } as const;
 
 /**

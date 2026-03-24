@@ -143,6 +143,15 @@ export class VisualizationSync {
       console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
     });
 
+    eventBus.on(GameEventType.VIS_SET_REACHABLE_NODES, (data: { nodeIds: number[] }) => {
+      this.nodeVis.setReachableNodes(data.nodeIds);
+      this.doUpdateView();
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_REACHABLE_NODES, () => {
+      this.nodeVis.clearReachableNodes();
+      this.doUpdateView();
+    });
+
     eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
 
     eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {

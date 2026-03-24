@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { setupThree } from '../rendering/threeSetup';
 import type { ThreeSetup } from '../rendering/threeSetup';
-import ExportMenu from './ExportMenu';
 import GameHUD from './GameHUD';
 import ConsoleLogger from './ConsoleLogger';
 import LobbyUI from './LobbyUI';
@@ -61,7 +60,6 @@ const GRF_main = () => {
         ref={canvasRef}
         style={{ display: appState === 'playing' ? 'block' : 'none' }}
       />
-      {appState === 'playing' && <ExportMenu threeSetup={threeSetup} />}
       {appState === 'playing' && <GameHUD threeSetup={threeSetup} />}
       {appState !== 'playing' && (
         <LobbyUI

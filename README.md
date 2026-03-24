@@ -8,10 +8,11 @@
 
 - **オフラインモード** — ローカルでターン制対戦（1ブラウザ）
 - **オンラインモード** — Colyseus サーバー経由でリアルタイム同期（2人以上）
+- **NPC 戦術 AI** — カバー評価・アンブッシュ・低HP撤退による自律行動
 - 20×20グリッドのノードベースマップ
 - 視野角60°・最大視野距離1000の射線判定
-- ターン制（移動 → 射撃）、1ショット34ダメージ（100HP）
-- 障害物生成・インポート/エクスポート機能
+- ターン制（移動 → 射撃）、1ショット34ダメージ（100HP）、複数マス移動（BFS経路探索）
+- 障害物生成機能
 
 ## 技術スタック
 
@@ -109,11 +110,13 @@ Idle → Select → Move → Shot → Idle
 ├── src/
 │   ├── config/        定数（GameConfig.ts, GameConstants.ts）
 │   ├── schema/        型定義（TurnAction, TurnResult）
-│   ├── model/         ゲームロジック（model, Graph, Player, node, ...）
-│   ├── logic/         StateMachine, GameController
-│   ├── rendering/     threeSetup, SceneManager, MeshFactory, VisualizationSync, ViewAngleVisualizer
+│   ├── model/         データモデル（Model, Graph, Player, Node, MapGenerator, LineSegment, entities/）
+│   ├── logic/         StateMachine, GameController, TurnManager, ai/(NPCBrain, NodeScorer, ShotSelector)
+│   ├── rendering/     threeSetup, SceneManager, VisualizationSync, PlayerMeshFactory, PlayerAnimator,
+│   │                  PlayerLifecycleManager, CameraFollowController, NodeVisualizationManager,
+│   │                  NodeWallMeshFactory, ViewAngleVisualizer, MeshUtils
 │   ├── input/         InputHandler
-│   ├── ui/            GRF_main, LobbyUI, ExportMenu, ConsoleLogger
+│   ├── ui/            GRF_main, GRF_main.css, LobbyUI, GameHUD, ConsoleLogger
 │   ├── network/       INetworkAdapter, LocalAdapter, ColyseusAdapter
 │   └── core/          GameEventBus
 ├── server/

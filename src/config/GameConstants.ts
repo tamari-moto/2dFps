@@ -23,6 +23,11 @@ export const ENTITY_IDS = {
 } as const;
 
 /**
+ * Human-controlled player ID
+ */
+export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
+
+/**
  * Type-safe entity ID type
  */
 export type EntityId = typeof ENTITY_IDS[keyof typeof ENTITY_IDS];

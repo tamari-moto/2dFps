@@ -61,18 +61,23 @@ src/
 │       └── Entity.ts           # エンティティ基底クラス
 ├── logic/                      # ← server/src/logic/ と対称
 │   ├── StateMachine.ts         # ゲーム状態機械
-│   └── GameController.ts       # ゲームロジックコントローラ
+│   ├── GameController.ts       # ゲームロジックコントローラ
+│   ├── TurnManager.ts          # NPC ターン自動実行・スケジューリング
+│   └── ai/
+│       ├── NPCBrain.ts         # NPC 行動決定（Facade: decideTurn()）
+│       ├── NodeScorer.ts       # 移動候補ノード評価スコアリング
+│       └── ShotSelector.ts     # 射撃対象選択
 ├── rendering/                  # Three.js 描画（クライアント固有）
 │   ├── threeSetup.ts           # Three.js 統合・オーケストレーション
 │   ├── SceneManager.ts         # シーン管理
-│   ├── PlayerMeshFactory.ts    # プレイヤーメッシュ生成
+│   ├── VisualizationSync.ts    # オーケストレーター（VIS_* イベント → 各マネージャ委譲）
+│   ├── PlayerMeshFactory.ts    # プレイヤー3Dメッシュ生成
 │   ├── PlayerAnimator.ts       # GSAP によるプレイヤーアニメーション
-│   ├── PlayerLifecycleManager.ts # プレイヤーの生成・破棄・状態遷移
-│   ├── CameraFollowController.ts # カメラ追従制御
-│   ├── VisualizationSync.ts    # モデル↔描画の同期
+│   ├── PlayerLifecycleManager.ts # プレイヤーメッシュのライフサイクル管理
+│   ├── CameraFollowController.ts # カメラ追従・パンアニメーション
+│   ├── NodeVisualizationManager.ts # ノード色状態・双方向マッピング管理
+│   ├── NodeWallMeshFactory.ts  # ノード円形・障害物壁メッシュ生成
 │   ├── ViewAngleVisualizer.ts  # 視野角の可視化
-│   ├── NodeVisualizationManager.ts # ノードの色状態管理
-│   ├── NodeWallMeshFactory.ts  # 障害物の3D壁メッシュ生成
 │   └── MeshUtils.ts            # メッシュユーティリティ
 ├── input/                      # 入力処理（クライアント固有）
 │   └── InputHandler.ts
@@ -80,9 +85,8 @@ src/
 │   ├── GRF_main.tsx            # ルート React コンポーネント（AppState 管理）
 │   ├── GRF_main.css            # スタイルシート
 │   ├── LobbyUI.tsx             # ロビー画面（オフライン/オンライン選択）
-│   ├── GameHUD.tsx             # ゲーム中 HUD（体力、ターン情報等）
-│   ├── ExportMenu.tsx          # マップ管理 UI
-│   └── ConsoleLogger.tsx       # デバッグコンソール
+│   ├── GameHUD.tsx             # ゲーム中 HUD（体力・ターン情報）
+│   └── ConsoleLogger.tsx
 ├── network/                    # ← server/src/rooms/ と対称（通信抽象化）
 │   ├── INetworkAdapter.ts      # アダプターインターフェース
 │   ├── LocalAdapter.ts         # オフライン用（プロセス内処理）
@@ -191,6 +195,39 @@ GameState:   { players: MapSchema<PlayerState>, currentTurnPlayerId, gameStarted
 | S→C | `player_left` | `{ playerId }` |
 | S→C | `error` | `{ code }` |
 | C→S | `turn_action` | `{ playerId, moveToNodeId, shotAtNodeId? }` |
+
+### NPC ターン管理 (TurnManager.ts + logic/ai/)
+
+```
+TurnManager.processNPCTurns()
+  ↓ 生存 NPC を順に処理
+NPCBrain.decideTurn(model, npc)
+  ├── NodeScorer.scoreNode()   // カバー・距離・LOS でノード評価
+  └── ShotSelector.selectShotTarget()  // 視野内敵を HP・距離でランク付け
+  ↓
+networkAdapter.sendTurnAction()  // 人間プレイヤーと同じターンアクションを実行
+```
+
+**AIConfig（GameConfig.ts）** の主要パラメータ:
+
+| 定数 | 値 | 説明 |
+|------|----|------|
+| `CoverWeight` | 30 | 壁に囲まれたノードへの加点 |
+| `EnemyLOSPenalty` | -20 | 敵から見えるノードへのペナルティ |
+| `AmbushBonus` | 15 | NPC が見えて敵が見えない場合のボーナス |
+| `DistanceWeight` | -2 | 高HP時: 敵に近づく / 低HP時: 遠ざかる |
+| `RetreatHPThreshold` | 40 | 撤退モードに切り替わる HP 閾値 |
+| `NPCTurnDelayMs` | 1200 | NPC ターン間の待機時間（アニメーション表示用） |
+
+### BFS 経路探索 (model.ts)
+
+```typescript
+// 到達可能ノード一覧（BFS・複数マス移動）
+getReachableNodes(fromNodeId: number, maxSteps: number): Set<number>
+
+// 最短経路（BFS・複数マス移動）
+getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] | null
+```
 
 ### ColyseusAdapter の注意点
 
