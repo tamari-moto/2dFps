@@ -55,11 +55,10 @@ src/
 │   ├── node.ts                 # ノードデータ構造 (id, x, y)
 │   ├── LineSegment.ts          # 線分交差判定 (CCW アルゴリズム)
 │   ├── Player.ts               # プレイヤーデータ
-│   ├── MapGenerator.ts         # マップ生成
+│   ├── MapGenerator.ts         # マップ生成（ランダム障害物 / BSP ダンジョン生成）
 │   ├── ObstacleExporter.ts     # 障害物 JSON エクスポート/インポート
 │   └── entities/
-│       ├── Entity.ts
-│       └── EntityManager.ts
+│       └── Entity.ts           # エンティティ基底クラス
 ├── logic/                      # ← server/src/logic/ と対称
 │   ├── StateMachine.ts         # ゲーム状態機械
 │   ├── GameController.ts       # ゲームロジックコントローラ
@@ -84,6 +83,7 @@ src/
 │   └── InputHandler.ts
 ├── ui/                         # React UI コンポーネント（クライアント固有）
 │   ├── GRF_main.tsx            # ルート React コンポーネント（AppState 管理）
+│   ├── GRF_main.css            # スタイルシート
 │   ├── LobbyUI.tsx             # ロビー画面（オフライン/オンライン選択）
 │   ├── GameHUD.tsx             # ゲーム中 HUD（体力・ターン情報）
 │   └── ConsoleLogger.tsx
@@ -132,6 +132,33 @@ Idle → Select → Move → Shot → Idle
 どの状態からも Cancel で Idle へ戻る
 ```
 
+### イベント駆動アーキテクチャ (GameEventBus)
+
+`src/core/GameEventBus.ts` がアプリケーション全体のイベントハブ。型安全な pub/sub でレイヤー間を疎結合に接続する。
+
+| カテゴリ | 主なイベント | 発火元 → 購読先 |
+|---------|-------------|----------------|
+| プレイヤー | `PLAYER_MOVED`, `PLAYER_SELECTED`, `PLAYER_SWITCHED` | GameController → VisualizationSync |
+| 戦闘 | `COMBAT_RESOLVED`, `HIT_DETECTED`, `MISS_DETECTED` | GameController → UI / 描画 |
+| ターン | `TURN_STARTED`, `TURN_ENDED`, `TURN_ACTION` | GameController ↔ NetworkAdapter |
+| 入力 | `NODE_CLICKED`, `CANVAS_CLICKED_EMPTY`, `KEY_PRESSED` | InputHandler → GameController |
+| 描画コマンド | `VIS_UPDATE_VIEW`, `VIS_SET_ACTIVE_PLAYER`, `VIS_SHOW_HIT_EFFECT` 等 | GameController → VisualizationSync |
+| マップ | `MAP_GENERATED`, `OBSTACLES_UPDATED` | MapGenerator → 描画 |
+| ゲーム状態 | `GAME_STARTED`, `GAME_OVER` | NetworkAdapter → GameController / UI |
+| ネットワーク | `NETWORK_CONNECTED`, `TURN_RESULT_RECEIVED`, `PLAYER_JOINED` 等 | ColyseusAdapter → GameController |
+
+### 描画レイヤーの委譲構造
+
+VisualizationSync は薄いオーケストレーターとして、GameEventBus の `VIS_*` イベントを受け取り、4つの専門マネージャに処理を委譲する。
+
+```
+VisualizationSync (オーケストレーター)
+├── PlayerAnimator           # GSAP アニメーション（移動、ダンス、被弾演出）
+├── PlayerLifecycleManager   # プレイヤーメッシュの生成・破棄・状態遷移
+├── NodeVisualizationManager # ノードの色状態管理（選択、移動先、射撃先）
+└── CameraFollowController   # カメラ追従・パンアニメーション
+```
+
 ### Mesh ↔ Node 双方向マッピング
 
 ```typescript
@@ -143,7 +170,9 @@ nodeToMeshMap: Map<number, number>  // node.id → THREE.Mesh.id
 
 ```
 マウスクリック → Raycaster → Mesh ID → Node ID
-→ StateMachine → Model 更新 → VisualizationSync.updateView()
+→ NODE_CLICKED イベント発火 (GameEventBus)
+→ GameController が受信 → StateMachine 状態遷移 → Model 更新
+→ VIS_* イベント発火 → VisualizationSync が各マネージャに委譲
 → GSAP アニメーション → renderer.render()
 ```
 
@@ -159,6 +188,7 @@ GameState:   { players: MapSchema<PlayerState>, currentTurnPlayerId, gameStarted
 | 方向 | メッセージ | データ |
 |------|-----------|--------|
 | S→C | `player_assigned` | `{ playerId }` |
+| S→C | `obstacles_ready` | `Obstacle[]` |
 | S→C | `game_started` | `{ firstTurnPlayerId }` |
 | S→C | `turn_result` | `TurnResult` |
 | S→C | `game_over` | `{ winnerId }` |
@@ -210,12 +240,14 @@ getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] 
 - **マジックナンバー禁止**: 数値定数は必ず `src/config/GameConfig.ts` に追加する
 - **Model と View の分離**: ゲームロジックは `model/` + `logic/` 層、描画は `rendering/` 層、UI は `ui/` 層
 - **型安全**: TypeScript の型を省略しない
+- **サーバー側定数に注意**: `server/src/logic/ServerGameLogic.ts` にハードコードされた定数（グリッドサイズ等）があり、クライアント側 `GameConfig.ts` と値が異なる場合がある。変更時は両方を確認すること
 
 ## 外部ライブラリ
 
 | ライブラリ | 用途 |
 |-----------|------|
 | Three.js 0.174 | WebGL レンダリング、Raycaster |
+| three-stdlib 2.35 | Three.js 拡張ユーティリティ |
 | GSAP 3.12 | アニメーション (移動、点滅) |
 | React 19 | UI コンポーネント |
 | Vite 6.2 | ビルドツール・HMR |
