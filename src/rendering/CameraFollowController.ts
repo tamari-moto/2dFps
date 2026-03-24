@@ -34,19 +34,14 @@ export class CameraFollowController {
     }
 
     const controls = this.sceneManager.getControls();
-    const camera   = this.sceneManager.getCamera();
     const target   = controls.target;
-
-    const offsetX = camera.position.x - target.x;
-    const offsetY = camera.position.y - target.y;
-    const offsetZ = camera.position.z - target.z;
 
     const tl = gsap.timeline({ onComplete: () => { this.followTween = null; } });
     tl.to(target, { x, y, duration, ease }, 0);
-    tl.to(camera.position, {
-      x: x + offsetX,
-      y: y + offsetY,
-      z: offsetZ + target.z,
+    tl.to(this.sceneManager.getCamera().position, {
+      x: x + CameraConfig.OffsetX,
+      y: y + CameraConfig.OffsetY,
+      z: CameraConfig.OffsetZ,
       duration,
       ease,
     }, 0);
