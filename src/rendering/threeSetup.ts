@@ -85,7 +85,6 @@ export class ThreeSetup {
    */
   private startRenderLoop(): void {
     const render = () => {
-      this.sceneManager.updateControls();
       this.sceneManager.render();
       requestAnimationFrame(render);
     };

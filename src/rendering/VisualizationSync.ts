@@ -48,7 +48,7 @@ export class VisualizationSync {
     // Snap camera to starting player (no animation)
     const initialPlayer = model.getPlayer(activePlayerId);
     if (initialPlayer) {
-      this.camera.snapTo(initialPlayer.node.x, initialPlayer.node.y);
+      this.camera.snapTo(initialPlayer.node.x, initialPlayer.node.y, initialPlayer.angle);
     }
 
     this.subscribeToEvents(eventBus);
@@ -115,7 +115,7 @@ export class VisualizationSync {
         playerId, player.node.x, player.node.y, player.angle, isActive,
       );
       if (isActive && moving) {
-        this.camera.panTo(player.node.x, player.node.y, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
+        this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
       }
     }
   }
@@ -127,7 +127,7 @@ export class VisualizationSync {
       this.activePlayerId = data.playerId;
       const player = this.model.getPlayer(data.playerId);
       if (player) {
-        this.camera.panTo(player.node.x, player.node.y, CameraConfig.FollowPanDuration, CameraConfig.FollowPanEase);
+        this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowPanDuration, CameraConfig.FollowPanEase);
       }
       this.doUpdateView();
     });

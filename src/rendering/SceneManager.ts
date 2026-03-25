@@ -14,6 +14,7 @@ export class SceneManager {
   private orbitControls: OrbitControls;
   private composer: EffectComposer | null = null;
   private boundHandleResize: () => void;
+  private boundHandleWheel: (e: WheelEvent) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     // Setup renderer
@@ -34,8 +35,8 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(CameraConfig.FOV, 1.0);
     this.camera.aspect = width / height;
     this.camera.position.set(
-      CameraConfig.OffsetX,
-      CameraConfig.OffsetY,
+      -CameraConfig.BackDistance,
+      0,
       CameraConfig.OffsetZ,
     );
     this.camera.updateProjectionMatrix();
@@ -47,6 +48,7 @@ export class SceneManager {
     this.orbitControls.maxDistance = CameraConfig.MaxDistance;
     this.orbitControls.enableRotate = CameraConfig.EnableRotate;
     this.orbitControls.enablePan = CameraConfig.EnablePan;
+    this.orbitControls.enableZoom = false;
 
     // Add background grid
     this.createBackgroundGrid();
@@ -71,6 +73,10 @@ export class SceneManager {
     // Handle window resize - store bound function to enable proper cleanup
     this.boundHandleResize = this.handleResize.bind(this);
     window.addEventListener('resize', this.boundHandleResize);
+
+    // Handle wheel zoom via FOV
+    this.boundHandleWheel = this.handleWheel.bind(this);
+    canvas.addEventListener('wheel', this.boundHandleWheel, { passive: false });
   }
 
   /**
@@ -125,6 +131,16 @@ export class SceneManager {
       hLine.userData['isGrid'] = true;
       this.scene.add(hLine);
     }
+  }
+
+  /**
+   * Handles wheel events to zoom via FOV adjustment
+   */
+  private handleWheel(e: WheelEvent): void {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? CameraConfig.FOVWheelStep : -CameraConfig.FOVWheelStep;
+    this.camera.fov = Math.max(CameraConfig.FOVMin, Math.min(CameraConfig.FOVMax, this.camera.fov + delta));
+    this.camera.updateProjectionMatrix();
   }
 
   /**
