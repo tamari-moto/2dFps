@@ -40,33 +40,36 @@ export class TurnManager {
     this._isProcessing = true;
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
 
-    const npcPlayers = this.getAliveNPCs();
+    try {
+      const npcPlayers = this.getAliveNPCs();
 
-    for (const npc of npcPlayers) {
-      if (!npc.isAlive) continue; // may have been killed during earlier NPC turn
+      for (const npc of npcPlayers) {
+        if (!npc.isAlive) continue; // may have been killed during earlier NPC turn
 
-      this.eventBus.emit(GameEventType.NPC_TURN_STARTED, { playerId: npc.id });
-      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: npc.id });
+        this.eventBus.emit(GameEventType.NPC_TURN_STARTED, { playerId: npc.id });
+        this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: npc.id });
 
-      // AI decides action
-      const action = decideTurn(this.model, npc);
+        // AI decides action
+        const action = decideTurn(this.model, npc);
 
-      // Execute through network adapter (synchronous for LocalAdapter)
-      this.networkAdapter.sendTurnAction(action);
+        // Execute through network adapter (synchronous for LocalAdapter)
+        this.networkAdapter.sendTurnAction(action);
 
-      // Wait for animation to complete
-      await this.delay(AIConfig.NPCTurnDelayMs);
+        // Wait for animation to complete
+        await this.delay(AIConfig.NPCTurnDelayMs);
 
-      // Check if game is over
-      const alivePlayers = Array.from(this.model.players.values()).filter(p => p.isAlive);
-      if (alivePlayers.length <= 1) break;
+        // Check if game is over
+        const alivePlayers = Array.from(this.model.players.values()).filter(p => p.isAlive);
+        if (alivePlayers.length <= 1) break;
+      }
+
+      // Return control to human player
+      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: HUMAN_PLAYER_ID });
+      this.eventBus.emit(GameEventType.NPC_TURNS_COMPLETE);
+      this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+    } finally {
+      this._isProcessing = false;
     }
-
-    // Return control to human player
-    this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: HUMAN_PLAYER_ID });
-    this.eventBus.emit(GameEventType.NPC_TURNS_COMPLETE);
-    this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
-    this._isProcessing = false;
   }
 
   private getAliveNPCs() {

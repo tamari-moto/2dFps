@@ -131,6 +131,7 @@ export class ThreeSetup {
    * Disposes all resources
    */
   dispose(): void {
+    this.eventBus.removeAllListeners();
     this.sceneManager.dispose();
     this.inputHandler.dispose();
   }

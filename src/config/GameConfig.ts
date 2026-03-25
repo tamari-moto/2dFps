@@ -36,6 +36,9 @@ export const PlayerConfig = {
 
   /** Maximum number of grid steps a player can move per turn */
   MoveRange: 3,
+
+  /** 視界外の敵を非表示にするか */
+  FogOfWarEnabled: true,
 } as const;
 
 /**

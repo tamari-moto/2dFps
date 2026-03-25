@@ -61,6 +61,12 @@ export class PlayerLifecycleManager {
     }, 300);
   }
 
+  setVisible(playerId: string, visible: boolean): void {
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+    obj.visible = visible;
+  }
+
   hidePlayer(playerId: string): void {
     const obj = this.playerMeshes.get(playerId);
     if (!obj) return;

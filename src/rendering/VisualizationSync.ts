@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 import { SceneManager } from './SceneManager';
-import { CameraConfig } from '../config/GameConfig';
+import { CameraConfig, PlayerConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerAnimator } from './PlayerAnimator';
 import { PlayerLifecycleManager } from './PlayerLifecycleManager';
@@ -89,12 +89,31 @@ export class VisualizationSync {
   }
 
   private updatePlayers(): void {
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+
+    const visibleNodeIds = new Set<number>();
+    if (PlayerConfig.FogOfWarEnabled && activePlayer) {
+      const nodes = this.model.getVisibleNodesAtAngle(
+        activePlayer.node, activePlayer.angle, PlayerConfig.MaxViewDistance,
+      );
+      for (const n of nodes) visibleNodeIds.add(n.id);
+      visibleNodeIds.add(activePlayer.node.id);
+    }
+
     for (const [playerId, player] of this.model.players) {
+      if (!player.isAlive) continue;
+
       const isActive = playerId === this.activePlayerId;
+      const shouldShow = !PlayerConfig.FogOfWarEnabled
+        || isActive
+        || visibleNodeIds.has(player.node.id);
+
+      this.lifecycle.setVisible(playerId, shouldShow);
+      if (!shouldShow) continue;
+
       const moving = this.lifecycle.applyTransform(
         playerId, player.node.x, player.node.y, player.angle, isActive,
       );
-
       if (isActive && moving) {
         this.camera.panTo(player.node.x, player.node.y, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
       }

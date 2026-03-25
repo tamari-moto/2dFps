@@ -17,6 +17,15 @@ const GRF_main = () => {
   const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const initialized = React.useRef(false);
 
+  React.useEffect(() => {
+    return () => {
+      if (threeSetup) {
+        threeSetup.dispose();
+        initialized.current = false;
+      }
+    };
+  }, [threeSetup]);
+
   const startGame = React.useCallback(async (adapter: INetworkAdapter) => {
     const canvas = canvasRef.current;
     if (!canvas || initialized.current) return;

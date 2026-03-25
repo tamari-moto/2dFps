@@ -177,7 +177,7 @@ export class GameController {
   /**
    * Executes a complete turn by delegating to the network adapter.
    */
-  private executeTurn(sm: StateMachine): void {
+  private async executeTurn(sm: StateMachine): Promise<void> {
     sm.transition(GameEvent.Complete);
 
     const nextNodeId = this.currentNextNodeId;
@@ -207,7 +207,10 @@ export class GameController {
     });
 
     // After human turn, trigger NPC turns
-    this.turnManager.processNPCTurns();
+    await this.turnManager.processNPCTurns().catch((err: unknown) => {
+      console.error('[GameController] NPC turn processing failed:', err);
+      this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+    });
   }
 
   /**
