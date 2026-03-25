@@ -12,7 +12,7 @@ export class LineSegment {
 
   intersects(p1: { x: number, y: number }, p2: { x: number, y: number }): boolean {
     function ccw(A: { x: any; y: any; }, B: { x: any; y: any; }, C: { x: any; y: any; }) {
-      return (C.y - A.y) * (B.x - A.x) > (B.y - A.y) * (C.x - A.x);
+      return (C.y - A.y) * (B.x - A.x) >= (B.y - A.y) * (C.x - A.x);
     }
     return (ccw(this.start, p1, p2) != ccw(this.end, p1, p2)) && (ccw(this.start, this.end, p1) != ccw(this.start, this.end, p2));
   }
