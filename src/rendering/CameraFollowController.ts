@@ -6,46 +6,51 @@ import type { SceneManager } from './SceneManager';
  * Manages camera follow behaviour: smooth pan animations and instant snap.
  */
 export class CameraFollowController {
-  private followTween: gsap.core.Tween | null = null;
+  private followTimeline: gsap.core.Timeline | null = null;
 
   constructor(private sceneManager: SceneManager) {}
 
-  /** Immediately position the camera over (x, y) with no animation. */
-  snapTo(x: number, y: number): void {
-    const controls = this.sceneManager.getControls();
-    const camera   = this.sceneManager.getCamera();
-    controls.target.set(x, y, 0);
-    camera.position.set(
-      x + CameraConfig.OffsetX,
-      y + CameraConfig.OffsetY,
-      CameraConfig.OffsetZ,
-    );
-    controls.update();
+  /** Compute XY camera offset from player angle (degrees) so camera sits behind the player. */
+  private calcOffset(angle: number): { ox: number; oy: number } {
+    const rad = angle * Math.PI / 180;
+    return {
+      ox: -Math.cos(rad) * CameraConfig.BackDistance,
+      oy: -Math.sin(rad) * CameraConfig.BackDistance,
+    };
+  }
+
+  /** Immediately position the camera behind (x, y) facing angle, with no animation. */
+  snapTo(x: number, y: number, angle: number): void {
+    const camera = this.sceneManager.getCamera();
+    const { ox, oy } = this.calcOffset(angle);
+    camera.up.set(0, 0, 1);
+    camera.position.set(x + ox, y + oy, CameraConfig.OffsetZ);
+    camera.lookAt(x, y, 0);
   }
 
   /**
-   * Smoothly pan the camera to (x, y).
-   * Animates both OrbitControls target and camera.position together
-   * to maintain the 3D oblique angle.
+   * Smoothly pan the camera behind (x, y) facing angle.
+   * Animates camera.position and calls lookAt each frame via onUpdate.
    */
-  panTo(x: number, y: number, duration: number, ease: string): void {
-    if (this.followTween) {
-      this.followTween.kill();
+  panTo(x: number, y: number, angle: number, duration: number, ease: string): void {
+    if (this.followTimeline) {
+      this.followTimeline.kill();
     }
 
-    const controls = this.sceneManager.getControls();
-    const target   = controls.target;
+    const camera = this.sceneManager.getCamera();
+    camera.up.set(0, 0, 1);
+    const { ox, oy } = this.calcOffset(angle);
 
-    const tl = gsap.timeline({ onComplete: () => { this.followTween = null; } });
-    tl.to(target, { x, y, duration, ease }, 0);
-    tl.to(this.sceneManager.getCamera().position, {
-      x: x + CameraConfig.OffsetX,
-      y: y + CameraConfig.OffsetY,
+    const tl = gsap.timeline({ onComplete: () => { this.followTimeline = null; } });
+    tl.to(camera.position, {
+      x: x + ox,
+      y: y + oy,
       z: CameraConfig.OffsetZ,
       duration,
       ease,
+      onUpdate: () => camera.lookAt(x, y, 0),
     }, 0);
 
-    this.followTween = tl.getChildren()[0] as gsap.core.Tween;
+    this.followTimeline = tl;
   }
 }

@@ -214,8 +214,17 @@ export const AnimationConfig = {
  * Camera configuration
  */
 export const CameraConfig = {
-  /** Field of view angle */
+  /** Field of view angle (default) */
   FOV: 90,
+
+  /** FOV minimum (most zoomed in) */
+  FOVMin: 20,
+
+  /** FOV maximum (most zoomed out) */
+  FOVMax: 120,
+
+  /** FOV change per wheel tick */
+  FOVWheelStep: 5,
 
   /** Camera initial Z position */
   InitialZPosition: 10,
@@ -229,14 +238,11 @@ export const CameraConfig = {
   /** Enable rotation control */
   EnableRotate: false,
 
-  /** 3D斜め視点: カメラの target に対する X オフセット（横ずれ、0=真後ろ） */
-  OffsetX: 0,
+  /** TPS後方追従: プレイヤー後方のXY距離（プレイヤーの向きの逆方向へ配置） */
+  BackDistance: 60,
 
-  /** 3D斜め視点: カメラの target に対する Y オフセット（手前引き）。負値でプレイヤー後方から */
-  OffsetY: -150,
-
-  /** 3D斜め視点: カメラの Z オフセット（高さ）。大きいほど俯瞰 */
-  OffsetZ: 150,
+  /** TPS後方追従: カメラの Z オフセット（高さ）。小さいほどFPS寄り */
+  OffsetZ: 60,
 
   /** パン操作を無効化（カメラは自動追従） */
   EnablePan: false,
