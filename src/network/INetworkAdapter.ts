@@ -37,4 +37,11 @@ export interface INetworkAdapter {
 
   /** Register a callback invoked when obstacle data arrives from the server */
   onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void;
+
+  /**
+   * Returns true if NPC turn processing should run on the client side.
+   * LocalAdapter: true (offline, single-client)
+   * ColyseusAdapter: false (server-authoritative, multi-client)
+   */
+  supportsNPC(): boolean;
 }

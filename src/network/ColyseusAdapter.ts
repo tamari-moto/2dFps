@@ -205,4 +205,6 @@ export class ColyseusAdapter implements INetworkAdapter {
   getRoom(): Colyseus.Room {
     return this.room;
   }
+
+  supportsNPC(): boolean { return false; }
 }
