@@ -206,11 +206,13 @@ export class GameController {
       shotAtNodeId: shotNodeId,
     });
 
-    // After human turn, trigger NPC turns
-    await this.turnManager.processNPCTurns().catch((err: unknown) => {
-      console.error('[GameController] NPC turn processing failed:', err);
-      this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
-    });
+    // After human turn, trigger NPC turns (offline only)
+    if (this.networkAdapter.supportsNPC()) {
+      await this.turnManager.processNPCTurns().catch((err: unknown) => {
+        console.error('[GameController] NPC turn processing failed:', err);
+        this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+      });
+    }
   }
 
   /**

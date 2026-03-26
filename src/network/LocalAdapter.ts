@@ -101,4 +101,6 @@ export class LocalAdapter implements INetworkAdapter {
       hits.push({ targetId, damage, isEliminated: !target.isAlive });
     }
   }
+
+  supportsNPC(): boolean { return true; }
 }
