@@ -3,11 +3,12 @@ import { PlayerState } from '../schema/GameState';
 
 // ---- constants (mirrors src/config/GameConfig.ts) -------------------------
 
-const NODES_IN_GRID_SIZE = 20;
+const NODES_IN_GRID_SIZE = 50; // must match client MapConfig.NodesInGridSize (src/config/GameConfig.ts)
 const NODE_SPACING = 30;
 const MAX_VIEW_DISTANCE = 1000;
 const VIEW_ANGLE_DEG = 60;
 const DAMAGE_PER_SHOT = 34;
+const MOVE_RANGE = 3; // must match client PlayerConfig.MoveRange (src/config/GameConfig.ts)
 
 // ---- minimal node / geometry types ----------------------------------------
 
@@ -84,6 +85,24 @@ export class ServerGameLogic {
     }
 
     return adj;
+  }
+
+  private getReachableNodes(startId: number, maxSteps: number): Set<number> {
+    const visited = new Set<number>([startId]);
+    const reachable = new Set<number>();
+    const queue: Array<{ nodeId: number; dist: number }> = [{ nodeId: startId, dist: 0 }];
+    while (queue.length > 0) {
+      const { nodeId, dist } = queue.shift()!;
+      if (dist >= maxSteps) continue;
+      for (const neighbor of this.adjacency[nodeId] ?? []) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          reachable.add(neighbor);
+          queue.push({ nodeId: neighbor, dist: dist + 1 });
+        }
+      }
+    }
+    return reachable;
   }
 
   // ---- geometry helpers -----------------------------------------------------
@@ -182,12 +201,12 @@ export class ServerGameLogic {
     const toNode = this.nodes[action.moveToNodeId];
     if (!toNode) return null;
 
-    // Validate move: destination must be adjacent (or same node)
-    if (
-      action.moveToNodeId !== actor.nodeId &&
-      !this.adjacency[actor.nodeId].includes(action.moveToNodeId)
-    ) {
-      return null;
+    // Validate move: destination must be reachable within MOVE_RANGE steps
+    if (action.moveToNodeId !== actor.nodeId) {
+      const reachable = this.getReachableNodes(actor.nodeId, MOVE_RANGE);
+      if (!reachable.has(action.moveToNodeId)) {
+        return null;
+      }
     }
 
     actor.nodeId = action.moveToNodeId;
