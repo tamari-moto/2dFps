@@ -1,11 +1,18 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'colyseus';
+import cors from 'cors';
 import { GameRoom } from './rooms/GameRoom';
 
 const PORT = Number(process.env.PORT) || 2567;
 
 const app = express();
+app.use(cors({
+  origin: [
+    'https://tamari-moto.github.io',
+    'http://localhost:5173',
+  ]
+}));
 app.use(express.json());
 
 // Health check

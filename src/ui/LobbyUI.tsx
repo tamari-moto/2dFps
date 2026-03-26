@@ -8,7 +8,9 @@ interface LobbyUIProps {
 }
 
 const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOnline }) => {
-  const [serverUrl, setServerUrl] = React.useState('ws://localhost:2567');
+  const [serverUrl, setServerUrl] = React.useState(
+    import.meta.env.VITE_SERVER_URL ?? 'ws://localhost:2567'
+  );
 
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
