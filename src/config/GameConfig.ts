@@ -472,6 +472,16 @@ export const AIConfig = {
 } as const;
 
 /**
+ * Mobile UI configuration
+ */
+export const MobileUIConfig = {
+  /** Virtual button size in px */
+  ButtonSize: 56,
+  /** Virtual button panel opacity */
+  ButtonOpacity: 0.75,
+} as const;
+
+/**
  * Calculated values (derived from other config values)
  */
 export const CalculatedConfig = {

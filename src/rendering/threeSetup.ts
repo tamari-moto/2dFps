@@ -57,6 +57,11 @@ export class ThreeSetup {
       this.inputHandler.setActivePlayerId(data.playerId);
     });
 
+    // Connect pinch-zoom to SceneManager FOV adjustment
+    this.inputHandler.setPinchZoomCallback((delta) => {
+      this.sceneManager.adjustFOV(delta);
+    });
+
     // Initialize game controller
     this.gameController = new GameController(
       model,

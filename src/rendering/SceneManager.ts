@@ -144,6 +144,15 @@ export class SceneManager {
   }
 
   /**
+   * Adjusts FOV by the given delta (positive = zoom out, negative = zoom in).
+   * Used for pinch-zoom from touch input.
+   */
+  adjustFOV(delta: number): void {
+    this.camera.fov = Math.max(CameraConfig.FOVMin, Math.min(CameraConfig.FOVMax, this.camera.fov + delta * 0.1));
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
    * Handles window resize events
    */
   private handleResize(): void {

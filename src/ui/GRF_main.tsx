@@ -3,9 +3,11 @@ import { setupThree } from '../rendering/threeSetup';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import GameHUD from './GameHUD';
 import LobbyUI from './LobbyUI';
+import MobileControls from './MobileControls';
 import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
+import { gameEventBus, GameEventType } from '../core/GameEventBus';
 
 type AppState = 'lobby' | 'connecting' | 'playing';
 
@@ -15,6 +17,9 @@ const GRF_main = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const initialized = React.useRef(false);
+  const [mobileUI, setMobileUI] = React.useState(false);
+  const [playerIds, setPlayerIds] = React.useState<string[]>([]);
+  const [activePlayerId, setActivePlayerId] = React.useState('');
 
   React.useEffect(() => {
     return () => {
@@ -34,6 +39,10 @@ const GRF_main = () => {
     setThreeSetup(setup);
     setAppState('playing');
 
+    const ids = setup.getPlayerIds();
+    setPlayerIds(ids);
+    setActivePlayerId(ids[0] ?? '');
+
     // Online mode: when another player joins later, add them to the local model + scene.
     if (adapter instanceof ColyseusAdapter) {
       const room = adapter.getRoom();
@@ -43,6 +52,22 @@ const GRF_main = () => {
       });
     }
   }, []);
+
+  React.useEffect(() => {
+    const handler = (data: { currentPlayerId: string }) => {
+      setActivePlayerId(data.currentPlayerId);
+    };
+    gameEventBus.on(GameEventType.PLAYER_SWITCHED, handler);
+    return () => { gameEventBus.off(GameEventType.PLAYER_SWITCHED, handler); };
+  }, []);
+
+  const handleSwitchPlayer = React.useCallback((id: string) => {
+    setActivePlayerId(id);
+    gameEventBus.emit(GameEventType.PLAYER_SWITCHED, {
+      previousPlayerId: activePlayerId,
+      currentPlayerId: id,
+    });
+  }, [activePlayerId]);
 
   const handleOffline = React.useCallback(() => {
     startGame(new LocalAdapter());
@@ -67,7 +92,20 @@ const GRF_main = () => {
         ref={canvasRef}
         style={{ display: appState === 'playing' ? 'block' : 'none' }}
       />
-      {appState === 'playing' && <GameHUD threeSetup={threeSetup} />}
+      {appState === 'playing' && (
+        <GameHUD
+          threeSetup={threeSetup}
+          mobileUI={mobileUI}
+          onToggleMobileUI={() => setMobileUI(v => !v)}
+        />
+      )}
+      {appState === 'playing' && mobileUI && (
+        <MobileControls
+          playerIds={playerIds}
+          activePlayerId={activePlayerId}
+          onSwitchPlayer={handleSwitchPlayer}
+        />
+      )}
       {appState !== 'playing' && (
         <LobbyUI
           connecting={appState === 'connecting'}
