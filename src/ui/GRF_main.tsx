@@ -2,7 +2,6 @@ import * as React from 'react';
 import { setupThree } from '../rendering/threeSetup';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import GameHUD from './GameHUD';
-import ConsoleLogger from './ConsoleLogger';
 import LobbyUI from './LobbyUI';
 import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
@@ -64,7 +63,6 @@ const GRF_main = () => {
 
   return (
     <div>
-      <ConsoleLogger />
       <canvas
         ref={canvasRef}
         style={{ display: appState === 'playing' ? 'block' : 'none' }}
