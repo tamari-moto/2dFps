@@ -77,8 +77,8 @@ const ConsoleLogger: React.FC = () => {
 
   const containerStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '10px',
-    left: '10px',
+    bottom: '10px',
+    right: '10px',
     width: '400px',
     maxHeight: '300px',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
