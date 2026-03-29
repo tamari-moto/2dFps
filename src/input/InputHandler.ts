@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { KEYBOARD_KEYS } from '../config/GameConstants';
+import { MobileUIConfig } from '../config/GameConfig';
 
 
 /**
@@ -22,6 +23,12 @@ export class InputHandler {
   private readonly handleTouchMoveBound: (e: TouchEvent) => void;
   private pinchStartDistance: number | null = null;
   private onPinchZoom: ((delta: number) => void) | null = null;
+  private onCameraPan: ((dx: number, dy: number) => void) | null = null;
+  private touchStartX: number = 0;
+  private touchStartY: number = 0;
+  private touchLastX: number = 0;
+  private touchLastY: number = 0;
+  private readonly handleTouchEndBound: (e: TouchEvent) => void;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -44,6 +51,7 @@ export class InputHandler {
     this.handleKeyDownBound = this.handleKeyDown.bind(this);
     this.handleTouchStartBound = this.handleTouchStart.bind(this);
     this.handleTouchMoveBound = this.handleTouchMove.bind(this);
+    this.handleTouchEndBound = this.handleTouchEnd.bind(this);
 
     this.setupEventListeners();
   }
@@ -58,6 +66,11 @@ export class InputHandler {
     this.onPinchZoom = cb;
   }
 
+  /** Sets the callback invoked on 1-finger drag/flick for camera pan. */
+  setCameraPanCallback(cb: (dx: number, dy: number) => void): void {
+    this.onCameraPan = cb;
+  }
+
   /**
    * Sets up DOM event listeners
    */
@@ -66,6 +79,7 @@ export class InputHandler {
     window.addEventListener('keydown', this.handleKeyDownBound, false);
     this.canvas.addEventListener('touchstart', this.handleTouchStartBound, { passive: false });
     this.canvas.addEventListener('touchmove', this.handleTouchMoveBound, { passive: false });
+    this.canvas.addEventListener('touchend', this.handleTouchEndBound, { passive: false });
   }
 
   /**
@@ -121,25 +135,17 @@ export class InputHandler {
   }
 
   /**
-   * Handles touchstart: single tap → node click, two fingers → begin pinch zoom
+   * Handles touchstart: record start position for tap/flick detection.
+   * Two fingers → begin pinch zoom.
    */
   private handleTouchStart(event: TouchEvent): void {
     event.preventDefault();
     if (event.touches.length === 1) {
       const touch = event.touches[0];
-      const intersects = this.getIntersectsFromXY(touch.clientX - this.canvas.getBoundingClientRect().left, touch.clientY - this.canvas.getBoundingClientRect().top);
-      if (intersects.length > 0) {
-        const mesh = intersects[0].object as THREE.Mesh;
-        const nodeId = this.meshToNodeMap.get(mesh.id);
-        if (nodeId !== undefined) {
-          this.eventBus.emit(GameEventType.NODE_CLICKED, {
-            nodeId,
-            position: { x: mesh.position.x, y: mesh.position.y },
-          });
-        }
-      } else {
-        this.eventBus.emit(GameEventType.CANVAS_CLICKED_EMPTY);
-      }
+      this.touchStartX = touch.clientX;
+      this.touchStartY = touch.clientY;
+      this.touchLastX = touch.clientX;
+      this.touchLastY = touch.clientY;
     } else if (event.touches.length === 2) {
       const dx = event.touches[0].clientX - event.touches[1].clientX;
       const dy = event.touches[0].clientY - event.touches[1].clientY;
@@ -148,17 +154,58 @@ export class InputHandler {
   }
 
   /**
-   * Handles touchmove: two-finger pinch → FOV zoom
+   * Handles touchmove:
+   * - 1 finger drag → camera pan (flick)
+   * - 2 fingers → pinch zoom
    */
   private handleTouchMove(event: TouchEvent): void {
     event.preventDefault();
-    if (event.touches.length === 2 && this.pinchStartDistance !== null) {
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      const dx = touch.clientX - this.touchLastX;
+      const dy = touch.clientY - this.touchLastY;
+      this.touchLastX = touch.clientX;
+      this.touchLastY = touch.clientY;
+      if (this.onCameraPan) this.onCameraPan(dx, dy);
+    } else if (event.touches.length === 2 && this.pinchStartDistance !== null) {
       const dx = event.touches[0].clientX - event.touches[1].clientX;
       const dy = event.touches[0].clientY - event.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const delta = this.pinchStartDistance - dist;
       this.pinchStartDistance = dist;
       if (this.onPinchZoom) this.onPinchZoom(delta);
+    }
+  }
+
+  /**
+   * Handles touchend: if total movement < TapThreshold, treat as tap → node click.
+   */
+  private handleTouchEnd(event: TouchEvent): void {
+    event.preventDefault();
+    if (event.changedTouches.length === 1) {
+      const totalDx = this.touchLastX - this.touchStartX;
+      const totalDy = this.touchLastY - this.touchStartY;
+      const moved = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+      if (moved < MobileUIConfig.TapThreshold) {
+        const rect = this.canvas.getBoundingClientRect();
+        const touch = event.changedTouches[0];
+        const intersects = this.getIntersectsFromXY(
+          touch.clientX - rect.left,
+          touch.clientY - rect.top,
+        );
+        if (intersects.length > 0) {
+          const mesh = intersects[0].object as THREE.Mesh;
+          const nodeId = this.meshToNodeMap.get(mesh.id);
+          if (nodeId !== undefined) {
+            this.eventBus.emit(GameEventType.NODE_CLICKED, {
+              nodeId,
+              position: { x: mesh.position.x, y: mesh.position.y },
+            });
+          }
+        } else {
+          this.eventBus.emit(GameEventType.CANVAS_CLICKED_EMPTY);
+        }
+      }
     }
   }
 
@@ -192,5 +239,6 @@ export class InputHandler {
     window.removeEventListener('keydown', this.handleKeyDownBound);
     this.canvas.removeEventListener('touchstart', this.handleTouchStartBound);
     this.canvas.removeEventListener('touchmove', this.handleTouchMoveBound);
+    this.canvas.removeEventListener('touchend', this.handleTouchEndBound);
   }
 }
