@@ -487,6 +487,20 @@ export const AIConfig = {
 } as const;
 
 /**
+ * Mobile UI configuration
+ */
+export const MobileUIConfig = {
+  /** Virtual button size in px */
+  ButtonSize: 56,
+  /** Virtual button panel opacity */
+  ButtonOpacity: 0.75,
+  /** Max finger movement in px to still count as a tap (not a flick/pan) */
+  TapThreshold: 10,
+  /** World units per screen pixel for camera pan */
+  PanSensitivity: 0.15,
+} as const;
+
+/**
  * Calculated values (derived from other config values)
  */
 export const CalculatedConfig = {

@@ -7,7 +7,7 @@ import type { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import { LocalAdapter } from '../network/LocalAdapter';
-import { applyServerConfig } from '../config/GameConfig';
+import { MobileUIConfig } from '../config/GameConfig';
 
 /**
  * Main setup class for the Three.js-based 2D FPS game
@@ -61,6 +61,16 @@ export class ThreeSetup {
     // Keep InputHandler's active player in sync
     this.eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
       this.inputHandler.setActivePlayerId(data.playerId);
+    });
+
+    // Connect pinch-zoom to SceneManager FOV adjustment
+    this.inputHandler.setPinchZoomCallback((delta) => {
+      this.sceneManager.adjustFOV(delta);
+    });
+
+    // Connect 1-finger drag to SceneManager camera pan
+    this.inputHandler.setCameraPanCallback((dx, dy) => {
+      this.sceneManager.panCamera(dx, dy, MobileUIConfig.PanSensitivity);
     });
 
     // Initialize game controller
