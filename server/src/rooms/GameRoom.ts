@@ -1,6 +1,7 @@
 import { Room, Client } from 'colyseus';
 import { GameState, PlayerState } from '../schema/GameState';
 import { ServerGameLogic, TurnAction } from '../logic/ServerGameLogic';
+import { MapConfig, PlayerConfig } from '../config/GameConfig';
 
 const MIN_PLAYERS_TO_START = 2;
 const MAX_PLAYERS = 10;
@@ -24,6 +25,21 @@ export class GameRoom extends Room<GameState> {
 
     // Notify this client of their assigned ID
     client.send('player_assigned', { playerId: client.sessionId });
+
+    // Send server-authoritative config so client can override its local defaults
+    client.send('server_config', {
+      mapConfig: {
+        NodesInGridSize: MapConfig.NodesInGridSize,
+        NodeSpacing:     MapConfig.NodeSpacing,
+      },
+      playerConfig: {
+        MoveRange:       PlayerConfig.MoveRange,
+        ViewAngle:       PlayerConfig.ViewAngle,
+        MaxViewDistance: PlayerConfig.MaxViewDistance,
+        DamagePerShot:   PlayerConfig.DamagePerShot,
+        ShotHitRadius:   PlayerConfig.ShotHitRadius,
+      },
+    });
 
     console.log(`[GameRoom] ${client.sessionId} joined (${this.state.players.size}/${this.maxClients})`);
 

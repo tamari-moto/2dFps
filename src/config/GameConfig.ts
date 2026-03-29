@@ -7,7 +7,11 @@
 /**
  * Map configuration
  */
-export const MapConfig = {
+export const MapConfig: {
+  NodesInGridSize: number;
+  NodeSpacing: number;
+  ObstacleMargin: number;
+} = {
   /** Number of nodes in grid (map will be NodesInGridSize x NodesInGridSize) */
   NodesInGridSize: 50,
 
@@ -16,12 +20,20 @@ export const MapConfig = {
 
   /** Minimum margin from map edges for obstacles */
   ObstacleMargin: 30,
-} as const;
+};
 
 /**
  * Player configuration
  */
-export const PlayerConfig = {
+export const PlayerConfig: {
+  ViewAngle: number;
+  MaxViewDistance: number;
+  CubeSize: number;
+  DamagePerShot: number;
+  MoveRange: number;
+  ShotHitRadius: number;
+  FogOfWarEnabled: boolean;
+} = {
   /** Player's field of view angle in degrees */
   ViewAngle: 60,
 
@@ -38,11 +50,11 @@ export const PlayerConfig = {
   MoveRange: 3,
 
   /** Hit radius for shot resolution: target must be within this distance of the shot node (px) */
-  ShotHitRadius: 45,
+  ShotHitRadius: 20,
 
   /** 視界外の敵を非表示にするか */
   FogOfWarEnabled: true,
-} as const;
+};
 
 /**
  * Node/Circle visualization configuration
@@ -488,3 +500,21 @@ export const CalculatedConfig = {
     return MapConfig.NodesInGridSize * MapConfig.NodesInGridSize;
   },
 } as const;
+
+/**
+ * Applies server-authoritative config values to the runtime config objects.
+ * Only fields present on the server are overridden; client-only fields are untouched.
+ * Called by ColyseusAdapter when a server_config message is received.
+ */
+export function applyServerConfig(payload: {
+  mapConfig: { NodesInGridSize: number; NodeSpacing: number };
+  playerConfig: { MoveRange: number; ViewAngle: number; MaxViewDistance: number; DamagePerShot: number; ShotHitRadius: number };
+}): void {
+  MapConfig.NodesInGridSize    = payload.mapConfig.NodesInGridSize;
+  MapConfig.NodeSpacing        = payload.mapConfig.NodeSpacing;
+  PlayerConfig.MoveRange       = payload.playerConfig.MoveRange;
+  PlayerConfig.ViewAngle       = payload.playerConfig.ViewAngle;
+  PlayerConfig.MaxViewDistance = payload.playerConfig.MaxViewDistance;
+  PlayerConfig.DamagePerShot   = payload.playerConfig.DamagePerShot;
+  PlayerConfig.ShotHitRadius   = payload.playerConfig.ShotHitRadius;
+}

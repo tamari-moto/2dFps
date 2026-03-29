@@ -12,13 +12,13 @@ export const MapConfig = {
 
 export const PlayerConfig = {
   /** must match client PlayerConfig.MoveRange */
-  MoveRange: 3,
+  MoveRange: 8,
   /** must match client PlayerConfig.ViewAngle */
   ViewAngle: 60,
   /** must match client PlayerConfig.MaxViewDistance */
   MaxViewDistance: 1000,
   /** must match client PlayerConfig.DamagePerShot */
-  DamagePerShot: 34,
+  DamagePerShot: 10,
   /** must match client PlayerConfig.ShotHitRadius */
-  ShotHitRadius: 45,
+  ShotHitRadius: 20,
 } as const;
