@@ -7,7 +7,7 @@ import type { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import { LocalAdapter } from '../network/LocalAdapter';
-import { MobileUIConfig } from '../config/GameConfig';
+import { MobileUIConfig, applyServerConfig } from '../config/GameConfig';
 
 /**
  * Main setup class for the Three.js-based 2D FPS game
