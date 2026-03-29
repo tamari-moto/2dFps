@@ -4,6 +4,7 @@ import type { ThreeSetup } from '../rendering/threeSetup';
 import GameHUD from './GameHUD';
 import LobbyUI from './LobbyUI';
 import MobileControls from './MobileControls';
+import ConsoleLogger from './ConsoleLogger';
 import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
@@ -106,6 +107,7 @@ const GRF_main = () => {
           onSwitchPlayer={handleSwitchPlayer}
         />
       )}
+      {appState === 'playing' && <ConsoleLogger />}
       {appState !== 'playing' && (
         <LobbyUI
           connecting={appState === 'connecting'}
