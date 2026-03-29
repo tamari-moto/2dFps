@@ -37,6 +37,9 @@ export const PlayerConfig = {
   /** Maximum number of grid steps a player can move per turn */
   MoveRange: 3,
 
+  /** Hit radius for shot resolution: target must be within this distance of the shot node (px) */
+  ShotHitRadius: 45,
+
   /** 視界外の敵を非表示にするか */
   FogOfWarEnabled: true,
 } as const;

@@ -92,13 +92,20 @@ export class LocalAdapter implements INetworkAdapter {
     hits: TurnResult['hits']
   ): void {
     const damage = PlayerConfig.DamagePerShot;
+    const shotNode = this.model.nodeList[shotNodeId];
+    if (!shotNode) return;
+
     for (const [targetId, target] of this.model.players) {
       if (targetId === attackerId) continue;
       if (!target.isAlive) continue;
-      if (target.node.id !== shotNodeId) continue;
 
-      target.takeDamage(damage);
-      hits.push({ targetId, damage, isEliminated: !target.isAlive });
+      const dx = target.node.x - shotNode.x;
+      const dy = target.node.y - shotNode.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > PlayerConfig.ShotHitRadius) continue;
+
+      const wouldBeEliminated = target.health - damage <= 0;
+      hits.push({ targetId, damage, isEliminated: wouldBeEliminated });
     }
   }
 
