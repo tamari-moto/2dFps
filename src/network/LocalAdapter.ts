@@ -1,6 +1,6 @@
 import { Model } from '../model/model';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult, ObstaclePayload } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
 import { ENTITY_IDS } from '../config/GameConstants';
 
@@ -40,6 +40,9 @@ export class LocalAdapter implements INetworkAdapter {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onObstaclesReady(_callback: (obstacles: ObstaclePayload[]) => void): void { /* no-op in local mode */ }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onServerConfig(_callback: (config: ServerConfigPayload) => void): void { /* no-op in local mode */ }
 
   /**
    * Executes a turn synchronously (ported from GameController.executeTurn /
@@ -92,13 +95,20 @@ export class LocalAdapter implements INetworkAdapter {
     hits: TurnResult['hits']
   ): void {
     const damage = PlayerConfig.DamagePerShot;
+    const shotNode = this.model.nodeList[shotNodeId];
+    if (!shotNode) return;
+
     for (const [targetId, target] of this.model.players) {
       if (targetId === attackerId) continue;
       if (!target.isAlive) continue;
-      if (target.node.id !== shotNodeId) continue;
 
-      target.takeDamage(damage);
-      hits.push({ targetId, damage, isEliminated: !target.isAlive });
+      const dx = target.node.x - shotNode.x;
+      const dy = target.node.y - shotNode.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > PlayerConfig.ShotHitRadius) continue;
+
+      const wouldBeEliminated = target.health - damage <= 0;
+      hits.push({ targetId, damage, isEliminated: wouldBeEliminated });
     }
   }
 

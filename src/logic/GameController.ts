@@ -234,6 +234,11 @@ export class GameController {
     }
 
     for (const hit of result.hits) {
+      const targetPlayer = this.model.getPlayer(hit.targetId);
+      if (targetPlayer) {
+        targetPlayer.takeDamage(hit.damage);
+      }
+
       this.eventBus.emit(GameEventType.HIT_DETECTED, {
         attackerId: result.movingPlayerId,
         targetId: hit.targetId,

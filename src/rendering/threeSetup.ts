@@ -30,6 +30,11 @@ export class ThreeSetup {
     // Initialize scene management
     this.sceneManager = new SceneManager(canvas);
 
+    // Apply server-authoritative config before building the model.
+    // ColyseusAdapter fires this synchronously if server_config already arrived;
+    // LocalAdapter is a no-op so client defaults remain.
+    adapter.onServerConfig((config) => { applyServerConfig(config); });
+
     // Initialize game model via adapter
     const model = adapter.initializeModel();
 
