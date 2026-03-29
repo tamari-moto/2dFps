@@ -34,3 +34,18 @@ export interface ObstaclePayload {
 export interface ObstaclesReadyPayload {
   obstacles: ObstaclePayload[];
 }
+
+/** Server-authoritative config payload sent to client after join */
+export interface ServerConfigPayload {
+  mapConfig: {
+    NodesInGridSize: number;
+    NodeSpacing: number;
+  };
+  playerConfig: {
+    MoveRange: number;
+    ViewAngle: number;
+    MaxViewDistance: number;
+    DamagePerShot: number;
+    ShotHitRadius: number;
+  };
+}

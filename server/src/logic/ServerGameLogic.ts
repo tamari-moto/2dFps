@@ -1,14 +1,6 @@
 import { MapSchema } from '@colyseus/schema';
 import { PlayerState } from '../schema/GameState';
-
-// ---- constants (mirrors src/config/GameConfig.ts) -------------------------
-
-const NODES_IN_GRID_SIZE = 50; // must match client MapConfig.NodesInGridSize (src/config/GameConfig.ts)
-const NODE_SPACING = 30;
-const MAX_VIEW_DISTANCE = 1000;
-const VIEW_ANGLE_DEG = 60;
-const DAMAGE_PER_SHOT = 34;
-const MOVE_RANGE = 3; // must match client PlayerConfig.MoveRange (src/config/GameConfig.ts)
+import { MapConfig, PlayerConfig } from '../config/GameConfig';
 
 // ---- minimal node / geometry types ----------------------------------------
 
@@ -64,9 +56,9 @@ export class ServerGameLogic {
   private buildNodes(): NodePos[] {
     const nodes: NodePos[] = [];
     let id = 0;
-    for (let i = 0; i < NODES_IN_GRID_SIZE; i++) {
-      for (let j = 0; j < NODES_IN_GRID_SIZE; j++) {
-        nodes.push({ id: id++, x: i * NODE_SPACING, y: j * NODE_SPACING });
+    for (let i = 0; i < MapConfig.NodesInGridSize; i++) {
+      for (let j = 0; j < MapConfig.NodesInGridSize; j++) {
+        nodes.push({ id: id++, x: i * MapConfig.NodeSpacing, y: j * MapConfig.NodeSpacing });
       }
     }
     return nodes;
@@ -74,7 +66,7 @@ export class ServerGameLogic {
 
   private buildAdjacency(): number[][] {
     const adj: number[][] = Array.from({ length: this.nodes.length }, () => []);
-    const size = NODES_IN_GRID_SIZE;
+    const size = MapConfig.NodesInGridSize;
 
     // 4-directional grid connectivity
     for (const n of this.nodes) {
@@ -140,7 +132,7 @@ export class ServerGameLogic {
     minHeight: number = 60,
     maxHeight: number = 150,
   ): void {
-    const MAP_SIZE = (NODES_IN_GRID_SIZE - 1) * NODE_SPACING;
+    const MAP_SIZE = (MapConfig.NodesInGridSize - 1) * MapConfig.NodeSpacing;
     const MARGIN = 30;
     const obstacles: ObstaclePayload[] = [];
 
@@ -203,7 +195,7 @@ export class ServerGameLogic {
 
     // Validate move: destination must be reachable within MOVE_RANGE steps
     if (action.moveToNodeId !== actor.nodeId) {
-      const reachable = this.getReachableNodes(actor.nodeId, MOVE_RANGE);
+      const reachable = this.getReachableNodes(actor.nodeId, PlayerConfig.MoveRange);
       if (!reachable.has(action.moveToNodeId)) {
         return null;
       }
@@ -238,20 +230,20 @@ export class ServerGameLogic {
           if (!targetNode) return;
 
           const dist = this.distance(actorNode, targetNode);
-          if (dist > MAX_VIEW_DISTANCE) return;
+          if (dist > PlayerConfig.MaxViewDistance) return;
 
           const angleOff = this.angleFromDirection(actorNode, targetNode, dirX, dirY);
-          if (angleOff >= VIEW_ANGLE_DEG) return;
+          if (angleOff >= PlayerConfig.ViewAngle) return;
 
           // Check if the target is on or near the shot node
           const distToShotNode = this.distance(targetNode, shotNode);
-          if (distToShotNode > NODE_SPACING * 1.5) return;
+          if (distToShotNode > PlayerConfig.ShotHitRadius) return;
 
-          target.health = Math.max(0, target.health - DAMAGE_PER_SHOT);
+          target.health = Math.max(0, target.health - PlayerConfig.DamagePerShot);
           const isEliminated = target.health <= 0;
           if (isEliminated) target.isAlive = false;
 
-          hits.push({ targetId, damage: DAMAGE_PER_SHOT, isEliminated });
+          hits.push({ targetId, damage: PlayerConfig.DamagePerShot, isEliminated });
         });
       }
     }

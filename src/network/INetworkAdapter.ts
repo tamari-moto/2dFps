@@ -1,5 +1,5 @@
 import { Model } from '../model/model';
-import { TurnAction, TurnResult, ObstaclePayload } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 
 /**
  * Abstraction layer between game logic and transport (local / online).
@@ -37,6 +37,13 @@ export interface INetworkAdapter {
 
   /** Register a callback invoked when obstacle data arrives from the server */
   onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void;
+
+  /**
+   * Register a callback invoked when server-authoritative config values arrive.
+   * ColyseusAdapter: fires once after connection with server values.
+   * LocalAdapter: no-op (client defaults remain in effect).
+   */
+  onServerConfig(callback: (config: ServerConfigPayload) => void): void;
 
   /**
    * Returns true if NPC turn processing should run on the client side.

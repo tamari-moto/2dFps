@@ -2,7 +2,7 @@ import * as Colyseus from 'colyseus.js';
 import { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult, ObstaclePayload, ObstaclesReadyPayload } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ObstaclesReadyPayload, ServerConfigPayload } from '../schema/types';
 
 /**
  * Online-play implementation of INetworkAdapter.
@@ -23,8 +23,10 @@ export class ColyseusAdapter implements INetworkAdapter {
   private playerLeftCallback?: (playerId: string) => void;
   private gameStartedCallback?: () => void;
   private obstaclesReadyCallback?: (obstacles: ObstaclePayload[]) => void;
+  private serverConfigCallback?: (config: ServerConfigPayload) => void;
   private pendingGameStarted?: boolean; // cached flag if game_started arrived early
   private pendingObstacles: ObstaclesReadyPayload | null = null;
+  private pendingServerConfig: ServerConfigPayload | null = null;
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
     this.client = new Colyseus.Client(serverUrl);
@@ -64,6 +66,10 @@ export class ColyseusAdapter implements INetworkAdapter {
     this.room.onMessage('obstacles_ready', (data: ObstaclesReadyPayload) => {
       this.pendingObstacles = data;
       this.obstaclesReadyCallback?.(data.obstacles);
+    });
+    this.room.onMessage('server_config', (data: ServerConfigPayload) => {
+      this.pendingServerConfig = data;
+      this.serverConfigCallback?.(data);
     });
     this.room.onMessage('player_left', () => {});
 
@@ -194,6 +200,14 @@ export class ColyseusAdapter implements INetworkAdapter {
     // Fire immediately if obstacles_ready arrived before this callback was registered
     if (this.pendingObstacles) {
       callback(this.pendingObstacles.obstacles);
+    }
+  }
+
+  onServerConfig(callback: (config: ServerConfigPayload) => void): void {
+    this.serverConfigCallback = callback;
+    // Fire immediately if server_config arrived before this callback was registered
+    if (this.pendingServerConfig) {
+      callback(this.pendingServerConfig);
     }
   }
 
