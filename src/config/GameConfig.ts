@@ -47,7 +47,7 @@ export const PlayerConfig: {
   DamagePerShot: 34,
 
   /** Maximum number of grid steps a player can move per turn */
-  MoveRange: 3,
+  MoveRange: 8,
 
   /** Hit radius for shot resolution: target must be within this distance of the shot node (px) */
   ShotHitRadius: 20,
@@ -113,10 +113,10 @@ export const ObstacleConfig = {
  */
 export const BSPMapConfig = {
   /** Maximum BSP recursion depth */
-  MaxDepth: 4,
+  MaxDepth: 8,
 
   /** Minimum cell size (px) before stopping subdivision */
-  MinCellSize: 300,
+  MinCellSize: 200,
 
   /** Split ratio range minimum (prevents extreme thin cells) */
   SplitMinRatio: 0.35,
@@ -137,13 +137,13 @@ export const BSPMapConfig = {
   WallThickness: 15,
 
   /** Door opening width in room walls */
-  DoorWidth: 90,
+  DoorWidth: 60,
 
   /** Corridor width (open path between rooms) */
-  CorridorWidth: 90,
+  CorridorWidth: 60,
 
   /** Corridor wall thickness */
-  CorridorWallThickness: 15,
+  CorridorWallThickness: 5,
 
   /** Tactical pillar size (square) */
   PillarSize: 60,
@@ -152,7 +152,7 @@ export const BSPMapConfig = {
   PillarMinRoomArea: 40000,
 
   /** Maximum pillars per room */
-  PillarMaxPerRoom: 2,
+  PillarMaxPerRoom: 3,
 
   /** Half-wall length (near doorways) */
   HalfWallLength: 75,
@@ -165,12 +165,6 @@ export const BSPMapConfig = {
 
   /** Corridor cover size */
   CorridorCoverSize: 45,
-
-  /** Central feature minimum size */
-  CentralFeatureMinSize: 60,
-
-  /** Central feature random size range */
-  CentralFeatureRandomRange: 60,
 } as const;
 
 /**
@@ -257,7 +251,7 @@ export const CameraConfig = {
   BackDistance: 60,
 
   /** TPS後方追従: カメラの Z オフセット（高さ）。小さいほどFPS寄り */
-  OffsetZ: 60,
+  OffsetZ: 500,
 
   /** パン操作を無効化（カメラは自動追従） */
   EnablePan: false,

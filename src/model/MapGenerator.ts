@@ -28,6 +28,9 @@ interface IdCounter {
   value: number;
 }
 
+/** ドア位置の壁方向 */
+type WallSide = 'top' | 'bottom' | 'left' | 'right';
+
 /**
  * MapGenerator class handles all map and obstacle generation logic.
  * Uses BSP (Binary Space Partitioning) for complex map generation.
@@ -144,9 +147,6 @@ export class MapGenerator {
 
     // Phase 6: 左半分を右半分にミラーリング
     this.mirrorObstacles(obstacles, lines, centerX, idCounter);
-
-    // Phase 7: 中央チョークポイントを追加
-    this.addCentralFeature(obstacles, lines, mapSize, idCounter, rng);
 
     return { obstacles, lines, pattern: 'bsp', seed: resolvedSeed };
   }
@@ -280,6 +280,28 @@ export class MapGenerator {
     return [bestA, bestB];
   }
 
+  /** 指定された壁のドア外面座標を返す（通路接続点） */
+  private static getDoorPosition(room: Room, side: WallSide): { x: number; y: number } {
+    switch (side) {
+      case 'top':    return { x: room.x + room.width / 2,  y: room.y };
+      case 'bottom': return { x: room.x + room.width / 2,  y: room.y + room.height };
+      case 'left':   return { x: room.x,                   y: room.y + room.height / 2 };
+      case 'right':  return { x: room.x + room.width,      y: room.y + room.height / 2 };
+    }
+  }
+
+  /** 2部屋の相対位置から接続すべき壁のペアを返す */
+  private static selectDoorSides(roomA: Room, roomB: Room): [WallSide, WallSide] {
+    const dx = (roomB.x + roomB.width / 2) - (roomA.x + roomA.width / 2);
+    const dy = (roomB.y + roomB.height / 2) - (roomA.y + roomA.height / 2);
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? ['right', 'left'] : ['left', 'right'];
+    } else {
+      return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+    }
+  }
+
   /** 兄弟サブツリー間を L 字型通路で接続（再帰） */
   private static connectRooms(
     node: BSPNode,
@@ -299,68 +321,56 @@ export class MapGenerator {
     const rightRooms = this.getAllRooms(node.right);
     const [roomA, roomB] = this.findClosestRoomPair(leftRooms, rightRooms);
 
-    // 部屋の中心点
-    const ax = roomA.x + roomA.width / 2;
-    const ay = roomA.y + roomA.height / 2;
-    const bx = roomB.x + roomB.width / 2;
-    const by = roomB.y + roomB.height / 2;
+    // 相対位置から最適な壁を選択
+    const [sideA, sideB] = this.selectDoorSides(roomA, roomB);
+
+    // 各部屋の選択された壁のドア位置を取得
+    const doorA = this.getDoorPosition(roomA, sideA);
+    const doorB = this.getDoorPosition(roomB, sideB);
 
     const cw = BSPMapConfig.CorridorWidth;
     const ct = BSPMapConfig.CorridorWallThickness;
 
-    // L 字型通路: ランダムに水平→垂直 or 垂直→水平
-    if (rng() > 0.5) {
-      // 水平 → 垂直
-      this.addCorridorSegment(ax, ay, bx, ay, cw, ct, obstacles, lines, idCounter);
-      this.addCorridorSegment(bx, ay, bx, by, cw, ct, obstacles, lines, idCounter);
-    } else {
-      // 垂直 → 水平
-      this.addCorridorSegment(ax, ay, ax, by, cw, ct, obstacles, lines, idCounter);
-      this.addCorridorSegment(ax, by, bx, by, cw, ct, obstacles, lines, idCounter);
-    }
+    // 斜め直線通路を生成
+    this.addDiagonalCorridorSegments(doorA.x, doorA.y, doorB.x, doorB.y, cw, ct, obstacles, lines, idCounter);
   }
 
-  /** 2 点間の通路壁を生成（水平 or 垂直セグメント） */
-  private static addCorridorSegment(
+  /** 2 点間の斜め廊下壁を生成（対角線直接接続） */
+  private static addDiagonalCorridorSegments(
     x1: number, y1: number, x2: number, y2: number,
     corridorWidth: number, wallThickness: number,
     obstacles: ObstacleData[], lines: LineSegment[], idCounter: IdCounter
   ): void {
-    const halfCW = corridorWidth / 2;
+    const dx: number = x2 - x1;
+    const dy: number = y2 - y1;
+    const len: number = Math.sqrt(dx * dx + dy * dy);
 
-    if (Math.abs(y1 - y2) < 1) {
-      // 水平通路
-      const minX = Math.min(x1, x2);
-      const maxX = Math.max(x1, x2);
-      const length = maxX - minX;
-      if (length < 1) return;
+    // 2点が同一座標またはほぼ同一の場合はスキップ
+    if (len < 1) return;
 
-      // 上壁
-      const topSegs = createRectangleSegments(minX - halfCW, y1 - halfCW - wallThickness, length + corridorWidth, wallThickness);
-      obstacles.push({ id: idCounter.value++, segments: topSegs });
-      lines.push(...topSegs);
+    const ux: number = dx / len;
+    const uy: number = dy / len;
+    // 中心軸に対する左側垂直単位ベクトル
+    const nx: number = -uy;
+    const ny: number = ux;
 
-      // 下壁
-      const botSegs = createRectangleSegments(minX - halfCW, y1 + halfCW, length + corridorWidth, wallThickness);
-      obstacles.push({ id: idCounter.value++, segments: botSegs });
-      lines.push(...botSegs);
-    } else {
-      // 垂直通路
-      const minY = Math.min(y1, y2);
-      const maxY = Math.max(y1, y2);
-      const length = maxY - minY;
-      if (length < 1) return;
+    const offset: number = corridorWidth / 2 + wallThickness;
 
-      // 左壁
-      const leftSegs = createRectangleSegments(x1 - halfCW - wallThickness, minY - halfCW, wallThickness, length + corridorWidth);
-      obstacles.push({ id: idCounter.value++, segments: leftSegs });
-      lines.push(...leftSegs);
+    // 左壁
+    const leftWall = new LineSegment(
+      x1 + nx * offset, y1 + ny * offset,
+      x2 + nx * offset, y2 + ny * offset
+    );
+    obstacles.push({ id: idCounter.value++, segments: [leftWall] });
+    lines.push(leftWall);
 
-      // 右壁
-      const rightSegs = createRectangleSegments(x1 + halfCW, minY - halfCW, wallThickness, length + corridorWidth);
-      obstacles.push({ id: idCounter.value++, segments: rightSegs });
-      lines.push(...rightSegs);
-    }
+    // 右壁
+    const rightWall = new LineSegment(
+      x1 - nx * offset, y1 - ny * offset,
+      x2 - nx * offset, y2 - ny * offset
+    );
+    obstacles.push({ id: idCounter.value++, segments: [rightWall] });
+    lines.push(rightWall);
   }
 
   /** 部屋の壁をドア付きで生成（各壁の中央にドア開口） */
@@ -494,42 +504,4 @@ export class MapGenerator {
     }
   }
 
-  /** 中央チョークポイントを追加（十字型障害物） */
-  private static addCentralFeature(
-    obstacles: ObstacleData[],
-    lines: LineSegment[],
-    mapSize: number,
-    idCounter: IdCounter,
-    rng: () => number
-  ): void {
-    const cx = mapSize / 2;
-    const cy = mapSize / 2;
-    const size = BSPMapConfig.CentralFeatureMinSize + rng() * BSPMapConfig.CentralFeatureRandomRange;
-    const t = BSPMapConfig.WallThickness;
-
-    // 十字型: 水平バー + 垂直バー
-    const hBar = createRectangleSegments(cx - size, cy - t / 2, size * 2, t);
-    obstacles.push({ id: idCounter.value++, segments: hBar });
-    lines.push(...hBar);
-
-    const vBar = createRectangleSegments(cx - t / 2, cy - size, t, size * 2);
-    obstacles.push({ id: idCounter.value++, segments: vBar });
-    lines.push(...vBar);
-
-    // 4 隅にガード（チョークポイント強化）
-    const guardSize = size * 0.4;
-    const guardOffset = size * 0.6;
-    const guardPositions = [
-      { x: cx - guardOffset - guardSize, y: cy - guardOffset - guardSize },
-      { x: cx + guardOffset, y: cy - guardOffset - guardSize },
-      { x: cx - guardOffset - guardSize, y: cy + guardOffset },
-      { x: cx + guardOffset, y: cy + guardOffset },
-    ];
-
-    for (const pos of guardPositions) {
-      const segs = createRectangleSegments(pos.x, pos.y, guardSize, guardSize);
-      obstacles.push({ id: idCounter.value++, segments: segs });
-      lines.push(...segs);
-    }
-  }
 }
