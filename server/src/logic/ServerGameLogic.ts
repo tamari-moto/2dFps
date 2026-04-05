@@ -1,6 +1,208 @@
 import { MapSchema } from '@colyseus/schema';
 import { PlayerState } from '../schema/GameState';
-import { MapConfig, PlayerConfig } from '../config/GameConfig';
+import { MapConfig, PlayerConfig, BSPMapConfig } from '../config/GameConfig';
+
+// ---- BSP map generation types -----------------------------------------------
+
+interface BSPNode {
+  x: number; y: number; width: number; height: number;
+  left?: BSPNode; right?: BSPNode;
+  room?: BSPRoom;
+}
+
+interface BSPRoom {
+  x: number; y: number; width: number; height: number;
+}
+
+interface Seg {
+  start: { x: number; y: number };
+  end:   { x: number; y: number };
+}
+
+interface IdCounter { value: number; }
+
+type WallSide = 'top' | 'bottom' | 'left' | 'right';
+
+// ---- BSP generation helpers (standalone, no client deps) --------------------
+
+function hashString(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function makePrng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s += 0x6D2B79F5;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeRect(x: number, y: number, w: number, h: number): Seg[] {
+  return [
+    { start: { x, y },         end: { x: x + w, y } },
+    { start: { x: x + w, y },  end: { x: x + w, y: y + h } },
+    { start: { x: x + w, y: y + h }, end: { x, y: y + h } },
+    { start: { x, y: y + h },  end: { x, y } },
+  ];
+}
+
+function buildBSPTree(x: number, y: number, width: number, height: number, depth: number, rng: () => number): BSPNode {
+  const node: BSPNode = { x, y, width, height };
+  if (depth >= BSPMapConfig.MaxDepth || width < BSPMapConfig.MinCellSize * 2 || height < BSPMapConfig.MinCellSize * 2) return node;
+  const splitH = height > width ? true : width > height ? false : rng() > 0.5;
+  const ratio = BSPMapConfig.SplitMinRatio + rng() * (BSPMapConfig.SplitMaxRatio - BSPMapConfig.SplitMinRatio);
+  if (splitH) {
+    const sh = height * ratio;
+    node.left  = buildBSPTree(x, y,      width, sh,          depth + 1, rng);
+    node.right = buildBSPTree(x, y + sh, width, height - sh, depth + 1, rng);
+  } else {
+    const sw = width * ratio;
+    node.left  = buildBSPTree(x,      y, sw,         height, depth + 1, rng);
+    node.right = buildBSPTree(x + sw, y, width - sw, height, depth + 1, rng);
+  }
+  return node;
+}
+
+function placeRooms(node: BSPNode, rng: () => number): void {
+  if (node.left && node.right) { placeRooms(node.left, rng); placeRooms(node.right, rng); return; }
+  const p = BSPMapConfig.RoomPadding, min = BSPMapConfig.RoomMinSize, mr = BSPMapConfig.RoomMaxRatio;
+  const rw = Math.max(min, min + rng() * (node.width * mr - min));
+  const rh = Math.max(min, min + rng() * (node.height * mr - min));
+  const ax = node.width - rw - p * 2, ay = node.height - rh - p * 2;
+  node.room = { x: node.x + p + (ax > 0 ? rng() * ax : 0), y: node.y + p + (ay > 0 ? rng() * ay : 0), width: rw, height: rh };
+}
+
+function getAllRooms(node: BSPNode): BSPRoom[] {
+  if (node.room) return [node.room];
+  const r: BSPRoom[] = [];
+  if (node.left)  r.push(...getAllRooms(node.left));
+  if (node.right) r.push(...getAllRooms(node.right));
+  return r;
+}
+
+function findClosestPair(a: BSPRoom[], b: BSPRoom[]): [BSPRoom, BSPRoom] {
+  let best = Infinity, ra = a[0], rb = b[0];
+  for (const x of a) for (const y of b) {
+    const d = (x.x + x.width / 2 - (y.x + y.width / 2)) ** 2 + (x.y + x.height / 2 - (y.y + y.height / 2)) ** 2;
+    if (d < best) { best = d; ra = x; rb = y; }
+  }
+  return [ra, rb];
+}
+
+function getDoorPos(room: BSPRoom, side: WallSide): { x: number; y: number } {
+  switch (side) {
+    case 'top':    return { x: room.x + room.width / 2,  y: room.y };
+    case 'bottom': return { x: room.x + room.width / 2,  y: room.y + room.height };
+    case 'left':   return { x: room.x,                   y: room.y + room.height / 2 };
+    case 'right':  return { x: room.x + room.width,      y: room.y + room.height / 2 };
+  }
+}
+
+function selectSides(a: BSPRoom, b: BSPRoom): [WallSide, WallSide] {
+  const dx = (b.x + b.width / 2) - (a.x + a.width / 2);
+  const dy = (b.y + b.height / 2) - (a.y + a.height / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? ['right', 'left'] : ['left', 'right'];
+  return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+}
+
+function addDiagonalCorridor(x1: number, y1: number, x2: number, y2: number, obstacles: ObstaclePayload[], idc: IdCounter): void {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return;
+  const nx = -dy / len, ny = dx / len;
+  const off = BSPMapConfig.CorridorWidth / 2 + BSPMapConfig.CorridorWallThickness;
+  obstacles.push({ id: idc.value++, segments: [{ start: { x: x1 + nx * off, y: y1 + ny * off }, end: { x: x2 + nx * off, y: y2 + ny * off } }] });
+  obstacles.push({ id: idc.value++, segments: [{ start: { x: x1 - nx * off, y: y1 - ny * off }, end: { x: x2 - nx * off, y: y2 - ny * off } }] });
+}
+
+function addRoomWalls(room: BSPRoom, obstacles: ObstaclePayload[], idc: IdCounter): void {
+  const { x, y, width, height } = room;
+  const t = BSPMapConfig.WallThickness, door = BSPMapConfig.DoorWidth;
+  const tlw = (width - door) / 2;
+  if (tlw > 0) {
+    obstacles.push({ id: idc.value++, segments: makeRect(x, y, tlw, t) });
+    obstacles.push({ id: idc.value++, segments: makeRect(x + tlw + door, y, width - tlw - door, t) });
+    const by = y + height - t;
+    obstacles.push({ id: idc.value++, segments: makeRect(x, by, tlw, t) });
+    obstacles.push({ id: idc.value++, segments: makeRect(x + tlw + door, by, width - tlw - door, t) });
+  }
+  const lth = (height - door) / 2;
+  if (lth > 0) {
+    obstacles.push({ id: idc.value++, segments: makeRect(x, y, t, lth) });
+    obstacles.push({ id: idc.value++, segments: makeRect(x, y + lth + door, t, height - lth - door) });
+    const rx = x + width - t;
+    obstacles.push({ id: idc.value++, segments: makeRect(rx, y, t, lth) });
+    obstacles.push({ id: idc.value++, segments: makeRect(rx, y + lth + door, t, height - lth - door) });
+  }
+}
+
+function addTacticalElements(rooms: BSPRoom[], obstacles: ObstaclePayload[], idc: IdCounter, rng: () => number): void {
+  for (const room of rooms) {
+    if (room.width * room.height < BSPMapConfig.PillarMinRoomArea) continue;
+    const count = 1 + Math.floor(rng() * BSPMapConfig.PillarMaxPerRoom);
+    const ps = BSPMapConfig.PillarSize, inset = BSPMapConfig.WallThickness + BSPMapConfig.DoorWidth;
+    for (let i = 0; i < count; i++) {
+      const px = room.x + inset + rng() * (room.width  - inset * 2 - ps);
+      const py = room.y + inset + rng() * (room.height - inset * 2 - ps);
+      obstacles.push({ id: idc.value++, segments: makeRect(px, py, ps, ps) });
+    }
+    const hw = BSPMapConfig.HalfWallLength, ht = BSPMapConfig.HalfWallThickness;
+    if (rng() > 0.4) {
+      const hx = room.x + room.width / 2 + BSPMapConfig.DoorWidth / 2 + 10;
+      const hy = room.y + BSPMapConfig.WallThickness + 10;
+      if (hx + hw < room.x + room.width - BSPMapConfig.WallThickness)
+        obstacles.push({ id: idc.value++, segments: makeRect(hx, hy, hw, ht) });
+    }
+  }
+}
+
+function mirrorObstacles(obstacles: ObstaclePayload[], centerX: number, idc: IdCounter): void {
+  const orig = obstacles.length;
+  for (let i = 0; i < orig; i++) {
+    const mirrored: Seg[] = obstacles[i].segments.map(s => ({
+      start: { x: 2 * centerX - s.end.x,   y: s.end.y },
+      end:   { x: 2 * centerX - s.start.x, y: s.start.y },
+    }));
+    obstacles.push({ id: idc.value++, segments: mirrored });
+  }
+}
+
+function connectRooms(node: BSPNode, obstacles: ObstaclePayload[], idc: IdCounter, rng: () => number): void {
+  if (!node.left || !node.right) return;
+  connectRooms(node.left,  obstacles, idc, rng);
+  connectRooms(node.right, obstacles, idc, rng);
+  const [ra, rb] = findClosestPair(getAllRooms(node.left), getAllRooms(node.right));
+  const [sa, sb] = selectSides(ra, rb);
+  const da = getDoorPos(ra, sa), db = getDoorPos(rb, sb);
+  addDiagonalCorridor(da.x, da.y, db.x, db.y, obstacles, idc);
+}
+
+function generateBSPMap(seed?: string): { obstacles: ObstaclePayload[]; seed: string } {
+  const resolvedSeed = seed ?? String(Math.floor(Math.random() * 0xFFFFFFFF));
+  const rng = makePrng(hashString(resolvedSeed));
+  const obstacles: ObstaclePayload[] = [];
+  const idc: IdCounter = { value: 1 };
+  const mapSize = (MapConfig.NodesInGridSize - 1) * MapConfig.NodeSpacing;
+  const margin = 30;
+  const centerX = mapSize / 2;
+
+  const root = buildBSPTree(margin, margin, centerX - margin, mapSize - margin * 2, 0, rng);
+  placeRooms(root, rng);
+
+  const allRooms = getAllRooms(root);
+  for (const room of allRooms) addRoomWalls(room, obstacles, idc);
+  connectRooms(root, obstacles, idc, rng);
+  addTacticalElements(allRooms, obstacles, idc, rng);
+  mirrorObstacles(obstacles, centerX, idc);
+
+  return { obstacles, seed: resolvedSeed };
+}
 
 // ---- minimal node / geometry types ----------------------------------------
 
@@ -125,33 +327,8 @@ export class ServerGameLogic {
 
   // ---- obstacle generation --------------------------------------------------
 
-  generateObstacles(
-    count: number = 3,
-    minWidth: number = 60,
-    maxWidth: number = 150,
-    minHeight: number = 60,
-    maxHeight: number = 150,
-  ): void {
-    const MAP_SIZE = (MapConfig.NodesInGridSize - 1) * MapConfig.NodeSpacing;
-    const MARGIN = 30;
-    const obstacles: ObstaclePayload[] = [];
-
-    for (let i = 0; i < count; i++) {
-      const w = Math.floor(Math.random() * (maxWidth - minWidth + 1)) + minWidth;
-      const h = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
-      const x = Math.floor(Math.random() * (MAP_SIZE - w - MARGIN * 2)) + MARGIN;
-      const y = Math.floor(Math.random() * (MAP_SIZE - h - MARGIN * 2)) + MARGIN;
-      obstacles.push({
-        id: i + 1,
-        segments: [
-          { start: { x, y }, end: { x: x + w, y } },
-          { start: { x: x + w, y }, end: { x: x + w, y: y + h } },
-          { start: { x: x + w, y: y + h }, end: { x, y: y + h } },
-          { start: { x, y: y + h }, end: { x, y } },
-        ],
-      });
-    }
-
+  generateObstacles(): void {
+    const { obstacles } = generateBSPMap();
     this.generatedObstacles = obstacles;
   }
 
