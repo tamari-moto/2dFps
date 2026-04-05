@@ -21,16 +21,18 @@ class Model {
     return this.lastSeed;
   }
 
-  constructor() {
-    this.initGrid();
+  constructor(generateObstacles: boolean = true) {
+    this.initGrid(generateObstacles);
     this.initLocalPlayers();
   }
 
   /**
-   * Initializes the grid: Nodes, edges, and obstacles.
+   * Initializes the grid: Nodes, edges, and optionally obstacles.
    * Called by the constructor and by LocalAdapter.
+   * @param generateObstacles - If true (default), generates BSP map. If false, skips obstacle generation.
+   *                            Used in online mode to allow server-provided obstacles.
    */
-  public initGrid(): void {
+  public initGrid(generateObstacles: boolean = true): void {
     const size = this.NodesInGridSize;
     let count = 0;
     for (let i = 0; i < size; i++) {
@@ -44,12 +46,14 @@ class Model {
     }
     this.addDirectionalEdges();
 
-    // BSP マップを生成（デフォルト）
-    const bspResult = MapGenerator.generateComplexMap();
-    this.lastSeed = bspResult.seed;
-    this.obstacles = bspResult.obstacles;
-    this.Lines = bspResult.lines;
-    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    if (generateObstacles) {
+      // BSP マップを生成（デフォルト）
+      const bspResult = MapGenerator.generateComplexMap();
+      this.lastSeed = bspResult.seed;
+      this.obstacles = bspResult.obstacles;
+      this.Lines = bspResult.lines;
+      MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    }
   }
 
   /**

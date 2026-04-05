@@ -131,17 +131,27 @@ export class ColyseusAdapter implements INetworkAdapter {
   /**
    * Initializes a local Model from the current server state.
    * Should be called after connect().
+   *
+   * Online mode: skips local obstacle generation to ensure server obstacles are used.
+   * Obstacles are applied immediately if obstacles_ready has arrived, or via callback later.
    */
   initializeModel(): Model {
-    this.model = new Model();
+    // Online mode: skip local obstacle generation; use server-provided obstacles
+    this.model = new Model(false);
 
-    // Override locally-generated obstacles with the server's shared obstacle layout.
+    // Apply server obstacles if already received
     if (this.pendingObstacles) {
       // ObstaclePayload[].segments are plain objects; importObstacles() converts
       // them to LineSegment instances internally via MapGenerator.importObstacles().
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.model.importObstacles(this.pendingObstacles.obstacles as any);
       this.pendingObstacles = null;
+    } else {
+      // obstacles_ready not yet received: register callback to apply when it arrives
+      this.obstaclesReadyCallback = (obstacles: ObstaclePayload[]): void => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.model!.importObstacles(obstacles as any);
+      };
     }
 
     // Replace the local-play default players with the server's player set.
