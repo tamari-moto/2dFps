@@ -46,6 +46,10 @@ export class GameRoom extends Room<GameState> {
     // Start game when enough players have joined
     if (!this.state.gameStarted && this.state.players.size >= MIN_PLAYERS_TO_START) {
       this.startGame();
+    } else if (this.state.gameStarted) {
+      // Game already started: send current map state to newly joined client
+      client.send('obstacles_ready', { obstacles: this.logic.getObstacles() });
+      client.send('game_started', {});
     }
   }
 
