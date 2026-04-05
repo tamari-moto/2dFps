@@ -44,8 +44,12 @@ class Model {
     }
     this.addDirectionalEdges();
 
-    // ランダムな障害物を生成
-    this.generateRandomObstaclesInternal();
+    // BSP マップを生成（デフォルト）
+    const bspResult = MapGenerator.generateComplexMap();
+    this.lastSeed = bspResult.seed;
+    this.obstacles = bspResult.obstacles;
+    this.Lines = bspResult.lines;
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
   }
 
   /**
@@ -266,19 +270,6 @@ class Model {
     }
   }
 
-  /**
-   * Internal method to generate random obstacles without resetting edges.
-   * Used during initialization.
-   */
-  private generateRandomObstaclesInternal(): void {
-    const result = MapGenerator.generateRandomObstacles();
-    this.lastSeed = result.seed;
-    this.obstacles = result.obstacles;
-    this.Lines = result.lines;
-
-    // Remove edges that intersect with obstacles
-    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
-  }
 
   /**
    * Applies a generated obstacle layout: resets edges, stores results, removes blocked edges.
