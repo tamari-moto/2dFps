@@ -1,16 +1,17 @@
 import { Model } from '../../model/model';
 import { Player } from '../../model/Player';
 import { Node } from '../../model/node';
-import { PlayerConfig, AIConfig } from '../../config/GameConfig';
+import { PlayerConfig, PersonalityWeights, CoordinationConfig } from '../../config/GameConfig';
 import { MapConfig } from '../../config/GameConfig';
 
 /**
  * Selects the best shot target for an NPC from the move-to position.
+ * Uses personality-based priority and focus fire coordination.
  * Returns the target node ID, or undefined if no enemy is visible.
  */
 export function selectShotTarget(
   model: Model,
-  _npc: Player,
+  npc: Player,
   moveToNode: Node,
   angle: number,
   enemies: Player[]
@@ -23,6 +24,7 @@ export function selectShotTarget(
 
   const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
   const gridSize = MapConfig.NodesInGridSize;
+  const weights = PersonalityWeights[npc.personality];
 
   let bestTarget: { nodeId: number; score: number } | undefined;
 
@@ -36,8 +38,14 @@ export function selectShotTarget(
     const enemyRow = enemy.node.id % gridSize;
     const dist = Math.abs(moveCol - enemyCol) + Math.abs(moveRow - enemyRow);
 
-    const hpBonus = (enemy.maxHealth - enemy.health) * AIConfig.ShotLowHPPriority / enemy.maxHealth;
-    const score = hpBonus - dist;
+    const hpBonus = (enemy.maxHealth - enemy.health) * weights.shotLowHPPriority / enemy.maxHealth;
+    let score = hpBonus - dist;
+
+    // Focus fire: bonus for enemies below HP threshold
+    const hpRatio = enemy.health / enemy.maxHealth;
+    if (hpRatio <= CoordinationConfig.FocusFireHPThreshold) {
+      score += CoordinationConfig.FocusFireBonus;
+    }
 
     if (!bestTarget || score > bestTarget.score) {
       bestTarget = { nodeId: enemy.node.id, score };
