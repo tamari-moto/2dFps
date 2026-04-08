@@ -162,7 +162,7 @@ export class ColyseusAdapter implements INetworkAdapter {
     }, playerId: string) => {
       const startNode = this.model.nodeList[sp.nodeId];
       if (!startNode) return;
-      const p = new Player(playerId, startNode, sp.color);
+      const p = new Player(playerId, startNode, 0);
       p.setAngle(sp.angle);
       p.health = sp.health;
       p.isAlive = sp.isAlive;

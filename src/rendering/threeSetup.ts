@@ -136,7 +136,7 @@ export class ThreeSetup {
     if (model.players.has(playerId)) return;
     const startNode = model.nodeList[nodeId];
     if (!startNode) return;
-    const p = new Player(playerId, startNode, color);
+    const p = new Player(playerId, startNode, 0);
     model.players.set(playerId, p);
     this.visualizationSync.addPlayerMesh(playerId, color);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);

@@ -2,7 +2,7 @@ import { Node } from './node';
 import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
-import { MapConfig, PlayerConfig } from '../config/GameConfig';
+import { MapConfig, PlayerConfig, TeamId } from '../config/GameConfig';
 import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
@@ -61,12 +61,12 @@ class Model {
    * In online mode this is replaced by applyServerState().
    */
   public initLocalPlayers(): void {
-    const playerColors = this.generatePlayerColors(LOCAL_PLAYER_COUNT);
     const usedNodeIds = new Set<number>();
 
     for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
       const playerId = createPlayerId(i);
       const isNPC = i > 0;
+      const team: TeamId = (i % 2) as TeamId;
 
       let nodeIndex: number;
       if (isNPC) {
@@ -79,7 +79,7 @@ class Model {
       }
 
       usedNodeIds.add(nodeIndex);
-      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], playerColors[i], 100, isNPC));
+      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team, 100, isNPC));
     }
   }
 
@@ -239,6 +239,41 @@ class Model {
   }
 
   /**
+   * Returns all alive players on the opposing team(s) of the given player.
+   */
+  public getEnemyPlayers(playerId: string): Player[] {
+    const self = this.players.get(playerId);
+    if (!self) return [];
+    return Array.from(this.players.values())
+      .filter(p => p.team !== self.team && p.isAlive);
+  }
+
+  /**
+   * Returns the union of all nodes visible by any alive teammate of the given player.
+   * Used for shared team fog-of-war.
+   */
+  public getTeamVisibleNodes(playerId: string): Set<number> {
+    const player = this.players.get(playerId);
+    if (!player) return new Set();
+
+    const visibleIds = new Set<number>();
+    visibleIds.add(player.node.id);
+
+    for (const [, teammate] of this.players) {
+      if (!teammate.isAlive) continue;
+      if (teammate.team !== player.team) continue;
+
+      const nodes = this.getVisibleNodesAtAngle(
+        teammate.node, teammate.angle, PlayerConfig.MaxViewDistance,
+      );
+      for (const n of nodes) visibleIds.add(n.id);
+      visibleIds.add(teammate.node.id);
+    }
+
+    return visibleIds;
+  }
+
+  /**
    * Gets the obstacles data
    * @returns Array of obstacle data
    */
@@ -320,56 +355,6 @@ class Model {
     this.applyObstacleLayout(result);
   }
 
-  /**
-   * Generates evenly distributed colors for players using HSL color space
-   * @param count - Number of colors to generate
-   * @returns Array of hex color values
-   */
-  private generatePlayerColors(count: number): number[] {
-    const colors: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const hue = (i / count) * 360;
-      colors.push(this.hslToHex(hue, 100, 50));
-    }
-    return colors;
-  }
-
-  /**
-   * Converts HSL color values to hex color
-   * @param h - Hue (0-360)
-   * @param s - Saturation (0-100)
-   * @param l - Lightness (0-100)
-   * @returns Hex color value
-   */
-  private hslToHex(h: number, s: number, l: number): number {
-    s /= 100;
-    l /= 100;
-
-    const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-    const m = l - c / 2;
-    let r = 0, g = 0, b = 0;
-
-    if (0 <= h && h < 60) {
-      r = c; g = x; b = 0;
-    } else if (60 <= h && h < 120) {
-      r = x; g = c; b = 0;
-    } else if (120 <= h && h < 180) {
-      r = 0; g = c; b = x;
-    } else if (180 <= h && h < 240) {
-      r = 0; g = x; b = c;
-    } else if (240 <= h && h < 300) {
-      r = x; g = 0; b = c;
-    } else if (300 <= h && h < 360) {
-      r = c; g = 0; b = x;
-    }
-
-    const ri = Math.round((r + m) * 255);
-    const gi = Math.round((g + m) * 255);
-    const bi = Math.round((b + m) * 255);
-
-    return (ri << 16) | (gi << 8) | bi;
-  }
 
 }
 

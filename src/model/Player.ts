@@ -1,5 +1,6 @@
 import { Node } from './node';
 import { Entity, EntityType } from './entities/Entity';
+import { TeamConfig, TeamId } from '../config/GameConfig';
 
 /**
  * Player entity with health and alive state
@@ -9,13 +10,16 @@ export class Player extends Entity {
   maxHealth: number;
   isAlive: boolean;
   isNPC: boolean;
+  team: TeamId;
 
-  constructor(id: string, initialNode: Node, color: number, maxHealth: number = 100, isNPC: boolean = false) {
+  constructor(id: string, initialNode: Node, team: TeamId, maxHealth: number = 100, isNPC: boolean = false) {
+    const color = team === 0 ? TeamConfig.Team0Color : TeamConfig.Team1Color;
     super(id, EntityType.PLAYER, initialNode, color, 0);
     this.maxHealth = maxHealth;
     this.health = maxHealth;
     this.isAlive = true;
     this.isNPC = isNPC;
+    this.team = team;
   }
 
   /**

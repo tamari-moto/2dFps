@@ -160,10 +160,8 @@ export class GameController {
   private tryShotTarget(activePlayer: Player, clickedNode: Node, sm: StateMachine): boolean {
     if (this.currentNextNodeId === undefined) return false;
 
-    const nextNode = this.model.nodeList[this.currentNextNodeId];
-    const isVisible = this.model
-      .getVisibleNodesAtAngle(nextNode, activePlayer.angle, PlayerConfig.MaxViewDistance)
-      .some(n => n.id === clickedNode.id);
+    const teamVisible = this.model.getTeamVisibleNodes(activePlayer.id);
+    const isVisible = teamVisible.has(clickedNode.id);
 
     if (isVisible) {
       sm.transition(GameEvent.ShotPlayer);
