@@ -495,6 +495,18 @@ export const MobileUIConfig = {
 } as const;
 
 /**
+ * Team configuration
+ */
+export type TeamId = 0 | 1;
+
+export const TeamConfig = {
+  /** Hex color for team 0 (red team) */
+  Team0Color: 0xff3333,
+  /** Hex color for team 1 (blue team) */
+  Team1Color: 0x3399ff,
+} as const;
+
+/**
  * Calculated values (derived from other config values)
  */
 export const CalculatedConfig = {

@@ -98,9 +98,11 @@ export class LocalAdapter implements INetworkAdapter {
     const shotNode = this.model.nodeList[shotNodeId];
     if (!shotNode) return;
 
+    const attacker = this.model.getPlayer(attackerId);
     for (const [targetId, target] of this.model.players) {
       if (targetId === attackerId) continue;
       if (!target.isAlive) continue;
+      if (attacker && target.team === attacker.team) continue;
 
       const dx = target.node.x - shotNode.x;
       const dy = target.node.y - shotNode.y;

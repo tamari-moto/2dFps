@@ -93,19 +93,17 @@ export class VisualizationSync {
 
     const visibleNodeIds = new Set<number>();
     if (PlayerConfig.FogOfWarEnabled && activePlayer) {
-      const nodes = this.model.getVisibleNodesAtAngle(
-        activePlayer.node, activePlayer.angle, PlayerConfig.MaxViewDistance,
-      );
-      for (const n of nodes) visibleNodeIds.add(n.id);
-      visibleNodeIds.add(activePlayer.node.id);
+      const teamNodes = this.model.getTeamVisibleNodes(this.activePlayerId);
+      for (const id of teamNodes) visibleNodeIds.add(id);
     }
 
     for (const [playerId, player] of this.model.players) {
       if (!player.isAlive) continue;
 
+      const isOnMyTeam = activePlayer && player.team === activePlayer.team;
       const isActive = playerId === this.activePlayerId;
       const shouldShow = !PlayerConfig.FogOfWarEnabled
-        || isActive
+        || isOnMyTeam
         || visibleNodeIds.has(player.node.id);
 
       this.lifecycle.setVisible(playerId, shouldShow);
