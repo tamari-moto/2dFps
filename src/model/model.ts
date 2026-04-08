@@ -2,7 +2,7 @@ import { Node } from './node';
 import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
-import { MapConfig, PlayerConfig } from '../config/GameConfig';
+import { MapConfig, PlayerConfig, NPCPersonality } from '../config/GameConfig';
 import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
@@ -64,6 +64,8 @@ class Model {
     const playerColors = this.generatePlayerColors(LOCAL_PLAYER_COUNT);
     const usedNodeIds = new Set<number>();
 
+    const personalities: NPCPersonality[] = ['aggressive', 'defensive', 'ambusher'];
+
     for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
       const playerId = createPlayerId(i);
       const isNPC = i > 0;
@@ -78,8 +80,13 @@ class Model {
         nodeIndex = i;
       }
 
+      // Assign personality to NPCs via round-robin
+      const personality: NPCPersonality = isNPC
+        ? personalities[(i - 1) % personalities.length]
+        : 'aggressive';
+
       usedNodeIds.add(nodeIndex);
-      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], playerColors[i], 100, isNPC));
+      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], playerColors[i], 100, isNPC, personality));
     }
   }
 

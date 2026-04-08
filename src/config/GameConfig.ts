@@ -452,7 +452,77 @@ export const PostProcessConfig = {
 } as const;
 
 /**
- * NPC AI configuration
+ * NPC personality types
+ */
+export type NPCPersonality = 'aggressive' | 'defensive' | 'ambusher';
+
+/**
+ * Weight overrides per NPC personality
+ */
+export interface PersonalityWeightSet {
+  coverWeight: number;
+  enemyLOSPenalty: number;
+  distanceWeight: number;
+  ambushBonus: number;
+  retreatHPThreshold: number;
+  retreatCoverMultiplier: number;
+  shotLowHPPriority: number;
+}
+
+export const PersonalityWeights: Record<NPCPersonality, PersonalityWeightSet> = {
+  aggressive: {
+    coverWeight: 15,
+    enemyLOSPenalty: -10,
+    distanceWeight: -5,
+    ambushBonus: 5,
+    retreatHPThreshold: 20,
+    retreatCoverMultiplier: 1.5,
+    shotLowHPPriority: 5,
+  },
+  defensive: {
+    coverWeight: 50,
+    enemyLOSPenalty: -30,
+    distanceWeight: -1,
+    ambushBonus: 10,
+    retreatHPThreshold: 60,
+    retreatCoverMultiplier: 3,
+    shotLowHPPriority: 15,
+  },
+  ambusher: {
+    coverWeight: 20,
+    enemyLOSPenalty: -15,
+    distanceWeight: 0,
+    ambushBonus: 40,
+    retreatHPThreshold: 40,
+    retreatCoverMultiplier: 2,
+    shotLowHPPriority: 10,
+  },
+};
+
+/**
+ * NPC coordination configuration
+ */
+export const CoordinationConfig = {
+  /** Angle difference (degrees) to consider a flanking position */
+  FlankAngleThreshold: 60,
+  /** Score bonus for flanking positions */
+  FlankBonus: 20,
+  /** Penalty when too close to another NPC */
+  ClusterPenalty: -15,
+  /** Manhattan distance threshold for cluster penalty */
+  ClusterDistance: 3,
+  /** Enemy HP ratio below which focus fire activates */
+  FocusFireHPThreshold: 0.5,
+  /** Shot score bonus for focus fire targets */
+  FocusFireBonus: 10,
+  /** Number of turns to remember enemy positions */
+  MemoryDuration: 3,
+  /** Bonus for moving toward last known enemy position */
+  SeekLastKnownBonus: 10,
+} as const;
+
+/**
+ * NPC AI configuration (default / fallback values)
  */
 export const AIConfig = {
   /** Bonus for nodes adjacent to walls (fewer graph edges = more cover) */
