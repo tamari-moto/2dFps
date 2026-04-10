@@ -231,4 +231,14 @@ export class ColyseusAdapter implements INetworkAdapter {
   }
 
   supportsNPC(): boolean { return false; }
+
+  /**
+   * Simultaneous round resolution is server-authoritative in online mode.
+   * Falls back to sequential execution until server-side support is added.
+   */
+  sendRoundActions(actions: TurnAction[]): void {
+    for (const action of actions) {
+      this.sendTurnAction(action);
+    }
+  }
 }

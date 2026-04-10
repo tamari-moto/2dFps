@@ -478,6 +478,9 @@ export const AIConfig = {
 
   /** Delay between NPC turns in ms (must exceed MovementDuration) */
   NPCTurnDelayMs: 1200,
+
+  /** Waiting time after a simultaneous round resolves before re-enabling input (ms) */
+  RoundAnimationDelayMs: 1500,
 } as const;
 
 /**

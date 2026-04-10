@@ -1,4 +1,5 @@
 import { Model } from '../model/model';
+import { Node } from '../model/node';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
@@ -113,4 +114,63 @@ export class LocalAdapter implements INetworkAdapter {
   }
 
   supportsNPC(): boolean { return true; }
+
+  /**
+   * Resolves all players' actions simultaneously:
+   * 1. Snapshot from-nodes before any movement
+   * 2. Apply all moves atomically
+   * 3. Resolve all shots after movement but before damage is applied
+   * 4. Fire turnResultCallback for each result
+   */
+  sendRoundActions(actions: TurnAction[]): void {
+    // 1. Snapshot positions before any moves
+    const fromNodes = new Map<string, Node>();
+    for (const action of actions) {
+      const player = this.model.getPlayer(action.playerId);
+      if (player) fromNodes.set(action.playerId, player.node);
+    }
+
+    // 2. Apply all moves atomically and build pending results
+    const pendingResults: TurnResult[] = [];
+    for (const action of actions) {
+      const player = this.model.getPlayer(action.playerId);
+      if (!player) continue;
+      const fromNode = fromNodes.get(action.playerId)!;
+      const newNode = this.model.nodeList[action.moveToNodeId];
+      if (!newNode) continue;
+
+      this.model.setPlayerRef(action.playerId, newNode);
+
+      let newAngle = player.angle;
+      if (action.shotAtNodeId !== undefined) {
+        const shotNode = this.model.nodeList[action.shotAtNodeId];
+        if (shotNode) {
+          newAngle = this.model.getAngleBetweenNodes(newNode, shotNode);
+          player.setAngle(newAngle);
+        }
+      } else if (action.moveToNodeId !== fromNode.id) {
+        newAngle = this.model.getAngleBetweenNodes(fromNode, newNode);
+        player.setAngle(newAngle);
+      }
+
+      pendingResults.push({
+        movingPlayerId: action.playerId,
+        newNodeId: action.moveToNodeId,
+        newAngle,
+        hits: [],
+      });
+    }
+
+    // 3. Resolve all shots after all moves, before any damage is applied
+    for (let i = 0; i < actions.length; i++) {
+      if (actions[i].shotAtNodeId !== undefined) {
+        this.resolveShot(actions[i].playerId, actions[i].shotAtNodeId!, pendingResults[i].hits);
+      }
+    }
+
+    // 4. Fire callbacks; GameController applies damage from each result
+    for (const result of pendingResults) {
+      this.turnResultCallback?.(result);
+    }
+  }
 }
