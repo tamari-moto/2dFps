@@ -28,7 +28,6 @@ export enum GameEventType {
   // View events
   VIEW_UPDATED = 'view:updated',
   VIEW_ANGLE_TOGGLED = 'view:angle_toggled',
-  CAMERA_MOVED = 'camera:moved',
 
   // Visualization commands (GameController → VisualizationSync)
   VIS_UPDATE_VIEW = 'vis:update_view',
@@ -52,8 +51,6 @@ export enum GameEventType {
 
   // Game state events
   GAME_STARTED = 'game:started',
-  GAME_PAUSED = 'game:paused',
-  GAME_RESUMED = 'game:resumed',
   GAME_OVER = 'game:over',
 
   // NPC events
@@ -131,7 +128,6 @@ export interface GameEventData {
   [GameEventType.VIEW_ANGLE_TOGGLED]: {
     isVisible: boolean;
   };
-  [GameEventType.CAMERA_MOVED]: void;
 
   // Visualization commands
   [GameEventType.VIS_UPDATE_VIEW]: void;
@@ -171,8 +167,6 @@ export interface GameEventData {
 
   // Game state events
   [GameEventType.GAME_STARTED]: void;
-  [GameEventType.GAME_PAUSED]: void;
-  [GameEventType.GAME_RESUMED]: void;
   [GameEventType.GAME_OVER]: void;
 
   // NPC events

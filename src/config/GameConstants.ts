@@ -19,7 +19,6 @@ export const createPlayerId = (index: number): string => `player${index + 1}`;
  */
 export const ENTITY_IDS = {
   PLAYER_1: 'player1',
-  PLAYER_2: 'player2',
 } as const;
 
 /**
@@ -27,10 +26,6 @@ export const ENTITY_IDS = {
  */
 export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
 
-/**
- * Type-safe entity ID type
- */
-export type EntityId = typeof ENTITY_IDS[keyof typeof ENTITY_IDS];
 
 /**
  * Keyboard key constants for game controls
@@ -38,8 +33,6 @@ export type EntityId = typeof ENTITY_IDS[keyof typeof ENTITY_IDS];
 export const KEYBOARD_KEYS = {
   TOGGLE_VIEW_ANGLE: 'v',
   TOGGLE_VIEW_ANGLE_UPPER: 'V',
-  SELECT_PLAYER_1: '1',
-  SELECT_PLAYER_2: '2',
   DANCE: 'd',
   DANCE_UPPER: 'D',
 } as const;

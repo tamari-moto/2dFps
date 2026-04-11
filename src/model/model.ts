@@ -286,23 +286,6 @@ class Model {
   }
 
   /**
-   * Generates random obstacles on the map and resets edges.
-   * This method is called when regenerating obstacles during gameplay.
-   */
-  public generateRandomObstacles(
-    count?: number,
-    minWidth?: number,
-    maxWidth?: number,
-    minHeight?: number,
-    maxHeight?: number,
-    seed?: string
-  ): void {
-    const result = MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight, seed);
-    this.lastSeed = result.seed;
-    this.applyObstacleLayout(result);
-  }
-
-  /**
    * Imports obstacles from obstacle data and resets edges.
    * @param obstaclesData - Array of obstacle data to import
    */

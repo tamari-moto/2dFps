@@ -2,7 +2,7 @@ import { Graph } from './Graph';
 import { Node } from './node';
 import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
 import type { ObstacleData } from './ObstacleExporter';
-import { MapConfig, ObstacleConfig, BSPMapConfig, CalculatedConfig } from '../config/GameConfig';
+import { MapConfig, BSPMapConfig, CalculatedConfig } from '../config/GameConfig';
 
 /** BSP ツリーのノード */
 interface BSPNode {
@@ -60,53 +60,6 @@ export class MapGenerator {
   /** ランダムなシード文字列を生成する（唯一の Math.random() 呼び出し） */
   public static generateSeed(): string {
     return String(Math.floor(Math.random() * 0xFFFFFFFF));
-  }
-
-  /**
-   * Generates random obstacles on the map.
-   * @param count - Number of obstacles to generate
-   * @param minWidth - Minimum width of obstacles
-   * @param maxWidth - Maximum width of obstacles
-   * @param minHeight - Minimum height of obstacles
-   * @param maxHeight - Maximum height of obstacles
-   * @param seed - Optional seed string for reproducible generation
-   * @returns Object containing generated obstacles, line segments, and used seed
-   */
-  public static generateRandomObstacles(
-    count: number = ObstacleConfig.DefaultCount,
-    minWidth: number = ObstacleConfig.MinWidth,
-    maxWidth: number = ObstacleConfig.MaxWidth,
-    minHeight: number = ObstacleConfig.MinHeight,
-    maxHeight: number = ObstacleConfig.MaxHeight,
-    seed?: string
-  ): { obstacles: ObstacleData[], lines: LineSegment[], seed: string } {
-    const resolvedSeed = seed ?? MapGenerator.generateSeed();
-    const rng = MapGenerator.makePrng(MapGenerator.hashString(resolvedSeed));
-    const obstacles: ObstacleData[] = [];
-    const lines: LineSegment[] = [];
-
-    // Calculate map boundaries
-    const mapSize = CalculatedConfig.MapSize;
-    const margin = MapConfig.ObstacleMargin; // Minimum distance from map edges
-
-    // Generate random obstacles
-    for (let i = 0; i < count; i++) {
-      const width = Math.floor(rng() * (maxWidth - minWidth + 1)) + minWidth;
-      const height = Math.floor(rng() * (maxHeight - minHeight + 1)) + minHeight;
-
-      // Ensure obstacles don't overlap with edges
-      const x = Math.floor(rng() * (mapSize - width - margin * 2)) + margin;
-      const y = Math.floor(rng() * (mapSize - height - margin * 2)) + margin;
-
-      const obstacleSegments = createRectangleSegments(x, y, width, height);
-      obstacles.push({ id: i + 1, segments: obstacleSegments });
-
-      obstacleSegments.forEach(element => {
-        lines.push(element);
-      });
-    }
-
-    return { obstacles, lines, seed: resolvedSeed };
   }
 
   /**
