@@ -4,11 +4,9 @@ import { gameEventBus, GameEventType } from '../core/GameEventBus';
 
 interface GameHUDProps {
   threeSetup: ThreeSetup | null;
-  mobileUI: boolean;
-  onToggleMobileUI: () => void;
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ threeSetup, mobileUI, onToggleMobileUI }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
   const [playerIds, setPlayerIds] = React.useState<string[]>([]);
   const [activeId, setActiveId] = React.useState<string>('');
@@ -72,13 +70,6 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup, mobileUI, onToggleMobileU
         aria-label={`グリッド: ${gridVisible ? 'ON' : 'OFF'}`}
       >
         グリッド: {gridVisible ? 'ON' : 'OFF'}
-      </button>
-      <button
-        onClick={onToggleMobileUI}
-        style={{ ...baseButtonStyle, backgroundColor: mobileUI ? '#c0392b' : '#555555' }}
-        aria-label={`スマホUI: ${mobileUI ? 'ON' : 'OFF'}`}
-      >
-        スマホUI: {mobileUI ? 'ON' : 'OFF'}
       </button>
       {playerIds.length > 0 && (
         <div style={playerRowStyle}>
