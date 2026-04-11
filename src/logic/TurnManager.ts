@@ -1,6 +1,6 @@
 import { Model } from '../model/model';
 import { TurnAction } from '../schema/types';
-import { HUMAN_PLAYER_ID } from '../config/GameConstants';
+import { HUMAN_PLAYER_ID } from '../config/GameConfig';
 import { decideTurn } from './ai/NPCBrain';
 
 /**

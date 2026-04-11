@@ -3,7 +3,7 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './MapGenerator';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
+import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
 

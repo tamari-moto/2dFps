@@ -3,7 +3,7 @@ import { Node } from '../model/node';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
-import { ENTITY_IDS } from '../config/GameConstants';
+import { ENTITY_IDS } from '../config/GameConfig';
 
 /**
  * Local-play implementation of INetworkAdapter.

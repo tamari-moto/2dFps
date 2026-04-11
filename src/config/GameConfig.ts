@@ -422,6 +422,52 @@ export const CalculatedConfig = {
 
 } as const;
 
+// ============================================================
+// 以下 GameConstants.ts から統合
+// ============================================================
+
+/**
+ * Number of players in local-play mode.
+ * Online mode uses the room's participant count instead.
+ */
+export const LOCAL_PLAYER_COUNT = 5;
+
+/**
+ * Generate a player ID from an index
+ */
+export const createPlayerId = (index: number): string => `player${index + 1}`;
+
+/**
+ * Entity ID constants for players
+ */
+export const ENTITY_IDS = {
+  PLAYER_1: 'player1',
+} as const;
+
+/**
+ * Human-controlled player ID
+ */
+export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
+
+/**
+ * Keyboard key constants for game controls
+ */
+export const KEYBOARD_KEYS = {
+  DANCE: 'd',
+  DANCE_UPPER: 'D',
+} as const;
+
+/**
+ * Player-related constants
+ */
+export const PLAYER_CONSTANTS = {
+  DEFAULT_ACTIVE_PLAYER: ENTITY_IDS.PLAYER_1,
+  ACTIVE_SCALE: 1.2,
+  NORMAL_SCALE: 1.0,
+} as const;
+
+// ============================================================
+
 /**
  * Applies server-authoritative config values to the runtime config objects.
  * Only fields present on the server are overridden; client-only fields are untouched.
