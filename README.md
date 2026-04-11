@@ -38,7 +38,7 @@
 
 ## クイックスタート
 
-詳細は [document/SETUP.md](document/SETUP.md) を参照してください。
+詳細は [document/setup.md](document/setup.md) を参照してください。
 
 ### フロントエンド
 
@@ -108,7 +108,7 @@ Idle → Select → Move → Shot → Idle
 
 ```
 ├── src/
-│   ├── config/        定数（GameConfig.ts, GameConstants.ts）
+│   ├── config/        定数（GameConfig.ts）
 │   ├── schema/        型定義（TurnAction, TurnResult）
 │   ├── model/         データモデル（Model, Graph, Player, Node, MapGenerator, LineSegment, entities/）
 │   ├── logic/         StateMachine, GameController, TurnManager, ai/(NPCBrain, NodeScorer, ShotSelector)
@@ -126,9 +126,12 @@ Idle → Select → Move → Shot → Idle
 │       ├── schema/         GameState（PlayerState, GameState）
 │       └── logic/          ServerGameLogic（権威ゲームロジック）
 ├── document/
-│   ├── SETUP.md               環境構築・セットアップガイド
-│   ├── FOLDER_STRUCTURE.md    フォルダ構成の詳細ガイド
-│   └── DATA_FLOW.md           アーキテクチャ・データフロー詳細
+│   ├── setup.md               環境構築・セットアップガイド
+│   ├── deploy.md              デプロイ手順
+│   ├── folder-structure.md    フォルダ構成の詳細ガイド
+│   ├── data-flow.md           アーキテクチャ・データフロー詳細
+│   ├── server-architecture.md サーバー側アーキテクチャ設計
+│   └── game-logic.md          ゲームロジック設計（ラウンド制・AI・BFS）
 ├── CLAUDE.md              AI 開発用の設計メモ
 └── README.md
 ```
@@ -137,9 +140,12 @@ Idle → Select → Move → Shot → Idle
 
 | ファイル | 内容 |
 |---------|------|
-| [document/SETUP.md](document/SETUP.md) | 環境構築・セットアップガイド |
-| [document/FOLDER_STRUCTURE.md](document/FOLDER_STRUCTURE.md) | フォルダ構成の詳細ガイド |
-| [document/DATA_FLOW.md](document/DATA_FLOW.md) | アーキテクチャ・データフロー詳細 |
+| [document/setup.md](document/setup.md) | 環境構築・セットアップガイド |
+| [document/deploy.md](document/deploy.md) | デプロイ手順 |
+| [document/folder-structure.md](document/folder-structure.md) | フォルダ構成の詳細ガイド |
+| [document/data-flow.md](document/data-flow.md) | アーキテクチャ・データフロー詳細 |
+| [document/server-architecture.md](document/server-architecture.md) | サーバー側アーキテクチャ設計 |
+| [document/game-logic.md](document/game-logic.md) | ゲームロジック設計（ラウンド制・AI・BFS） |
 | [CLAUDE.md](CLAUDE.md) | AI 開発者向け設計メモ |
 
 ## スクリプト一覧
