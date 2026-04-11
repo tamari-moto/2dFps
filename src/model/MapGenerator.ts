@@ -1,8 +1,12 @@
 import { Graph } from './Graph';
 import { Node } from './node';
 import { createRectangleSegments, LineSegment, removeEdgesIfIntersected } from './LineSegment';
-import type { ObstacleData } from './ObstacleExporter';
 import { MapConfig, BSPMapConfig, CalculatedConfig } from '../config/GameConfig';
+
+export interface ObstacleData {
+  id: number;
+  segments: LineSegment[];
+}
 
 /** BSP ツリーのノード */
 interface BSPNode {

@@ -1,5 +1,5 @@
 import { Model } from '../model/model';
-import type { ObstacleData } from '../model/ObstacleExporter';
+import type { ObstacleData } from '../model/MapGenerator';
 import { State, GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { AIConfig, PlayerConfig } from '../config/GameConfig';
@@ -56,7 +56,6 @@ export class GameController {
     this.eventBus.on(GameEventType.NODE_CLICKED, this.handleNodeClick.bind(this));
     this.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.handleCanvasEmptyClick.bind(this));
     this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
-    this.eventBus.on(GameEventType.VIEW_ANGLE_TOGGLED, this.handleViewAngleToggle.bind(this));
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
@@ -305,13 +304,6 @@ export class GameController {
     this.activePlayerId = data.currentPlayerId;
     this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
     console.log(`Switched to ${data.currentPlayerId}`);
-  }
-
-  /**
-   * Handles view angle toggle
-   */
-  private handleViewAngleToggle(): void {
-    this.eventBus.emit(GameEventType.VIS_TOGGLE_VIEW_ANGLE);
   }
 
   /**

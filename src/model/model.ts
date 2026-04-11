@@ -1,7 +1,7 @@
 import { Node } from './node';
 import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
-import type { ObstacleData } from './ObstacleExporter';
+import type { ObstacleData } from './MapGenerator';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
 import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
 import { MapGenerator } from './MapGenerator';

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Model } from '../model/model';
-import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 import { SceneManager } from './SceneManager';
 import { CameraConfig, PlayerConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
@@ -18,7 +17,6 @@ export class VisualizationSync {
   private lifecycle: PlayerLifecycleManager;
   private animator:  PlayerAnimator;
   private camera:    CameraFollowController;
-  private viewAngle: ViewAngleVisualizer;
   private model:     Model;
 
   private activePlayerId: string;
@@ -38,7 +36,6 @@ export class VisualizationSync {
     this.lifecycle = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
     this.nodeVis   = new NodeVisualizationManager(sceneManager, model);
     this.camera    = new CameraFollowController(sceneManager);
-    this.viewAngle = new ViewAngleVisualizer(sceneManager.getScene());
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -84,7 +81,6 @@ export class VisualizationSync {
     if (!activePlayer) return;
 
     this.updatePlayers();
-    this.viewAngle.draw(activePlayer.node, activePlayer.angle);
     this.nodeVis.updateNodeColors(activePlayer);
   }
 
@@ -154,12 +150,6 @@ export class VisualizationSync {
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
       this.lifecycle.hidePlayer(data.playerId);
-    });
-
-    eventBus.on(GameEventType.VIS_TOGGLE_VIEW_ANGLE, () => {
-      const isVisible = this.viewAngle.toggle();
-      this.doUpdateView();
-      console.log(`View angle edges: ${isVisible ? 'ON' : 'OFF'}`);
     });
 
     eventBus.on(GameEventType.VIS_SET_REACHABLE_NODES, (data: { nodeIds: number[] }) => {

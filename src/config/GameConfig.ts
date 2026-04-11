@@ -247,22 +247,6 @@ export const CameraConfig = {
   FollowMoveEase: 'power2.out',
 } as const;
 
-/**
- * View angle visualization configuration
- */
-export const ViewAngleVisualizationConfig = {
-  /** Enable view angle edges visualization */
-  ShowViewAngleEdges: false,
-
-  /** Color for view angle edges (cyan, matches VisibleColor) */
-  EdgeColor: 0x00e5cc,
-
-  /** Opacity for view angle edges */
-  EdgeOpacity: 0.45,
-
-  /** Line width for view angle edges */
-  EdgeLineWidth: 2,
-} as const;
 
 /**
  * Render / visual theme configuration

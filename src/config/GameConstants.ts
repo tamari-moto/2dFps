@@ -31,8 +31,6 @@ export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
  * Keyboard key constants for game controls
  */
 export const KEYBOARD_KEYS = {
-  TOGGLE_VIEW_ANGLE: 'v',
-  TOGGLE_VIEW_ANGLE_UPPER: 'V',
   DANCE: 'd',
   DANCE_UPPER: 'D',
 } as const;

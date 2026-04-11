@@ -109,13 +109,8 @@ export class InputHandler {
   private handleKeyDown(event: KeyboardEvent): void {
     this.eventBus.emit(GameEventType.KEY_PRESSED, { key: event.key });
 
-    // Handle view angle toggle
-    if (event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE ||
-        event.key === KEYBOARD_KEYS.TOGGLE_VIEW_ANGLE_UPPER) {
-      this.eventBus.emit(GameEventType.VIEW_ANGLE_TOGGLED, { isVisible: true });
-    }
     // Handle dance animation
-    else if (event.key === KEYBOARD_KEYS.DANCE ||
+    if (event.key === KEYBOARD_KEYS.DANCE ||
              event.key === KEYBOARD_KEYS.DANCE_UPPER) {
       this.eventBus.emit(GameEventType.VIS_PLAY_DANCE, { playerId: this.activePlayerId });
     }

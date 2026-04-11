@@ -39,23 +39,12 @@ const MobileControls: React.FC<MobileControlsProps> = ({ playerIds, activePlayer
     lineHeight: 1.2,
   };
 
-  const handleViewAngle = () => {
-    gameEventBus.emit(GameEventType.VIEW_ANGLE_TOGGLED, { isVisible: true });
-  };
-
   const handleDance = () => {
     gameEventBus.emit(GameEventType.VIS_PLAY_DANCE, { playerId: activePlayerId });
   };
 
   return (
     <div style={panelStyle}>
-      <button
-        style={{ ...btnStyle, backgroundColor: '#1a6b6b' }}
-        onPointerDown={handleViewAngle}
-        aria-label="視野角トグル"
-      >
-        視野
-      </button>
       <button
         style={{ ...btnStyle, backgroundColor: '#4a3060' }}
         onPointerDown={handleDance}

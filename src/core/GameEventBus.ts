@@ -27,7 +27,6 @@ export enum GameEventType {
 
   // View events
   VIEW_UPDATED = 'view:updated',
-  VIEW_ANGLE_TOGGLED = 'view:angle_toggled',
 
   // Visualization commands (GameController → VisualizationSync)
   VIS_UPDATE_VIEW = 'vis:update_view',
@@ -39,7 +38,6 @@ export enum GameEventType {
   VIS_CLEAR_SHOT_MESH = 'vis:clear_shot_mesh',
   VIS_SHOW_HIT_EFFECT = 'vis:show_hit_effect',
   VIS_HIDE_PLAYER = 'vis:hide_player',
-  VIS_TOGGLE_VIEW_ANGLE = 'vis:toggle_view_angle',
   VIS_UPDATE_OBSTACLES = 'vis:update_obstacles',
   VIS_PLAY_DANCE = 'vis:play_dance',
   VIS_SET_REACHABLE_NODES = 'vis:set_reachable_nodes',
@@ -125,9 +123,6 @@ export interface GameEventData {
 
   // View events
   [GameEventType.VIEW_UPDATED]: void;
-  [GameEventType.VIEW_ANGLE_TOGGLED]: {
-    isVisible: boolean;
-  };
 
   // Visualization commands
   [GameEventType.VIS_UPDATE_VIEW]: void;
@@ -151,7 +146,6 @@ export interface GameEventData {
   [GameEventType.VIS_HIDE_PLAYER]: {
     playerId: string;
   };
-  [GameEventType.VIS_TOGGLE_VIEW_ANGLE]: void;
   [GameEventType.VIS_UPDATE_OBSTACLES]: void;
   [GameEventType.VIS_PLAY_DANCE]: {
     playerId: string;
@@ -200,19 +194,7 @@ type EventListener<T = any> = (data: T) => void;
  */
 export class GameEventBus {
   private listeners: Map<GameEventType, Set<EventListener>> = new Map();
-  private eventHistory: Array<{ type: GameEventType; data: any; timestamp: number }> = [];
-  private debugMode: boolean = false;
-  private maxHistorySize: number = 100;
 
-  constructor(debugMode: boolean = false) {
-    this.debugMode = debugMode;
-  }
-
-  /**
-   * Subscribe to an event
-   * @param eventType - The type of event to listen to
-   * @param listener - The callback function to invoke when event is emitted
-   */
   on<T extends GameEventType>(
     eventType: T,
     listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
@@ -221,52 +203,19 @@ export class GameEventBus {
       this.listeners.set(eventType, new Set());
     }
     this.listeners.get(eventType)!.add(listener);
-
-    if (this.debugMode) {
-      console.log(`[GameEventBus] Listener registered for: ${eventType}`);
-    }
   }
 
-  /**
-   * Unsubscribe from an event
-   * @param eventType - The type of event
-   * @param listener - The callback function to remove
-   */
   off<T extends GameEventType>(
     eventType: T,
     listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
   ): void {
-    const listeners = this.listeners.get(eventType);
-    if (listeners) {
-      listeners.delete(listener);
-      if (this.debugMode) {
-        console.log(`[GameEventBus] Listener unregistered for: ${eventType}`);
-      }
-    }
+    this.listeners.get(eventType)?.delete(listener);
   }
 
-  /**
-   * Emit an event to all registered listeners
-   * @param eventType - The type of event to emit
-   * @param data - The data to pass to listeners
-   */
   emit<T extends GameEventType>(
     eventType: T,
     data?: T extends keyof GameEventData ? GameEventData[T] : any
   ): void {
-    // Record in history
-    this.eventHistory.push({
-      type: eventType,
-      data,
-      timestamp: Date.now(),
-    });
-
-    // Trim history if needed
-    if (this.eventHistory.length > this.maxHistorySize) {
-      this.eventHistory.shift();
-    }
-
-    // Notify listeners
     const listeners = this.listeners.get(eventType);
     if (listeners) {
       listeners.forEach((listener) => {
@@ -277,17 +226,8 @@ export class GameEventBus {
         }
       });
     }
-
-    if (this.debugMode) {
-      console.log(`[GameEventBus] Event emitted: ${eventType}`, data);
-    }
   }
 
-  /**
-   * Subscribe to an event for one-time execution
-   * @param eventType - The type of event to listen to
-   * @param listener - The callback function to invoke once
-   */
   once<T extends GameEventType>(
     eventType: T,
     listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
@@ -299,66 +239,11 @@ export class GameEventBus {
     this.on(eventType, onceWrapper);
   }
 
-  /**
-   * Get event history
-   */
-  getHistory(): Array<{ type: GameEventType; data: any; timestamp: number }> {
-    return [...this.eventHistory];
-  }
-
-  /**
-   * Clear event history
-   */
-  clearHistory(): void {
-    this.eventHistory = [];
-  }
-
-  /**
-   * Get all registered event types
-   */
-  getRegisteredEvents(): GameEventType[] {
-    return Array.from(this.listeners.keys());
-  }
-
-  /**
-   * Get listener count for an event type
-   */
-  getListenerCount(eventType: GameEventType): number {
-    return this.listeners.get(eventType)?.size ?? 0;
-  }
-
-  /**
-   * Remove all listeners for a specific event type
-   */
   removeAllListeners(eventType?: GameEventType): void {
     if (eventType) {
       this.listeners.delete(eventType);
-      if (this.debugMode) {
-        console.log(`[GameEventBus] All listeners removed for: ${eventType}`);
-      }
     } else {
       this.listeners.clear();
-      if (this.debugMode) {
-        console.log(`[GameEventBus] All listeners removed`);
-      }
-    }
-  }
-
-  /**
-   * Enable or disable debug mode
-   */
-  setDebugMode(enabled: boolean): void {
-    this.debugMode = enabled;
-  }
-
-  /**
-   * Set maximum history size
-   */
-  setMaxHistorySize(size: number): void {
-    this.maxHistorySize = size;
-    // Trim history if needed
-    while (this.eventHistory.length > this.maxHistorySize) {
-      this.eventHistory.shift();
     }
   }
 }
