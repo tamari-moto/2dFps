@@ -453,8 +453,18 @@ export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
  * Keyboard key constants for game controls
  */
 export const KEYBOARD_KEYS = {
-  DANCE: 'd',
-  DANCE_UPPER: 'D',
+  DANCE: 'f',
+  DANCE_UPPER: 'F',
+  MOVE_UP: 'w',
+  MOVE_UP_UPPER: 'W',
+  MOVE_DOWN: 's',
+  MOVE_DOWN_UPPER: 'S',
+  MOVE_LEFT: 'a',
+  MOVE_LEFT_UPPER: 'A',
+  MOVE_RIGHT: 'd',
+  MOVE_RIGHT_UPPER: 'D',
+  CONFIRM_TURN: 'Enter',
+  CANCEL: 'Escape',
 } as const;
 
 /**
