@@ -1,9 +1,9 @@
 import { Node } from './node';
 import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
-import type { ObstacleData } from './ObstacleExporter';
+import type { ObstacleData } from './MapGenerator';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConstants';
+import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
 
@@ -283,23 +283,6 @@ class Model {
     this.obstacles = result.obstacles;
     this.Lines = result.lines;
     MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
-  }
-
-  /**
-   * Generates random obstacles on the map and resets edges.
-   * This method is called when regenerating obstacles during gameplay.
-   */
-  public generateRandomObstacles(
-    count?: number,
-    minWidth?: number,
-    maxWidth?: number,
-    minHeight?: number,
-    maxHeight?: number,
-    seed?: string
-  ): void {
-    const result = MapGenerator.generateRandomObstacles(count, minWidth, maxWidth, minHeight, maxHeight, seed);
-    this.lastSeed = result.seed;
-    this.applyObstacleLayout(result);
   }
 
   /**

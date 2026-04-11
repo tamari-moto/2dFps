@@ -23,6 +23,13 @@ export interface INetworkAdapter {
    */
   sendTurnAction(action: TurnAction): void;
 
+  /**
+   * Sends all players' actions for a simultaneous round.
+   * All moves are applied atomically, then all shots are resolved before any damage is applied.
+   * LocalAdapter: full atomic resolution; ColyseusAdapter: falls back to sequential execution.
+   */
+  sendRoundActions(actions: TurnAction[]): void;
+
   /** Register a callback invoked when turn results are available */
   onTurnResult(callback: (result: TurnResult) => void): void;
 

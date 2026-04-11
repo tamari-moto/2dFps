@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { NodeConfig, NodeVisualConfig, ObstacleConfig, WallConfig } from '../config/GameConfig';
+import { NodeConfig, NodeVisualConfig, WallConfig } from '../config/GameConfig';
 
 /**
  * Creates a node circle mesh
@@ -40,17 +40,4 @@ export function createWallMesh(x1: number, y1: number, x2: number, y2: number): 
   mesh.rotation.z = angle;
   mesh.userData[WallConfig.UserDataTag] = true;
   return mesh;
-}
-
-/**
- * Creates a line segment for obstacles (legacy)
- */
-export function createLineSegment(x1: number, y1: number, x2: number, y2: number): THREE.Line {
-  const material = new THREE.LineBasicMaterial({ color: ObstacleConfig.LineColor });
-  const points = [
-    new THREE.Vector3(x1, y1, 0),
-    new THREE.Vector3(x2, y2, 0),
-  ];
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  return new THREE.Line(geometry, material);
 }

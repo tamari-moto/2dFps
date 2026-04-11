@@ -1,12 +1,12 @@
 import { Model } from '../model/model';
-import type { ObstacleData } from '../model/ObstacleExporter';
+import type { ObstacleData } from '../model/MapGenerator';
 import { State, GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig } from '../config/GameConfig';
+import { AIConfig, PlayerConfig } from '../config/GameConfig';
 import { Player } from '../model/Player';
 import { Node } from '../model/node';
 import { INetworkAdapter } from '../network/INetworkAdapter';
-import type { TurnResult } from '../schema/types';
+import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
 
 /**
@@ -22,6 +22,9 @@ export class GameController {
   private turnManager: TurnManager;
   private inputLocked: boolean = false;
   private reachableNodes: Set<number> = new Set();
+
+  /** True while sendRoundActions callbacks are being processed; suppresses per-result VIS_UPDATE_VIEW */
+  private batchProcessing = false;
 
   constructor(
     model: Model,
@@ -39,11 +42,7 @@ export class GameController {
       this.stateMachines.set(playerId, new StateMachine());
     }
 
-    this.turnManager = new TurnManager(
-      model,
-      eventBus,
-      networkAdapter,
-    );
+    this.turnManager = new TurnManager(model);
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
@@ -57,7 +56,6 @@ export class GameController {
     this.eventBus.on(GameEventType.NODE_CLICKED, this.handleNodeClick.bind(this));
     this.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.handleCanvasEmptyClick.bind(this));
     this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
-    this.eventBus.on(GameEventType.VIEW_ANGLE_TOGGLED, this.handleViewAngleToggle.bind(this));
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
@@ -175,9 +173,10 @@ export class GameController {
   }
 
   /**
-   * Executes a complete turn by delegating to the network adapter.
+   * Executes a simultaneous round: collects all player actions, resolves them atomically,
+   * then fires a single VIS_UPDATE_VIEW so all animations play in parallel.
    */
-  private async executeTurn(sm: StateMachine): Promise<void> {
+  private executeTurn(sm: StateMachine): void {
     sm.transition(GameEvent.Complete);
 
     const nextNodeId = this.currentNextNodeId;
@@ -199,20 +198,29 @@ export class GameController {
       nodeIds: Array.from(this.reachableNodes),
     });
 
-    // Delegate logic to adapter; result is applied via applyTurnResult callback
-    this.networkAdapter.sendTurnAction({
-      playerId: this.activePlayerId,
-      moveToNodeId: nextNodeId,
-      shotAtNodeId: shotNodeId,
-    });
-
-    // After human turn, trigger NPC turns (offline only)
+    // Collect human action + all NPC actions (NPCs decide from current model state)
+    const allActions: TurnAction[] = [
+      { playerId: this.activePlayerId, moveToNodeId: nextNodeId, shotAtNodeId: shotNodeId },
+    ];
     if (this.networkAdapter.supportsNPC()) {
-      await this.turnManager.processNPCTurns().catch((err: unknown) => {
-        console.error('[GameController] NPC turn processing failed:', err);
-        this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
-      });
+      allActions.push(...this.turnManager.collectNPCActions());
     }
+
+    // Resolve all actions atomically; applyTurnResult is called for each result
+    // but VIS_UPDATE_VIEW is suppressed until all results are applied
+    this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
+    this.batchProcessing = true;
+    this.networkAdapter.sendRoundActions(allActions);
+    this.batchProcessing = false;
+
+    // Single VIS_UPDATE_VIEW fires all animations simultaneously
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+
+    // Re-enable input after animations complete
+    this.delay(AIConfig.RoundAnimationDelayMs).then(() => {
+      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
+      this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+    });
   }
 
   /**
@@ -225,6 +233,7 @@ export class GameController {
 
   /**
    * Applies a turn result received from the network adapter.
+   * During batch (simultaneous) processing, VIS_UPDATE_VIEW is deferred to the caller.
    */
   private applyTurnResult(result: TurnResult): void {
     const movingPlayer = this.model.getPlayer(result.movingPlayerId);
@@ -250,7 +259,10 @@ export class GameController {
       console.log(`❌ ${result.movingPlayerId} missed!`);
     }
 
-    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    // During batch processing the caller emits one VIS_UPDATE_VIEW after all results
+    if (!this.batchProcessing) {
+      this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    }
   }
 
   /**
@@ -292,13 +304,6 @@ export class GameController {
     this.activePlayerId = data.currentPlayerId;
     this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
     console.log(`Switched to ${data.currentPlayerId}`);
-  }
-
-  /**
-   * Handles view angle toggle
-   */
-  private handleViewAngleToggle(): void {
-    this.eventBus.emit(GameEventType.VIS_TOGGLE_VIEW_ANGLE);
   }
 
   /**
@@ -344,5 +349,9 @@ export class GameController {
   importObstacles(obstaclesData: ObstacleData[]): void {
     this.model.importObstacles(obstaclesData);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

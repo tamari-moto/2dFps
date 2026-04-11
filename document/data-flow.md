@@ -57,7 +57,7 @@
                    ↓
 ┌───────────────────────────────────────────────────────┐
 │  Configuration 層 (config/)                            │
-│  GameConfig, GameConstants                             │
+│  GameConfig                                           │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -340,24 +340,25 @@ getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] 
 3. `maxSteps` ステップ以内の全ノードを `Set<number>` で返す
 4. `VIS_SET_REACHABLE_NODES` イベントで可視化層に通知 → ノード色でハイライト表示
 
-### NPC ターン実行フロー (TurnManager + ai/)
+### 同時移動ラウンド制 (GameController + TurnManager + LocalAdapter)
+
+人間プレイヤーが行動を確定すると、全 NPC の行動をまとめて収集し、全員の移動・射撃をアトミックに解決する。
 
 ```mermaid
 graph TD
-    A[GameController.executeTurn] --> B[TurnManager.processNPCTurns]
-    B --> C[生存 NPC 一覧を取得]
-    C --> D{NPC が残っているか}
-    D -->|Yes| E[NPCBrain.decideTurn model, npc]
-    E --> E1[getReachableNodes で候補ノード列挙]
-    E --> E2[NodeScorer.scoreNode で各候補を評価]
-    E2 --> E3[最高スコアノードを移動先に決定]
-    E --> E4[ShotSelector.selectShotTarget で射撃対象決定]
-    E3 --> F[TurnAction 生成]
-    E4 --> F
-    F --> G[networkAdapter.sendTurnAction]
-    G --> H[NPCTurnDelayMs 待機]
-    H --> D
-    D -->|No| I[人間プレイヤーに制御を戻す]
+    A[GameController.executeTurn] --> B[人間の TurnAction 作成]
+    B --> C[TurnManager.collectNPCActions]
+    C --> D[生存 NPC ごとに NPCBrain.decideTurn]
+    D --> D1[NodeScorer.scoreNode で候補評価]
+    D --> D2[ShotSelector.selectShotTarget で射撃対象決定]
+    D1 --> E[TurnAction 生成]
+    D2 --> E
+    E --> F[networkAdapter.sendRoundActions 全員分]
+    F --> G{LocalAdapter?}
+    G -->|Yes| H[全移動を Snapshot で確定 → 全射撃を解決]
+    G -->|No| I[ColyseusAdapter: 逐次 sendTurnAction にフォールバック]
+    H --> J[VIS_UPDATE_VIEW を1回発火 → 同時アニメーション]
+    J --> K[RoundAnimationDelayMs 後に INPUT_LOCKED false]
 ```
 
 **NodeScorer のスコア計算要素**:
@@ -368,6 +369,8 @@ graph TD
 | 敵 LOS ペナルティ | `EnemyLOSPenalty=-20` | 敵に見えるノードにペナルティ |
 | アンブッシュボーナス | `AmbushBonus=15` | NPC が見えて敵が見えない状況に加点 |
 | 距離評価 | `DistanceWeight=-2` | 高HP→接近、低HP（`RetreatHPThreshold=40`）→退却 |
+| 撤退カバー | `RetreatCoverMultiplier=2` | 撤退モード時のカバーウェイト乗数 |
+| 低HP射撃優先 | `ShotLowHPPriority=10` | 低 HP 敵への射撃優先度ボーナス |
 
 ### 障害物管理フロー
 
@@ -502,6 +505,10 @@ gsap.to(camera.position, {
 
 - **Input → Logic**: `NODE_CLICKED`, `CANVAS_CLICKED_EMPTY`, `KEY_PRESSED`
 - **Logic → Rendering**: `VIS_UPDATE_VIEW`, `VIS_SET_SELECT_MESH`, `VIS_SET_NEXT_MESH`, `VIS_SET_SHOT_MESH` 等
+- **Logic → Input**: `INPUT_LOCKED`（ラウンド処理中に入力をロック）
+- **NPC**: `NPC_TURN_STARTED`, `NPC_TURNS_COMPLETE`（TurnManager → GameController）
+- **Player**: `PLAYER_MOVED`, `PLAYER_SELECTED`, `PLAYER_SWITCHED`, `PLAYER_ANGLE_CHANGED`
+- **Network**: `NETWORK_CONNECTED`, `ROOM_STATE_CHANGED`, `TURN_RESULT_RECEIVED`, `PLAYER_JOINED`
 - **Controller が Model を直接操作し、描画にはイベントのみを発行**（Model-View 分離）
 
 ### 2. オーケストレーター委譲パターン (VisualizationSync)
@@ -638,9 +645,8 @@ const meshId = nodeToMeshMap.get(nodeId)
 - 各プレイヤーが独立した `StateMachine` インスタンスを持つ
 
 #### `src/logic/TurnManager.ts`
-- NPC ターンを `processNPCTurns()` で順番に自動実行
-- `NPCBrain.decideTurn()` で行動決定 → `networkAdapter.sendTurnAction()` で実行
-- `NPCTurnDelayMs` 間隔でアニメーション表示に配慮した逐次処理
+- `collectNPCActions()` で全 NPC の `TurnAction` を一括収集して返す
+- `NPCBrain.decideTurn()` で各 NPC の行動を決定
 
 #### `src/logic/ai/NPCBrain.ts`
 - `decideTurn(model, npc): TurnAction` — NPC 行動決定のエントリポイント（Facade パターン）
@@ -754,7 +760,7 @@ const meshId = nodeToMeshMap.get(nodeId)
 
 #### `src/network/INetworkAdapter.ts`
 - ネットワークアダプターインターフェース
-- `getMyPlayerId()`, `initializeModel()`, `sendTurnAction()`, 各種コールバック
+- `getMyPlayerId()`, `initializeModel()`, `sendTurnAction()`, `sendRoundActions()`, `supportsNPC()`, 各種コールバック
 
 #### `src/network/LocalAdapter.ts`
 - オフライン用アダプター（プロセス内でターン処理を実行）
@@ -765,10 +771,7 @@ const meshId = nodeToMeshMap.get(nodeId)
 ### Configuration 層 (config/)
 
 #### `src/config/GameConfig.ts`
-- 全定数の一元管理（MapConfig, PlayerConfig, BSPMapConfig, RenderConfig, AnimationConfig 等）
-
-#### `src/config/GameConstants.ts`
-- キーバインド、プレイヤーID生成等の定数
+- 全定数の一元管理（MapConfig, PlayerConfig, BSPMapConfig, RenderConfig, AnimationConfig, AIConfig 等）
 
 ---
 
@@ -778,7 +781,7 @@ const meshId = nodeToMeshMap.get(nodeId)
 
 ```
 ┌─────────────┐
-│   Config    │ (GameConfig.ts, GameConstants.ts)
+│   Config    │ (GameConfig.ts)
 └──────┬──────┘
        ↓
 ┌─────────────┐

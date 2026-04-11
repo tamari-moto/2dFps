@@ -85,28 +85,6 @@ export const NodeConfig = {
   ReachableColor: 0x2a7a6a,
 } as const;
 
-/**
- * Obstacle generation configuration
- */
-export const ObstacleConfig = {
-  /** Default number of random obstacles */
-  DefaultCount: 3,
-
-  /** Minimum obstacle width */
-  MinWidth: 60,
-
-  /** Maximum obstacle width */
-  MaxWidth: 150,
-
-  /** Minimum obstacle height */
-  MinHeight: 60,
-
-  /** Maximum obstacle height */
-  MaxHeight: 150,
-
-  /** Line color for obstacles (muted teal) */
-  LineColor: 0x00bfbf,
-} as const;
 
 /**
  * BSP map generation configuration
@@ -269,22 +247,6 @@ export const CameraConfig = {
   FollowMoveEase: 'power2.out',
 } as const;
 
-/**
- * View angle visualization configuration
- */
-export const ViewAngleVisualizationConfig = {
-  /** Enable view angle edges visualization */
-  ShowViewAngleEdges: false,
-
-  /** Color for view angle edges (cyan, matches VisibleColor) */
-  EdgeColor: 0x00e5cc,
-
-  /** Opacity for view angle edges */
-  EdgeOpacity: 0.45,
-
-  /** Line width for view angle edges */
-  EdgeLineWidth: 2,
-} as const;
 
 /**
  * Render / visual theme configuration
@@ -310,43 +272,11 @@ export const RenderConfig = {
    *  so we lift by HS * 0.7 (HS = PlayerMarkerSize / 6.4). */
   PlayerZOffset: (20 / 6.4) * 3.21,
 
-  // --- Primitive drone player geometry ---
-  /** Radial segments for body octagon */
-  PlayerBodySegments: 8,
-  /** Body radius = PlayerMarkerSize * this */
-  PlayerBodyRadius: 0.45,
-  /** Body height (thin slab) = PlayerMarkerSize * this */
-  PlayerBodyThickness: 0.05,
-  /** PBR roughness for body */
+  // --- Player body material ---
+  /** PBR roughness for player body */
   PlayerBodyRoughness: 0.6,
-  /** PBR metalness for body */
+  /** PBR metalness for player body */
   PlayerBodyMetalness: 0.3,
-
-  // --- Cockpit (forward direction indicator) ---
-  /** Cockpit circle radius = PlayerMarkerSize * this */
-  PlayerCockpitRadius: 0.15,
-  /** Cockpit Y offset toward front = PlayerMarkerSize * this */
-  PlayerCockpitOffsetY: 0.20,
-  /** Cockpit emissive glow intensity */
-  PlayerCockpitEmissiveIntensity: 1.5,
-
-  // --- Barrel (gun pointing forward) ---
-  /** Barrel width = PlayerMarkerSize * this */
-  PlayerBarrelWidth: 0.10,
-  /** Barrel length along Y = PlayerMarkerSize * this */
-  PlayerBarrelLength: 0.55,
-  /** Barrel Y center offset = PlayerMarkerSize * this */
-  PlayerBarrelOffsetY: 0.55,
-  /** Barrel color (fixed dark metallic, independent of player color) */
-  PlayerBarrelColor: 0x1a1a2e,
-
-  // --- Thrusters (left & right) ---
-  /** Thruster width = PlayerMarkerSize * this */
-  PlayerThrusterWidth: 0.18,
-  /** Thruster length = PlayerMarkerSize * this */
-  PlayerThrusterLength: 0.30,
-  /** Thruster X offset from center = PlayerMarkerSize * this */
-  PlayerThrusterOffsetX: 0.48,
 
   // --- Humanoid variant: handgun ---
   /** Handgun barrel color (dark metallic) */
@@ -476,22 +406,8 @@ export const AIConfig = {
   /** Bonus for targeting low-HP enemies */
   ShotLowHPPriority: 10,
 
-  /** Delay between NPC turns in ms (must exceed MovementDuration) */
-  NPCTurnDelayMs: 1200,
-} as const;
-
-/**
- * Mobile UI configuration
- */
-export const MobileUIConfig = {
-  /** Virtual button size in px */
-  ButtonSize: 56,
-  /** Virtual button panel opacity */
-  ButtonOpacity: 0.75,
-  /** Max finger movement in px to still count as a tap (not a flick/pan) */
-  TapThreshold: 10,
-  /** World units per screen pixel for camera pan */
-  PanSensitivity: 0.15,
+  /** Waiting time after a simultaneous round resolves before re-enabling input (ms) */
+  RoundAnimationDelayMs: 1500,
 } as const;
 
 /**
@@ -503,11 +419,54 @@ export const CalculatedConfig = {
     return (MapConfig.NodesInGridSize - 1) * MapConfig.NodeSpacing;
   },
 
-  /** Total number of nodes in the map */
-  get TotalNodes(): number {
-    return MapConfig.NodesInGridSize * MapConfig.NodesInGridSize;
-  },
+
 } as const;
+
+// ============================================================
+// 以下 GameConstants.ts から統合
+// ============================================================
+
+/**
+ * Number of players in local-play mode.
+ * Online mode uses the room's participant count instead.
+ */
+export const LOCAL_PLAYER_COUNT = 5;
+
+/**
+ * Generate a player ID from an index
+ */
+export const createPlayerId = (index: number): string => `player${index + 1}`;
+
+/**
+ * Entity ID constants for players
+ */
+export const ENTITY_IDS = {
+  PLAYER_1: 'player1',
+} as const;
+
+/**
+ * Human-controlled player ID
+ */
+export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
+
+/**
+ * Keyboard key constants for game controls
+ */
+export const KEYBOARD_KEYS = {
+  DANCE: 'd',
+  DANCE_UPPER: 'D',
+} as const;
+
+/**
+ * Player-related constants
+ */
+export const PLAYER_CONSTANTS = {
+  DEFAULT_ACTIVE_PLAYER: ENTITY_IDS.PLAYER_1,
+  ACTIVE_SCALE: 1.2,
+  NORMAL_SCALE: 1.0,
+} as const;
+
+// ============================================================
 
 /**
  * Applies server-authoritative config values to the runtime config objects.

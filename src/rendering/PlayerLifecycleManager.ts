@@ -5,7 +5,7 @@ import { SceneManager } from './SceneManager';
 import { PlayerAnimator } from './PlayerAnimator';
 import { createVariantPlayer } from './PlayerMeshFactory';
 import { AnimationConfig, RenderConfig } from '../config/GameConfig';
-import { PLAYER_CONSTANTS } from '../config/GameConstants';
+import { PLAYER_CONSTANTS } from '../config/GameConfig';
 
 /**
  * Manages the lifecycle of player mesh objects:
