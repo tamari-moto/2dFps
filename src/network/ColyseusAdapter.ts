@@ -17,6 +17,7 @@ export class ColyseusAdapter implements INetworkAdapter {
   private room!: Colyseus.Room;
   private model!: Model;
   private myPlayerId: string = '';
+  private _isSpectator: boolean = false;
 
   private turnResultCallback?: (result: TurnResult) => void;
   private playerJoinedCallback?: (playerId: string) => void;
@@ -38,11 +39,12 @@ export class ColyseusAdapter implements INetworkAdapter {
    * Connects to the Colyseus server and waits for player assignment.
    * Call this before passing the adapter to setupThree().
    */
-  async connect(roomId?: string): Promise<void> {
+  async connect(roomId?: string, spectate: boolean = false): Promise<void> {
+    const joinOptions = spectate ? { spectate: true } : {};
     if (roomId) {
-      this.room = await this.client.joinById(roomId);
+      this.room = await this.client.joinById(roomId, joinOptions);
     } else {
-      this.room = await this.client.joinOrCreate('game_room');
+      this.room = await this.client.joinOrCreate('game_room', joinOptions);
     }
 
     // Register all message handlers immediately after join, before awaiting anything.
@@ -80,9 +82,10 @@ export class ColyseusAdapter implements INetworkAdapter {
 
     // Forward future player arrivals to the joined callback.
     // Note: onAdd fires for every player including the local one during state sync.
-    // We skip the local player; the callback receives the playerId for remote players.
-    this.room.state.players.onAdd((_player: unknown, playerId: string) => {
+    // We skip the local player and any spectators; the callback receives the playerId for remote players.
+    this.room.state.players.onAdd((player: { isSpectator: boolean }, playerId: string) => {
       if (playerId === this.myPlayerId) return;
+      if (player.isSpectator) return;
       // player is the live PlayerState reference — changes will be reflected in it.
       // Delay one microtask so that initializePlayers() on the server has time to
       // push its state delta (nodeId, color) before we read them.
@@ -111,7 +114,8 @@ export class ColyseusAdapter implements INetworkAdapter {
         resolve();
       };
 
-      this.room.onMessage('player_assigned', (data: { playerId: string }) => {
+      this.room.onMessage('player_assigned', (data: { playerId: string; isSpectator: boolean }) => {
+        this._isSpectator = data.isSpectator;
         const assignedId = data.playerId;
         // Check if this player is already in the state (sync patch arrived first)
         if (this.room.state.players.has(assignedId)) {
@@ -155,11 +159,13 @@ export class ColyseusAdapter implements INetworkAdapter {
     }
 
     // Replace the local-play default players with the server's player set.
+    // Spectators are excluded from the model — they are observers only.
     this.model.players.clear();
     this.room.state.players.forEach((sp: {
       id: string; nodeId: number; angle: number; health: number;
-      isAlive: boolean; color: number;
+      isAlive: boolean; color: number; isSpectator: boolean;
     }, playerId: string) => {
+      if (sp.isSpectator) return;
       const startNode = this.model.nodeList[sp.nodeId];
       if (!startNode) return;
       const p = new Player(playerId, startNode, sp.color);
@@ -229,6 +235,8 @@ export class ColyseusAdapter implements INetworkAdapter {
   getRoom(): Colyseus.Room {
     return this.room;
   }
+
+  isSpectator(): boolean { return this._isSpectator; }
 
   supportsNPC(): boolean { return false; }
 

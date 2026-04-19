@@ -7,6 +7,7 @@ export class PlayerState extends Schema {
   @type('number') health: number = 100;
   @type('boolean') isAlive: boolean = true;
   @type('number') color: number = 0xffffff;
+  @type('boolean') isSpectator: boolean = false;
 }
 
 export class GameState extends Schema {

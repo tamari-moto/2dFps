@@ -343,7 +343,7 @@ export class ServerGameLogic {
    */
   initializePlayers(players: MapSchema<PlayerState>): void {
     const ids: string[] = [];
-    players.forEach((_p, id) => ids.push(id));
+    players.forEach((p, id) => { if (!p.isSpectator) ids.push(id); });
 
     ids.forEach((id, i) => {
       const p = players.get(id)!;

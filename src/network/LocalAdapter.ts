@@ -113,6 +113,8 @@ export class LocalAdapter implements INetworkAdapter {
     }
   }
 
+  isSpectator(): boolean { return false; }
+
   supportsNPC(): boolean { return true; }
 
   /**

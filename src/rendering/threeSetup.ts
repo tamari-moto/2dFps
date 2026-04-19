@@ -37,12 +37,20 @@ export class ThreeSetup {
 
     // Initialize game model via adapter
     const model = adapter.initializeModel();
+    const spectator = adapter.isSpectator();
+
+    // For spectators the assigned playerId is not in model.players;
+    // fall back to the first real player so the camera has a starting position.
+    const myPlayerId = adapter.getMyPlayerId();
+    const activePlayerId = model.players.has(myPlayerId)
+      ? myPlayerId
+      : (model.players.keys().next().value ?? myPlayerId);
 
     // Initialize visualization synchronization
     this.visualizationSync = new VisualizationSync(
       this.sceneManager,
       model,
-      adapter.getMyPlayerId(),
+      activePlayerId,
       this.eventBus,
     );
 
@@ -55,7 +63,7 @@ export class ThreeSetup {
       this.visualizationSync.getMeshToNodeMap(),
       this.eventBus,
       playerIds,
-      adapter.getMyPlayerId(),
+      activePlayerId,
     );
 
     // Keep InputHandler's active player in sync
@@ -67,8 +75,9 @@ export class ThreeSetup {
     this.gameController = new GameController(
       model,
       this.eventBus,
-      adapter.getMyPlayerId(),
-      adapter
+      activePlayerId,
+      adapter,
+      spectator,
     );
 
     // Re-apply obstacles + redraw if obstacles_ready arrives after initializeModel()

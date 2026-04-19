@@ -4,9 +4,10 @@ import { gameEventBus, GameEventType } from '../core/GameEventBus';
 
 interface GameHUDProps {
   threeSetup: ThreeSetup | null;
+  isSpectator?: boolean;
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ threeSetup, isSpectator = false }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
   const [playerIds, setPlayerIds] = React.useState<string[]>([]);
   const [activeId, setActiveId] = React.useState<string>('');
@@ -62,8 +63,19 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     gap: '4px',
   };
 
+  const spectatorBannerStyle: React.CSSProperties = {
+    padding: '6px 14px',
+    backgroundColor: '#7B1FA2',
+    color: '#fff',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    letterSpacing: '2px',
+  };
+
   return (
     <div style={containerStyle}>
+      {isSpectator && <div style={spectatorBannerStyle}>SPECTATING</div>}
       <button
         onClick={handleToggleGrid}
         style={gridButtonStyle}

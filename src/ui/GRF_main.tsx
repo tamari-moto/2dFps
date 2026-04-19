@@ -8,7 +8,7 @@ import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
 
-type AppState = 'lobby' | 'connecting' | 'playing';
+type AppState = 'lobby' | 'connecting' | 'playing' | 'spectating';
 
 const GRF_main = () => {
   const [appState, setAppState] = React.useState<AppState>('lobby');
@@ -26,14 +26,14 @@ const GRF_main = () => {
     };
   }, [threeSetup]);
 
-  const startGame = React.useCallback(async (adapter: INetworkAdapter) => {
+  const startGame = React.useCallback(async (adapter: INetworkAdapter, isSpectator: boolean = false) => {
     const canvas = canvasRef.current;
     if (!canvas || initialized.current) return;
     initialized.current = true;
 
     const setup = setupThree(canvas, adapter);
     setThreeSetup(setup);
-    setAppState('playing');
+    setAppState(isSpectator ? 'spectating' : 'playing');
 
     // Online mode: when another player joins later, add them to the local model + scene.
     if (adapter instanceof ColyseusAdapter) {
@@ -62,20 +62,36 @@ const GRF_main = () => {
     }
   }, [startGame]);
 
+  const handleSpectate = React.useCallback(async (serverUrl: string) => {
+    setAppState('connecting');
+    setErrorMsg('');
+    try {
+      const adapter = new ColyseusAdapter(serverUrl);
+      await adapter.connect(undefined, true);
+      startGame(adapter, true);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : '観戦接続に失敗しました');
+      setAppState('lobby');
+    }
+  }, [startGame]);
+
+  const inGame = appState === 'playing' || appState === 'spectating';
+
   return (
     <div>
       <canvas
         ref={canvasRef}
-        style={{ display: appState === 'playing' ? 'block' : 'none' }}
+        style={{ display: inGame ? 'block' : 'none' }}
       />
-      {appState === 'playing' && <GameHUD threeSetup={threeSetup} />}
-      {appState === 'playing' && <ConsoleLogger />}
-      {appState !== 'playing' && (
+      {inGame && <GameHUD threeSetup={threeSetup} isSpectator={appState === 'spectating'} />}
+      {inGame && <ConsoleLogger />}
+      {!inGame && (
         <LobbyUI
           connecting={appState === 'connecting'}
           errorMsg={errorMsg}
           onOffline={handleOffline}
           onOnline={handleOnline}
+          onSpectate={handleSpectate}
         />
       )}
     </div>

@@ -19,7 +19,8 @@ export class GameController {
   private activePlayerId: string;
   private networkAdapter: INetworkAdapter;
   private stateMachines: Map<string, StateMachine> = new Map();
-  private turnManager: TurnManager;
+  private turnManager?: TurnManager;
+  private readonly isSpectatorMode: boolean;
   private inputLocked: boolean = false;
   private reachableNodes: Set<number> = new Set();
 
@@ -30,19 +31,22 @@ export class GameController {
     model: Model,
     eventBus: GameEventBus,
     activePlayerId: string,
-    networkAdapter: INetworkAdapter
+    networkAdapter: INetworkAdapter,
+    isSpectator: boolean = false,
   ) {
     this.model = model;
     this.eventBus = eventBus;
     this.activePlayerId = activePlayerId;
     this.networkAdapter = networkAdapter;
+    this.isSpectatorMode = isSpectator;
 
-    // Create a StateMachine for each player
-    for (const playerId of model.players.keys()) {
-      this.stateMachines.set(playerId, new StateMachine());
+    if (!isSpectator) {
+      // Create a StateMachine for each player (not needed for spectators)
+      for (const playerId of model.players.keys()) {
+        this.stateMachines.set(playerId, new StateMachine());
+      }
+      this.turnManager = new TurnManager(model);
     }
-
-    this.turnManager = new TurnManager(model);
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
@@ -53,8 +57,11 @@ export class GameController {
    * Sets up event listeners for game events
    */
   private setupEventListeners(): void {
-    this.eventBus.on(GameEventType.NODE_CLICKED, this.handleNodeClick.bind(this));
-    this.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.handleCanvasEmptyClick.bind(this));
+    if (!this.isSpectatorMode) {
+      // Spectators cannot issue commands — skip input event subscriptions
+      this.eventBus.on(GameEventType.NODE_CLICKED, this.handleNodeClick.bind(this));
+      this.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.handleCanvasEmptyClick.bind(this));
+    }
     this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
@@ -202,7 +209,7 @@ export class GameController {
     const allActions: TurnAction[] = [
       { playerId: this.activePlayerId, moveToNodeId: nextNodeId, shotAtNodeId: shotNodeId },
     ];
-    if (this.networkAdapter.supportsNPC()) {
+    if (this.networkAdapter.supportsNPC() && this.turnManager) {
       allActions.push(...this.turnManager.collectNPCActions());
     }
 
@@ -297,13 +304,15 @@ export class GameController {
   private handlePlayerSwitch(data: { currentPlayerId: string }): void {
     if (this.inputLocked) return;
 
-    // Block switching to NPC-controlled players
-    const targetPlayer = this.model.getPlayer(data.currentPlayerId);
-    if (targetPlayer?.isNPC) return;
+    if (!this.isSpectatorMode) {
+      // Block switching to NPC-controlled players (spectators can view any player)
+      const targetPlayer = this.model.getPlayer(data.currentPlayerId);
+      if (targetPlayer?.isNPC) return;
+    }
 
     this.activePlayerId = data.currentPlayerId;
     this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
-    console.log(`Switched to ${data.currentPlayerId}`);
+    console.log(`${this.isSpectatorMode ? '[Spectating]' : 'Switched to'} ${data.currentPlayerId}`);
   }
 
   /**
