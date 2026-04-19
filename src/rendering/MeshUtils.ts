@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 
 /**
+ * Convert game-space (x, y) to Three.js world position.
+ * Game logic uses XY plane; Three.js scene uses XZ plane (Y = up).
+ * Mapping: game(x, y) → three(x, 0, y)
+ */
+export function gameToWorld(gx: number, gy: number, height = 0): THREE.Vector3 {
+  return new THREE.Vector3(gx, height, gy);
+}
+
+/**
  * Creates a placeholder undefined mesh
  */
 export function createUndefinedMesh(): THREE.Mesh {

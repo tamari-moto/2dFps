@@ -6,6 +6,7 @@ import { PlayerAnimator } from './PlayerAnimator';
 import { createVariantPlayer } from './PlayerMeshFactory';
 import { AnimationConfig, RenderConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConfig';
+import { gameToWorld } from './MeshUtils';
 
 /**
  * Manages the lifecycle of player mesh objects:
@@ -119,23 +120,24 @@ export class PlayerLifecycleManager {
     const obj = this.playerMeshes.get(playerId);
     if (!obj) return false;
 
-    const dx = obj.position.x - targetX;
-    const dy = obj.position.y - targetY;
-    const moving = Math.sqrt(dx * dx + dy * dy) > 0.5;
+    const worldTarget = gameToWorld(targetX, targetY, RenderConfig.PlayerZOffset);
+    const dx = obj.position.x - worldTarget.x;
+    const dz = obj.position.z - worldTarget.z;
+    const moving = Math.sqrt(dx * dx + dz * dz) > 0.5;
 
     if (moving && this.animator.getState(playerId) === 'idle') {
       this.animator.startWalk(playerId);
     }
 
     gsap.to(obj.position, {
-      x: targetX,
-      y: targetY,
+      x: worldTarget.x,
+      y: worldTarget.y,
+      z: worldTarget.z,
       duration: AnimationConfig.MovementDuration,
     });
-    obj.position.z = RenderConfig.PlayerZOffset;
 
-    obj.rotation.x = Math.PI / 2;
-    obj.rotation.y = (angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
+    obj.rotation.x = 0;
+    obj.rotation.y = -((angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset);
     obj.rotation.z = 0;
 
     const scale = isActive ? PLAYER_CONSTANTS.ACTIVE_SCALE : PLAYER_CONSTANTS.NORMAL_SCALE;

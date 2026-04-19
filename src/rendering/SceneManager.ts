@@ -15,6 +15,7 @@ export class SceneManager {
   private composer: EffectComposer | null = null;
   private boundHandleResize: () => void;
   private boundHandleWheel: (e: WheelEvent) => void;
+  private tickCallbacks: Set<() => void> = new Set();
 
   constructor(canvas: HTMLCanvasElement) {
     // Setup renderer
@@ -36,9 +37,10 @@ export class SceneManager {
     this.camera.aspect = width / height;
     this.camera.position.set(
       -CameraConfig.BackDistance,
-      0,
       CameraConfig.OffsetZ,
+      0,
     );
+    this.camera.up.set(0, 1, 0);
     this.camera.updateProjectionMatrix();
 
     // Setup controls
@@ -52,6 +54,9 @@ export class SceneManager {
 
     // Add background grid
     this.createBackgroundGrid();
+
+    // Add XYZ axes helper at origin (X=red, Y=green, Z=blue)
+    this.scene.add(new THREE.AxesHelper(MapConfig.NodeSpacing * 3));
 
     // Add lights
     this.addLighting();
@@ -118,15 +123,15 @@ export class SceneManager {
 
     for (let i = 0; i < size; i++) {
       const x = i * spacing;
-      const vPts = [new THREE.Vector3(x, 0, -0.5), new THREE.Vector3(x, total, -0.5)];
+      const vPts = [new THREE.Vector3(x, -0.5, 0), new THREE.Vector3(x, -0.5, total)];
       const vLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(vPts), material);
       vLine.userData['isGrid'] = true;
       this.scene.add(vLine);
     }
 
     for (let i = 0; i < size; i++) {
-      const y = i * spacing;
-      const hPts = [new THREE.Vector3(0, y, -0.5), new THREE.Vector3(total, y, -0.5)];
+      const z = i * spacing;
+      const hPts = [new THREE.Vector3(0, -0.5, z), new THREE.Vector3(total, -0.5, z)];
       const hLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hPts), material);
       hLine.userData['isGrid'] = true;
       this.scene.add(hLine);
@@ -149,11 +154,11 @@ export class SceneManager {
    */
   panCamera(screenDx: number, screenDy: number, sensitivity: number): void {
     const wx = screenDx * sensitivity;
-    const wy = -screenDy * sensitivity;
+    const wz = screenDy * sensitivity;
     this.camera.position.x += wx;
-    this.camera.position.y += wy;
+    this.camera.position.z += wz;
     this.orbitControls.target.x += wx;
-    this.orbitControls.target.y += wy;
+    this.orbitControls.target.z += wz;
     this.orbitControls.update();
   }
 
@@ -177,10 +182,21 @@ export class SceneManager {
     this.orbitControls.update();
   }
 
+  /** Registers a callback invoked every frame before rendering. */
+  addTickCallback(cb: () => void): void {
+    this.tickCallbacks.add(cb);
+  }
+
+  /** Unregisters a previously added tick callback. */
+  removeTickCallback(cb: () => void): void {
+    this.tickCallbacks.delete(cb);
+  }
+
   /**
    * Renders the scene (via EffectComposer if bloom is enabled)
    */
   render(): void {
+    for (const cb of this.tickCallbacks) cb();
     if (this.composer) {
       this.composer.render();
     } else {

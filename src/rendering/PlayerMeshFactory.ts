@@ -140,7 +140,7 @@ function buildArmGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE
 }
 
 // ── Gear: handgun (SCOUT) ─────────────────────────────────────────────────────
-// 座標系: VisualizationSync が rotation.x = π/2 を適用するため
+// 座標系: PlayerLifecycleManager が rotation.x = π/2 を適用するため
 //   ローカル +Y → 前方（プレイヤーが向く方向）
 //   ローカル +X → 右
 //   ローカル +Z → カメラ向き（上から見える面）
@@ -182,7 +182,7 @@ function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.G
 /**
  * Creates a humanoid Scout player character.
  *
- * Coordinate note: VisualizationSync applies rotation.x = π/2 to lay the group flat.
+ * Coordinate note: PlayerLifecycleManager applies rotation.x = π/2 to lay the group flat.
  * After that rotation:
  *   local +Y → screen forward (player facing direction)
  *   local ±X → screen left/right
@@ -212,6 +212,8 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   group.add(rightArm);
 
   group.add(buildGearGun(s, HS, rx, color));
+
+  group.add(new THREE.AxesHelper(s * 1.5));
 
   group.userData.partNames = SCOUT_PART_NAMES;
 

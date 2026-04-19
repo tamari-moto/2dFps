@@ -10,13 +10,32 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
   const [playerIds, setPlayerIds] = React.useState<string[]>([]);
   const [activeId, setActiveId] = React.useState<string>('');
+  const [activeAngle, setActiveAngle] = React.useState<number | null>(null);
+
+  const refreshAngle = React.useCallback((id: string) => {
+    if (!threeSetup) return;
+    const player = threeSetup.getModel().players.get(id);
+    setActiveAngle(player ? Math.round(player.angle) : null);
+  }, [threeSetup]);
 
   React.useEffect(() => {
     if (!threeSetup) return;
     const ids = threeSetup.getPlayerIds();
     setPlayerIds(ids);
-    setActiveId(ids[0] ?? '');
-  }, [threeSetup]);
+    const firstId = ids[0] ?? '';
+    setActiveId(firstId);
+    refreshAngle(firstId);
+  }, [threeSetup, refreshAngle]);
+
+  React.useEffect(() => {
+    const onView = () => setActiveAngle(prev => {
+      if (!threeSetup || !activeId) return prev;
+      const player = threeSetup.getModel().players.get(activeId);
+      return player ? Math.round(player.angle) : prev;
+    });
+    gameEventBus.on(GameEventType.VIS_UPDATE_VIEW, onView);
+    return () => gameEventBus.off(GameEventType.VIS_UPDATE_VIEW, onView);
+  }, [threeSetup, activeId]);
 
   const handleToggleGrid = () => {
     if (!threeSetup) return;
@@ -26,6 +45,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
 
   const handleSwitchPlayer = (id: string) => {
     setActiveId(id);
+    refreshAngle(id);
     gameEventBus.emit(GameEventType.PLAYER_SWITCHED, {
       previousPlayerId: activeId,
       currentPlayerId: id,
@@ -87,6 +107,18 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
               {id}
             </button>
           ))}
+        </div>
+      )}
+      {activeAngle !== null && (
+        <div style={{
+          color: '#00e5ff',
+          fontSize: '12px',
+          fontFamily: 'monospace',
+          background: 'rgba(0,0,0,0.5)',
+          padding: '3px 8px',
+          borderRadius: '3px',
+        }}>
+          angle: {activeAngle}°
         </div>
       )}
     </div>
