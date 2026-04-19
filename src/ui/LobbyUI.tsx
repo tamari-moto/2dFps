@@ -5,9 +5,10 @@ interface LobbyUIProps {
   errorMsg: string;
   onOffline: () => void;
   onOnline: (serverUrl: string) => void;
+  onSpectate: (serverUrl: string) => void;
 }
 
-const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOnline }) => {
+const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOnline, onSpectate }) => {
   const [serverUrl, setServerUrl] = React.useState(
     import.meta.env.VITE_SERVER_URL ?? 'ws://localhost:2567'
   );
@@ -55,6 +56,13 @@ const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOn
     backgroundColor: '#2196F3',
     color: '#fff',
     minWidth: '160px',
+  };
+
+  const spectateButtonStyle: React.CSSProperties = {
+    ...buttonBase,
+    backgroundColor: '#7B1FA2',
+    color: '#fff',
+    minWidth: '120px',
   };
 
   const inputStyle: React.CSSProperties = {
@@ -116,6 +124,13 @@ const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOn
           disabled={connecting}
         >
           {connecting ? '接続中...' : 'オンライン接続'}
+        </button>
+        <button
+          style={spectateButtonStyle}
+          onClick={() => onSpectate(serverUrl)}
+          disabled={connecting}
+        >
+          {connecting ? '接続中...' : '観戦する'}
         </button>
       </div>
 

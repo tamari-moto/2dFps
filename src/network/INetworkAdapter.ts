@@ -11,6 +11,9 @@ export interface INetworkAdapter {
   /** Returns the player ID assigned to the local user */
   getMyPlayerId(): string;
 
+  /** Returns true if the local client joined as a spectator */
+  isSpectator(): boolean;
+
   /**
    * Initializes and returns the game Model.
    * LocalAdapter creates a fresh Model; ColyseusAdapter builds one from server state.

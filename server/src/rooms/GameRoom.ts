@@ -18,13 +18,14 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
-  onJoin(client: Client): void {
+  onJoin(client: Client, options: { spectate?: boolean } = {}): void {
     const player = new PlayerState();
     player.id = client.sessionId;
+    player.isSpectator = options.spectate === true;
     this.state.players.set(client.sessionId, player);
 
-    // Notify this client of their assigned ID
-    client.send('player_assigned', { playerId: client.sessionId });
+    // Notify this client of their assigned ID and spectator status
+    client.send('player_assigned', { playerId: client.sessionId, isSpectator: player.isSpectator });
 
     // Send server-authoritative config so client can override its local defaults
     client.send('server_config', {
@@ -41,25 +42,29 @@ export class GameRoom extends Room<GameState> {
       },
     });
 
-    console.log(`[GameRoom] ${client.sessionId} joined (${this.state.players.size}/${this.maxClients})`);
+    const role = player.isSpectator ? 'SPECTATOR' : 'player';
+    console.log(`[GameRoom] ${client.sessionId} joined as ${role} (${this.state.players.size}/${this.maxClients})`);
 
-    // Start game when enough players have joined
-    if (!this.state.gameStarted && this.state.players.size >= MIN_PLAYERS_TO_START) {
+    // Start game when enough non-spectator players have joined
+    if (!this.state.gameStarted && this.countActivePlayers() >= MIN_PLAYERS_TO_START) {
       this.startGame();
     } else if (this.state.gameStarted) {
-      // Game already started: send current map state to newly joined client
+      // Game already started: send current map state to newly joined client (including spectators)
       client.send('obstacles_ready', { obstacles: this.logic.getObstacles() });
       client.send('game_started', {});
     }
   }
 
   onLeave(client: Client): void {
+    const leaving = this.state.players.get(client.sessionId);
+    const wasSpectator = leaving?.isSpectator ?? false;
+
     this.state.players.delete(client.sessionId);
     this.broadcast('player_left', { playerId: client.sessionId });
     console.log(`[GameRoom] ${client.sessionId} left`);
 
-    // If only one player remains during a started game, end it
-    if (this.state.gameStarted) {
+    // Spectator departure does not affect game-end conditions
+    if (!wasSpectator && this.state.gameStarted) {
       const alive = this.countAlivePlayers();
       if (alive <= 1) {
         this.endGame();
@@ -91,6 +96,12 @@ export class GameRoom extends Room<GameState> {
       return;
     }
 
+    const actor = this.state.players.get(client.sessionId);
+    if (actor?.isSpectator) {
+      client.send('error', { code: 'SPECTATOR_CANNOT_ACT' });
+      return;
+    }
+
     if (action.playerId !== client.sessionId) {
       client.send('error', { code: 'INVALID_PLAYER_ID' });
       return;
@@ -114,15 +125,21 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
+  private countActivePlayers(): number {
+    let count = 0;
+    this.state.players.forEach(p => { if (!p.isSpectator) count++; });
+    return count;
+  }
+
   private countAlivePlayers(): number {
     let count = 0;
-    this.state.players.forEach(p => { if (p.isAlive) count++; });
+    this.state.players.forEach(p => { if (!p.isSpectator && p.isAlive) count++; });
     return count;
   }
 
   private getAlivePlayerId(): string | null {
     let found: string | null = null;
-    this.state.players.forEach((p, id) => { if (p.isAlive) found = id; });
+    this.state.players.forEach((p, id) => { if (!p.isSpectator && p.isAlive) found = id; });
     return found;
   }
 
