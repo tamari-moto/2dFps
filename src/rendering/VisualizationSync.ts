@@ -7,6 +7,7 @@ import { PlayerAnimator } from './PlayerAnimator';
 import { PlayerLifecycleManager } from './PlayerLifecycleManager';
 import { CameraFollowController } from './CameraFollowController';
 import { NodeVisualizationManager } from './NodeVisualizationManager';
+import { HPBarManager } from './HPBarManager';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
@@ -17,6 +18,7 @@ export class VisualizationSync {
   private lifecycle: PlayerLifecycleManager;
   private animator:  PlayerAnimator;
   private camera:    CameraFollowController;
+  private hpBar:     HPBarManager;
   private model:     Model;
 
   private activePlayerId: string;
@@ -30,10 +32,17 @@ export class VisualizationSync {
     this.model = model;
     this.activePlayerId = activePlayerId;
 
+    const humanPlayerIds = new Set(
+      Array.from(model.players.entries())
+        .filter(([, p]) => !p.isNPC)
+        .map(([id]) => id),
+    );
+
     // Shared map — PlayerAnimator and PlayerLifecycleManager both reference it
     const meshMap = new Map<string, THREE.Object3D>();
     this.animator  = new PlayerAnimator(meshMap);
-    this.lifecycle = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
+    this.hpBar     = new HPBarManager();
+    this.lifecycle = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, this.hpBar, humanPlayerIds);
     this.nodeVis   = new NodeVisualizationManager(sceneManager, model);
     this.camera    = new CameraFollowController(sceneManager);
 
@@ -113,6 +122,8 @@ export class VisualizationSync {
       if (isActive && moving) {
         this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
       }
+
+      this.hpBar.update(playerId, player.health, player.maxHealth);
     }
   }
 
@@ -147,6 +158,7 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
       this.lifecycle.showHitEffect(data.playerId);
+      this.lifecycle.updateHPBar(data.playerId);
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
       this.lifecycle.hidePlayer(data.playerId);
