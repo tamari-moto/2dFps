@@ -6,6 +6,7 @@ import { PlayerAnimator } from './PlayerAnimator';
 import { createVariantPlayer } from './PlayerMeshFactory';
 import { AnimationConfig, RenderConfig } from '../config/GameConfig';
 import { PLAYER_CONSTANTS } from '../config/GameConfig';
+import { HPBarManager } from './HPBarManager';
 
 /**
  * Manages the lifecycle of player mesh objects:
@@ -19,6 +20,8 @@ export class PlayerLifecycleManager {
     private animator: PlayerAnimator,
     private model: Model,
     meshMap: Map<string, THREE.Object3D>,
+    private hpBarManager: HPBarManager,
+    private humanPlayerIds: Set<string>,
   ) {
     this.playerMeshes = meshMap;
   }
@@ -31,6 +34,8 @@ export class PlayerLifecycleManager {
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
       this.animator.startIdle(playerId);
+      const isSelf = this.humanPlayerIds.has(playerId);
+      this.hpBarManager.attachToPlayer(obj, playerId, isSelf, player.isNPC);
     }
   }
 
@@ -41,6 +46,14 @@ export class PlayerLifecycleManager {
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
     this.animator.startIdle(playerId);
+    const player = this.model.getPlayer(playerId);
+    const isSelf = this.humanPlayerIds.has(playerId);
+    this.hpBarManager.attachToPlayer(obj, playerId, isSelf, player?.isNPC ?? false);
+  }
+
+  updateHPBar(playerId: string): void {
+    const player = this.model.getPlayer(playerId);
+    if (player) this.hpBarManager.update(playerId, player.health, player.maxHealth);
   }
 
   // ── Visual effects ─────────────────────────────────────────────────────────

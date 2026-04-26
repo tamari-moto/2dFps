@@ -290,6 +290,28 @@ export const RenderConfig = {
 } as const;
 
 /**
+ * HP bar (3D in-scene) configuration
+ */
+export const HPBarConfig = {
+  /** Bar width in world units */
+  Width: 24,
+  /** Bar height in world units */
+  Height: 3,
+  /** Z offset above the player mesh center */
+  ZOffset: 18,
+  /** Foreground color: human player = green */
+  ColorSelf: 0x00e676,
+  /** Foreground color: ally NPC = blue */
+  ColorAlly: 0x2196f3,
+  /** Foreground color: enemy = red */
+  ColorEnemy: 0xff1744,
+  /** Background (empty HP) color */
+  ColorBg: 0x333333,
+  /** HP change animation duration (seconds) */
+  AnimDuration: 0.4,
+} as const;
+
+/**
  * Lighting configuration
  */
 export const LightingConfig = {
