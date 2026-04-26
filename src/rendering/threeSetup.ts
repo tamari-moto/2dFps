@@ -101,6 +101,7 @@ export class ThreeSetup {
    */
   private startRenderLoop(): void {
     const render = () => {
+      this.visualizationSync.updateBillboards(this.sceneManager.getCamera());
       this.sceneManager.render();
       requestAnimationFrame(render);
     };

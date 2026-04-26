@@ -501,6 +501,28 @@ export const MobileUIConfig = {
 } as const;
 
 /**
+ * HP bar (3D billboard) configuration
+ */
+export const HPBarConfig = {
+  /** Bar width in world units (matches PlayerMarkerSize) */
+  Width: 22,
+  /** Bar height in world units */
+  Height: 2.5,
+  /** Z position of HP bar above the play surface */
+  ZOffset: 20,
+  /** Background (empty HP) color */
+  BgColor: 0x1a1a1a,
+  /** Self (local player) bar color - green */
+  SelfColor: 0x00cc44,
+  /** Ally (human, non-self) bar color - blue */
+  AllyColor: 0x4488ff,
+  /** Enemy / NPC bar color - red */
+  EnemyColor: 0xff3333,
+  /** GSAP animation duration for HP change */
+  AnimDuration: 0.3,
+} as const;
+
+/**
  * Calculated values (derived from other config values)
  */
 export const CalculatedConfig = {

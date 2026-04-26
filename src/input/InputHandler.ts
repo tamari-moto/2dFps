@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { KEYBOARD_KEYS } from '../config/GameConstants';
-import { MobileUIConfig } from '../config/GameConfig';
 
 
 /**
@@ -23,12 +22,6 @@ export class InputHandler {
   private readonly handleTouchMoveBound: (e: TouchEvent) => void;
   private pinchStartDistance: number | null = null;
   private onPinchZoom: ((delta: number) => void) | null = null;
-  private onCameraPan: ((dx: number, dy: number) => void) | null = null;
-  private touchStartX: number = 0;
-  private touchStartY: number = 0;
-  private touchLastX: number = 0;
-  private touchLastY: number = 0;
-  private readonly handleTouchEndBound: (e: TouchEvent) => void;
 
   constructor(
     canvas: HTMLCanvasElement,

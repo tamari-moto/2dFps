@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { Model } from '../model/model';
 import { ViewAngleVisualizer } from './ViewAngleVisualizer';
 import { SceneManager } from './SceneManager';
-import { CameraConfig, PlayerConfig } from '../config/GameConfig';
+import { CameraConfig, HPBarConfig, PlayerConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerAnimator } from './PlayerAnimator';
 import { PlayerLifecycleManager } from './PlayerLifecycleManager';
 import { CameraFollowController } from './CameraFollowController';
 import { NodeVisualizationManager } from './NodeVisualizationManager';
+import { HPBarManager } from './HPBarManager';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
@@ -19,6 +20,7 @@ export class VisualizationSync {
   private animator:  PlayerAnimator;
   private camera:    CameraFollowController;
   private viewAngle: ViewAngleVisualizer;
+  private hpBars:    HPBarManager;
   private model:     Model;
 
   private activePlayerId: string;
@@ -40,10 +42,13 @@ export class VisualizationSync {
     this.camera    = new CameraFollowController(sceneManager);
     this.viewAngle = new ViewAngleVisualizer(sceneManager.getScene());
 
+    this.hpBars = new HPBarManager(sceneManager.getScene());
+
     // Initialize scene objects
     this.nodeVis.initializeNodes();
     this.nodeVis.initializeWalls();
     this.lifecycle.initializePlayers();
+    this.initializeHPBars();
 
     // Snap camera to starting player (no animation)
     const initialPlayer = model.getPlayer(activePlayerId);
@@ -67,6 +72,13 @@ export class VisualizationSync {
 
   addPlayerMesh(playerId: string, color: number): void {
     this.lifecycle.addPlayer(playerId, color);
+    this.hpBars.createBar(playerId, this.getBarColor(playerId));
+    const player = this.model.getPlayer(playerId);
+    if (player) this.hpBars.updateHP(playerId, player.health, player.maxHealth);
+  }
+
+  updateBillboards(camera: THREE.PerspectiveCamera): void {
+    this.hpBars.updateBillboards(camera, this.lifecycle.playerMeshes);
   }
 
   getMeshList(): THREE.Mesh[] {
@@ -78,6 +90,19 @@ export class VisualizationSync {
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
+
+  private initializeHPBars(): void {
+    for (const [playerId, player] of this.model.players) {
+      this.hpBars.createBar(playerId, this.getBarColor(playerId));
+      this.hpBars.updateHP(playerId, player.health, player.maxHealth);
+    }
+  }
+
+  private getBarColor(playerId: string): number {
+    if (playerId === this.activePlayerId) return HPBarConfig.SelfColor;
+    const player = this.model.getPlayer(playerId);
+    return player?.isNPC ? HPBarConfig.EnemyColor : HPBarConfig.AllyColor;
+  }
 
   private doUpdateView(): void {
     const activePlayer = this.model.getPlayer(this.activePlayerId);
@@ -109,6 +134,7 @@ export class VisualizationSync {
         || visibleNodeIds.has(player.node.id);
 
       this.lifecycle.setVisible(playerId, shouldShow);
+      this.hpBars.setVisible(playerId, shouldShow);
       if (!shouldShow) continue;
 
       const moving = this.lifecycle.applyTransform(
@@ -151,9 +177,12 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
       this.lifecycle.showHitEffect(data.playerId);
+      const player = this.model.getPlayer(data.playerId);
+      if (player) this.hpBars.updateHP(data.playerId, player.health, player.maxHealth);
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
       this.lifecycle.hidePlayer(data.playerId);
+      this.hpBars.setVisible(data.playerId, false);
     });
 
     eventBus.on(GameEventType.VIS_TOGGLE_VIEW_ANGLE, () => {
