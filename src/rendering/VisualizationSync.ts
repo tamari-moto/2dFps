@@ -23,6 +23,7 @@ export class VisualizationSync {
   private model:         Model;
 
   private activePlayerId: string;
+  private fpsModeActive = false;
 
   constructor(
     sceneManager: SceneManager,
@@ -78,6 +79,16 @@ export class VisualizationSync {
     return this.nodeVis.getMeshToNodeMap();
   }
 
+  /** Returns the camera follow controller (used by FPSCameraController to snap on disable). */
+  getCameraFollow(): CameraFollowController {
+    return this.camera;
+  }
+
+  /** Returns the currently active player ID. */
+  getActivePlayerId(): string {
+    return this.activePlayerId;
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private doUpdateView(): void {
@@ -114,7 +125,7 @@ export class VisualizationSync {
       const moving = this.lifecycle.applyTransform(
         playerId, player.node.x, player.node.y, player.angle, isActive,
       );
-      if (isActive && moving) {
+      if (isActive && moving && !this.fpsModeActive) {
         this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
       }
     }
@@ -126,10 +137,14 @@ export class VisualizationSync {
     eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
       this.activePlayerId = data.playerId;
       const player = this.model.getPlayer(data.playerId);
-      if (player) {
+      if (player && !this.fpsModeActive) {
         this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowPanDuration, CameraConfig.FollowPanEase);
       }
       this.doUpdateView();
+    });
+
+    eventBus.on(GameEventType.FPS_MODE_CHANGED, (data: { enabled: boolean }) => {
+      this.fpsModeActive = data.enabled;
     });
 
     eventBus.on(GameEventType.VIS_SET_SELECT_MESH, (data: { nodeId: number }) => {

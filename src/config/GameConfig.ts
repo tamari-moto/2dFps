@@ -519,8 +519,32 @@ export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
  * Keyboard key constants for game controls
  */
 export const KEYBOARD_KEYS = {
-  DANCE: 'd',
-  DANCE_UPPER: 'D',
+  DANCE: 'f',
+  DANCE_UPPER: 'F',
+  SPECTATOR_TOGGLE: 't',
+  SPECTATOR_TOGGLE_UPPER: 'T',
+} as const;
+
+/**
+ * FPS spectator mode parameters.
+ * 観戦モードは T キーで通常追従カメラと FPS フリーカメラを切り替える。
+ * 移動・視点・感度などすべてここで一元管理する。
+ */
+export const FPSConfig = {
+  /** 水平移動速度（world units / sec） */
+  MoveSpeed: 200,
+  /** Shift 押下時の速度乗数 */
+  SprintMultiplier: 2,
+  /** マウス感度（度 / pixel） */
+  MouseSensitivity: 0.15,
+  /** 観戦カメラの初期目線高さ（world Y、プレイヤー頭部相当） */
+  EyeHeight: 12,
+  /** ピッチ制限（度、上下対称）。±90° に近づくとジンバルロックするため少し内側に */
+  PitchLimit: 85,
+  /** FPS モード時の FOV（通常 90° → 75° に狭めて没入感を出す） */
+  FOV: 75,
+  /** dt のクランプ上限（秒）。タブ復帰時の巨大 dt で吹き飛ぶのを防ぐ */
+  MaxDeltaSeconds: 0.1,
 } as const;
 
 /**

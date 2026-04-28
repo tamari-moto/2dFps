@@ -56,6 +56,10 @@ export enum GameEventType {
   NPC_TURNS_COMPLETE = 'npc:turns_complete',
   INPUT_LOCKED = 'input:locked',
 
+  // Spectator (FPS) mode events
+  FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
+  FPS_MODE_CHANGED = 'fps:mode_changed',
+
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
   NETWORK_DISCONNECTED = 'network:disconnected',
@@ -170,6 +174,12 @@ export interface GameEventData {
   [GameEventType.NPC_TURNS_COMPLETE]: void;
   [GameEventType.INPUT_LOCKED]: {
     locked: boolean;
+  };
+
+  // Spectator (FPS) mode events
+  [GameEventType.FPS_MODE_TOGGLE_REQUESTED]: void;
+  [GameEventType.FPS_MODE_CHANGED]: {
+    enabled: boolean;
   };
 
   // Network events

@@ -1,5 +1,6 @@
 import { SceneManager } from './SceneManager';
 import { VisualizationSync } from './VisualizationSync';
+import { FPSCameraController } from './FPSCameraController';
 import { InputHandler } from '../input/InputHandler';
 import { GameController } from '../logic/GameController';
 import { GameEventBus, GameEventType, gameEventBus } from '../core/GameEventBus';
@@ -19,6 +20,7 @@ export class ThreeSetup {
   private inputHandler: InputHandler;
   private gameController: GameController;
   private eventBus: GameEventBus;
+  private fpsCamera: FPSCameraController;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -70,6 +72,24 @@ export class ThreeSetup {
       adapter.getMyPlayerId(),
       adapter
     );
+
+    // Initialize FPS spectator camera (T キーで通常追従と切替)
+    this.fpsCamera = new FPSCameraController(
+      this.sceneManager.getCamera(),
+      canvas,
+      this.sceneManager,
+      this.visualizationSync.getCameraFollow(),
+      this.eventBus,
+      model,
+      () => this.visualizationSync.getActivePlayerId(),
+    );
+    this.eventBus.on(GameEventType.FPS_MODE_TOGGLE_REQUESTED, () => {
+      if (this.fpsCamera.isEnabled()) {
+        this.fpsCamera.disable();
+      } else {
+        this.fpsCamera.enable();
+      }
+    });
 
     // Re-apply obstacles + redraw if obstacles_ready arrives after initializeModel()
     adapter.onObstaclesReady((obstacles) => {
@@ -136,6 +156,7 @@ export class ThreeSetup {
    * Disposes all resources
    */
   dispose(): void {
+    this.fpsCamera.dispose();
     this.eventBus.removeAllListeners();
     this.sceneManager.dispose();
     this.inputHandler.dispose();
