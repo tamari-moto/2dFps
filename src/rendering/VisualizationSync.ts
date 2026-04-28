@@ -1,23 +1,26 @@
 import * as THREE from 'three';
 import { Model } from '../model/model';
 import { SceneManager } from './SceneManager';
-import { CameraConfig, PlayerConfig } from '../config/GameConfig';
+import { CameraConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerAnimator } from './PlayerAnimator';
 import { PlayerLifecycleManager } from './PlayerLifecycleManager';
 import { CameraFollowController } from './CameraFollowController';
 import { NodeVisualizationManager } from './NodeVisualizationManager';
+import { TextBurstEffect } from './TextBurstEffect';
+import { gameToWorld } from './MeshUtils';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
  * to GameEventBus. External API is unchanged so threeSetup.ts needs no edits.
  */
 export class VisualizationSync {
-  private nodeVis:   NodeVisualizationManager;
-  private lifecycle: PlayerLifecycleManager;
-  private animator:  PlayerAnimator;
-  private camera:    CameraFollowController;
-  private model:     Model;
+  private nodeVis:       NodeVisualizationManager;
+  private lifecycle:     PlayerLifecycleManager;
+  private animator:      PlayerAnimator;
+  private camera:        CameraFollowController;
+  private mohicanEffect: TextBurstEffect;
+  private model:         Model;
 
   private activePlayerId: string;
 
@@ -32,10 +35,11 @@ export class VisualizationSync {
 
     // Shared map — PlayerAnimator and PlayerLifecycleManager both reference it
     const meshMap = new Map<string, THREE.Object3D>();
-    this.animator  = new PlayerAnimator(meshMap);
-    this.lifecycle = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
-    this.nodeVis   = new NodeVisualizationManager(sceneManager, model);
-    this.camera    = new CameraFollowController(sceneManager);
+    this.animator      = new PlayerAnimator(meshMap);
+    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
+    this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
+    this.camera        = new CameraFollowController(sceneManager);
+    this.mohicanEffect = new TextBurstEffect(sceneManager);
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -165,6 +169,11 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {
       this.animator.startDance(data.playerId);
+      const player = this.model.getPlayer(data.playerId);
+      if (player) {
+        const w = gameToWorld(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
+        this.mohicanEffect.play(w.x, w.y, w.z);
+      }
     });
   }
 }

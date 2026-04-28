@@ -198,6 +198,34 @@ export const AnimationConfig = {
 } as const;
 
 /**
+ * Text burst effect configuration (dance victory effect)
+ */
+export const TextBurstEffectConfig = {
+  /** 飛来開始距離（world units） */
+  FlyInDistance: 600,
+  /** スプライトのワールドスケール */
+  SpriteWorldSize: 30,
+  /** 1文字あたりの着地半径基準値（world units）。文字数が増えると自動で拡大 */
+  LandRadiusPerChar: 30,
+  /** 支点の Y 位置オフセット（プレイヤー Y + これ） */
+  PivotYOffset: 10,
+  /** 1文字あたりの扇半角基準値（度）。文字数が増えると自動で拡大 */
+  FanHalfAngleDegPerChar: 20,
+  /** 飛び込みアニメ秒数 */
+  FlyInDuration: 0.35,
+  /** 扇開きアニメ秒数 */
+  FanOpenDuration: 0.25,
+  /** 表示維持秒数 */
+  HoldDuration: 1.2,
+  /** フェードアウト秒数 */
+  FadeOutDuration: 0.4,
+  /** 文字色 */
+  TextColor: '#ffdd00',
+  /** キャンバス1辺サイズ（px） */
+  CanvasSize: 128,
+} as const;
+
+/**
  * Camera configuration
  */
 export const CameraConfig = {
