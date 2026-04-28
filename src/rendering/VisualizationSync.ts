@@ -19,7 +19,7 @@ export class VisualizationSync {
   private lifecycle:     PlayerLifecycleManager;
   private animator:      PlayerAnimator;
   private camera:        CameraFollowController;
-  private mohicanEffect: TextBurstEffect;
+  private textBurstEffect: TextBurstEffect;
   private model:         Model;
 
   private activePlayerId: string;
@@ -39,7 +39,7 @@ export class VisualizationSync {
     this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
     this.camera        = new CameraFollowController(sceneManager);
-    this.mohicanEffect = new TextBurstEffect(sceneManager);
+    this.textBurstEffect = new TextBurstEffect(sceneManager);
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -172,7 +172,8 @@ export class VisualizationSync {
       const player = this.model.getPlayer(data.playerId);
       if (player) {
         const w = gameToWorld(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
-        this.mohicanEffect.play(w.x, w.y, w.z);
+        this.textBurstEffect.play(w.x, w.y, w.z);
+        this.textBurstEffect.playDanceBurst(w.x, w.y, w.z);
       }
     });
   }

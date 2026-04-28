@@ -223,6 +223,20 @@ export const TextBurstEffectConfig = {
   TextColor: '#ffdd00',
   /** キャンバス1辺サイズ（px） */
   CanvasSize: 128,
+
+  // --- ダンスバースト ---
+  /** ダンス中の発射回数 */
+  DanceBurstCount: 6,
+  /** 発射間隔（ms） */
+  DanceBurstIntervalMs: 150,
+  /** バーストで使用する文字 */
+  DanceBurstChars: ['ダ', 'ン', 'ス'] as string[],
+  /** 飛び出し半径（world units） */
+  DanceBurstFlyRadius: 60,
+  /** 飛び出し＋フェードアウト秒数 */
+  DanceBurstDuration: 0.4,
+  /** バーストスプライトのワールドスケール */
+  DanceBurstSpriteSize: 25,
 } as const;
 
 /**

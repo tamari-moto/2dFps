@@ -7,7 +7,63 @@ const CHARS = ['モ', 'ヒ', 'カ', 'ン'] as const;
 
 
 export class TextBurstEffect {
+  private burstTimers: ReturnType<typeof setInterval>[] = [];
+
   constructor(private sceneManager: SceneManager) {}
+
+  playDanceBurst(worldX: number, worldY: number, worldZ: number): void {
+    const cfg = TextBurstEffectConfig;
+    const camera = this.sceneManager.getCamera();
+
+    let count = 0;
+    const id = setInterval(() => {
+      if (count >= cfg.DanceBurstCount) {
+        clearInterval(id);
+        this.burstTimers = this.burstTimers.filter(t => t !== id);
+        return;
+      }
+
+      const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      const camUp    = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+      const pivot    = new THREE.Vector3(worldX, worldY, worldZ);
+
+      cfg.DanceBurstChars.forEach((char, i) => {
+        // 各文字を均等角度オフセット + ランダムベース角度で飛ばす
+        const baseAngle = Math.random() * Math.PI * 2;
+        const angleRad  = baseAngle + (i / cfg.DanceBurstChars.length) * Math.PI * 2;
+
+        const target = pivot.clone()
+          .addScaledVector(camRight, cfg.DanceBurstFlyRadius * Math.cos(angleRad))
+          .addScaledVector(camUp,    cfg.DanceBurstFlyRadius * Math.sin(angleRad));
+
+        const sprite = this.createSprite(char, cfg.DanceBurstSpriteSize);
+        sprite.position.copy(pivot);
+        this.sceneManager.addToScene(sprite);
+
+        gsap.timeline({
+          onComplete: () => {
+            this.sceneManager.removeFromScene(sprite);
+            (sprite.material as THREE.SpriteMaterial).map?.dispose();
+            (sprite.material as THREE.SpriteMaterial).dispose();
+          },
+        })
+          .to(sprite.position, {
+            x: target.x, y: target.y, z: target.z,
+            duration: cfg.DanceBurstDuration,
+            ease: 'power2.out',
+          }, 0)
+          .to(sprite.material as THREE.SpriteMaterial, {
+            opacity: 0,
+            duration: cfg.DanceBurstDuration,
+            ease: 'power1.in',
+          }, 0);
+      });
+
+      count++;
+    }, cfg.DanceBurstIntervalMs);
+
+    this.burstTimers.push(id);
+  }
 
   play(worldX: number, worldY: number, worldZ: number): void {
     const cfg = TextBurstEffectConfig;
@@ -44,7 +100,6 @@ export class TextBurstEffect {
     const sprites = CHARS.map((char) => {
       const sprite = this.createSprite(char);
       sprite.position.copy(pivot);
-      sprite.scale.setScalar(cfg.SpriteWorldSize);
       this.sceneManager.addToScene(sprite);
       return sprite;
     });
@@ -101,7 +156,7 @@ export class TextBurstEffect {
     });
   }
 
-  private createSprite(char: string): THREE.Sprite {
+  private createSprite(char: string, worldSize?: number): THREE.Sprite {
     const cfg = TextBurstEffectConfig;
     const size = cfg.CanvasSize;
 
@@ -124,6 +179,8 @@ export class TextBurstEffect {
       opacity: 1,
       depthTest: false,
     });
-    return new THREE.Sprite(material);
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.setScalar(worldSize ?? cfg.SpriteWorldSize);
+    return sprite;
   }
 }
