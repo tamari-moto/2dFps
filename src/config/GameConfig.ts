@@ -264,12 +264,14 @@ export const RenderConfig = {
   /** Player diamond marker size */
   PlayerMarkerSize: 20,
 
-  /** Y rotation offset applied to all player models so the face points forward (radians) */
+  /** Y rotation offset that aligns model's local +Z (forward) with world axes (radians).
+   *  Player rotation: rotation.y = -angle_rad + PlayerFacingOffset
+   *    where angle_rad is game angle (0° = +X, CCW positive), and gameToWorld maps game(x,y) → world(x,0,y).
+   *  At angle=0, rotation.y = π/2 turns local +Z to world +X (game +X). */
   PlayerFacingOffset: Math.PI / 2,
 
-  /** Z offset applied to player mesh groups to vertically center the Scout model over the node circle.
-   *  After rotation.x = π/2, local Y maps to world Z. The model's visual center is below Y=0,
-   *  so we lift by HS * 0.7 (HS = PlayerMarkerSize / 6.4). */
+  /** Y offset applied to player mesh groups to vertically center the Scout model over the node circle.
+   *  The model's visual center is below Y=0, so we lift by HS * 3.21 (HS = PlayerMarkerSize / 6.4). */
   PlayerZOffset: (20 / 6.4) * 3.21,
 
   // --- Player body material ---

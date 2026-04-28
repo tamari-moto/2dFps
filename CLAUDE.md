@@ -257,6 +257,12 @@ getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] 
 - `onAdd` は `initializePlayers` の状態デルタより先に発火する場合がある → `Promise.resolve()` で1マイクロタスク遅延
 - `MapSchema.forEach` の順序は保証されない → `playerOrder` 配列（挿入順）でターン管理
 
+## 座標系と角度規約
+
+ゲーム空間（model/logic 層）は **XY 平面、`player.angle` は度数法・`atan2(dy, dx)` ベース（0° = +X、反時計回り正）**。Three.js 側の座標変換、モデルローカル軸、`rotation.y` 変換式、過去の落とし穴は [`src/rendering/CLAUDE.md`](src/rendering/CLAUDE.md) に集約されている。
+
+`player.angle` は `getVisibleNodesAtAngle`、`NPCBrain`、`LocalAdapter` など model/logic 層全体で共有されているため、**レンダリング側の都合で変更してはいけない**。
+
 ## コーディング規約
 
 - **マジックナンバー禁止**: 数値定数は必ず `src/config/GameConfig.ts` に追加する

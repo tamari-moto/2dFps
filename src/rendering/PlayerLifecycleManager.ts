@@ -109,6 +109,13 @@ export class PlayerLifecycleManager {
   /**
    * Applies position (animated), rotation, and scale to a player mesh.
    * Returns true if the player is moving (so the caller can trigger camera follow).
+   *
+   * Angle convention (game space, atan2(dy, dx) * 180/π):
+   *   0° = +X (right), 90° = +Y, counter-clockwise positive.
+   * Mapping to Three.js rotation.y:
+   *   game(x, y) → world(x, 0, y); model forward is local +Z.
+   *   To face game angle θ, rotation.y = atan2(cosθ, sinθ) = π/2 − θ_rad
+   *   = −θ_rad + PlayerFacingOffset (PlayerFacingOffset = π/2).
    */
   applyTransform(
     playerId: string,
@@ -137,7 +144,7 @@ export class PlayerLifecycleManager {
     });
 
     obj.rotation.x = 0;
-    obj.rotation.y = -((angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset);
+    obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
     obj.rotation.z = 0;
 
     const scale = isActive ? PLAYER_CONSTANTS.ACTIVE_SCALE : PLAYER_CONSTANTS.NORMAL_SCALE;
