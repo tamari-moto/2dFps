@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { NodeConfig, NodeVisualConfig, WallConfig } from '../config/GameConfig';
+import { NodeConfig, NodeVisualConfig, ShadowConfig, WallConfig } from '../config/GameConfig';
 import { gameToWorld } from './MeshUtils';
 
 /**
@@ -16,9 +16,9 @@ export function createNodeCircle(x: number, y: number, size: number = NodeConfig
     emissiveIntensity: NodeVisualConfig.EmissiveDefaultIntensity,
   });
   const circle = new THREE.Mesh(geometry, material);
-  // Lay the circle flat on the XZ plane
   circle.rotation.x = -Math.PI / 2;
   circle.position.copy(gameToWorld(x, y));
+  circle.receiveShadow = ShadowConfig.Enabled;
   return circle;
 }
 
@@ -44,6 +44,8 @@ export function createWallMesh(x1: number, y1: number, x2: number, y2: number): 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.copy(gameToWorld((x1 + x2) / 2, (y1 + y2) / 2, WallConfig.ZOffset));
   mesh.rotation.y = -angle;
+  mesh.castShadow = ShadowConfig.Enabled;
+  mesh.receiveShadow = ShadowConfig.Enabled;
   mesh.userData[WallConfig.UserDataTag] = true;
   return mesh;
 }

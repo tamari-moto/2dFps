@@ -50,7 +50,7 @@ export class PlayerLifecycleManager {
     const obj = this.playerMeshes.get(playerId);
     if (!obj) return;
 
-    this.setPlayerColor(obj, 0xff0000);
+    this.setPlayerColor(obj, RenderConfig.PlayerHitColor);
 
     gsap.timeline()
       .to(obj.scale, { x: 1.5, y: 1.5, z: 1.5, duration: 0.1, ease: 'power2.out' })

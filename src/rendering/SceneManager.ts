@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { EffectComposer, OrbitControls, RenderPass, UnrealBloomPass } from 'three-stdlib';
 import { Vector3 } from 'three';
-import { CameraConfig, LightingConfig, MapConfig, PostProcessConfig, RenderConfig } from '../config/GameConfig';
+import { CameraConfig, FogConfig, LightingConfig, MapConfig, PostProcessConfig, RenderConfig, ShadowConfig } from '../config/GameConfig';
 
 /**
  * Manages Three.js scene, camera, renderer, and controls setup
@@ -28,9 +28,16 @@ export class SceneManager {
     this.renderer.setClearColor(RenderConfig.BackgroundColor);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+    if (ShadowConfig.Enabled) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
 
     // Setup scene
     this.scene = new THREE.Scene();
+    if (FogConfig.Enabled) {
+      this.scene.fog = new THREE.FogExp2(FogConfig.Color, FogConfig.Density);
+    }
 
     // Setup camera
     this.camera = new THREE.PerspectiveCamera(CameraConfig.FOV, 1.0);
@@ -99,12 +106,30 @@ export class SceneManager {
     this.scene.add(hemi);
 
     const dir = new THREE.DirectionalLight(0xffffff, LightingConfig.DirectionalIntensity);
-    dir.position.set(LightingConfig.DirectionalX, LightingConfig.DirectionalY, LightingConfig.DirectionalZ);
+    dir.position.set(LightingConfig.DirectionalOrbitRadius, LightingConfig.DirectionalY, 0);
+    if (ShadowConfig.Enabled) {
+      dir.castShadow = true;
+      dir.shadow.mapSize.set(ShadowConfig.MapSize, ShadowConfig.MapSize);
+      dir.shadow.camera.near = ShadowConfig.CameraNear;
+      dir.shadow.camera.far = ShadowConfig.CameraFar;
+      dir.shadow.camera.left = -ShadowConfig.CameraSize;
+      dir.shadow.camera.right = ShadowConfig.CameraSize;
+      dir.shadow.camera.top = ShadowConfig.CameraSize;
+      dir.shadow.camera.bottom = -ShadowConfig.CameraSize;
+    }
     this.scene.add(dir);
 
-    const rim = new THREE.DirectionalLight(LightingConfig.RimLightColor, LightingConfig.RimLightIntensity);
-    rim.position.set(LightingConfig.RimLightX, LightingConfig.RimLightY, LightingConfig.RimLightZ);
-    this.scene.add(rim);
+    let elapsed = 0;
+    let lastTime = performance.now();
+    this.addTickCallback(() => {
+      const now = performance.now();
+      elapsed += (now - lastTime) * 0.001;
+      lastTime = now;
+      const r = LightingConfig.DirectionalOrbitRadius;
+      const angle = elapsed * LightingConfig.DirectionalOrbitSpeed;
+      dir.position.x = r * Math.cos(angle);
+      dir.position.z = r * Math.sin(angle);
+    });
   }
 
   /**

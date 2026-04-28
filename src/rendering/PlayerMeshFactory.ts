@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RenderConfig } from '../config/GameConfig';
+import { RenderConfig, ShadowConfig } from '../config/GameConfig';
 
 // ── Character part name registry ──────────────────────────────────────────────
 /**
@@ -188,7 +188,7 @@ function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.G
  *   local ±X → screen left/right
  *   local +Z → toward camera (visible from above)
  */
-export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
+export function createVariantPlayer(color: number = RenderConfig.PlayerDefaultColor): THREE.Group {
   const group = new THREE.Group();
   const s = RenderConfig.PlayerMarkerSize;
   const HS = s / 6.4;
@@ -216,6 +216,15 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
   group.add(new THREE.AxesHelper(s * 1.5));
 
   group.userData.partNames = SCOUT_PART_NAMES;
+
+  if (ShadowConfig.Enabled) {
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+  }
 
   return group;
 }

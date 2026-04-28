@@ -66,23 +66,23 @@ export const NodeConfig = {
   /** Number of segments in circle geometry */
   CircleSegments: 100,
 
-  /** Default node color (dark tactical green) */
-  DefaultColor: 0x1a3a2a,
+  /** Default node color (charcoal) */
+  DefaultColor: 0x1c1c1c,
 
-  /** Visible node color (bright cyan) */
-  VisibleColor: 0x00e5cc,
+  /** Visible node color (muted gold) */
+  VisibleColor: 0xc8a96e,
 
-  /** Selected node color (dark orange) */
-  SelectedColor: 0xff8c00,
+  /** Selected node color (copper) */
+  SelectedColor: 0xb87333,
 
-  /** Next move node color (neon green) */
-  NextMoveColor: 0x39ff14,
+  /** Next move node color (sage green) */
+  NextMoveColor: 0x8fbc8f,
 
-  /** Shot target node color (red) */
-  ShotTargetColor: 0xff2020,
+  /** Shot target node color (dark red) */
+  ShotTargetColor: 0xc0392b,
 
-  /** Reachable node color (soft teal) */
-  ReachableColor: 0x2a7a6a,
+  /** Reachable node color (dark grey) */
+  ReachableColor: 0x3d3d3d,
 } as const;
 
 
@@ -252,11 +252,11 @@ export const CameraConfig = {
  * Render / visual theme configuration
  */
 export const RenderConfig = {
-  /** Background clear color (very dark navy) */
-  BackgroundColor: 0x050d12,
+  /** Background clear color (near black) */
+  BackgroundColor: 0x0a0a0a,
 
   /** Grid line color for background grid */
-  GridLineColor: 0x0d2b20,
+  GridLineColor: 0x1a1a1a,
 
   /** Grid line opacity */
   GridLineOpacity: 0.6,
@@ -279,6 +279,10 @@ export const RenderConfig = {
   PlayerBodyMetalness: 0.3,
 
   // --- Humanoid variant: handgun ---
+  /** Default player color when none is specified */
+  PlayerDefaultColor: 0xffff00,
+  /** Player color during hit effect */
+  PlayerHitColor: 0xff0000,
   /** Handgun barrel color (dark metallic) */
   PlayerGunBarrelColor: 0x222233,
 
@@ -294,31 +298,21 @@ export const RenderConfig = {
  */
 export const LightingConfig = {
   /** Ambient light intensity */
-  AmbientIntensity: 0.3,
+  AmbientIntensity: 0.8,
   /** Hemisphere light sky color */
-  HemisphereSkyColor: 0x223344,
+  HemisphereSkyColor: 0x1a1510,
   /** Hemisphere light ground color */
-  HemisphereGroundColor: 0x0d2b20,
+  HemisphereGroundColor: 0x0d0b08,
   /** Hemisphere light intensity */
-  HemisphereIntensity: 0.7,
+  HemisphereIntensity: 1.2,
   /** Main directional light intensity */
-  DirectionalIntensity: 1.2,
-  /** Main directional light X position */
-  DirectionalX: 30,
-  /** Main directional light Y position */
+  DirectionalIntensity: 2.0,
+  /** Main directional light Y height (fixed during orbit) */
   DirectionalY: 20,
-  /** Main directional light Z position */
-  DirectionalZ: 100,
-  /** Rim light color (cool blue) */
-  RimLightColor: 0x4488cc,
-  /** Rim light intensity */
-  RimLightIntensity: 0.4,
-  /** Rim light X position */
-  RimLightX: -50,
-  /** Rim light Y position */
-  RimLightY: -50,
-  /** Rim light Z position */
-  RimLightZ: 60,
+  /** Orbit radius of directional light in XZ plane */
+  DirectionalOrbitRadius: 10,
+  /** Orbit speed of directional light (radians per second) */
+  DirectionalOrbitSpeed: 0.3,
 } as const;
 
 /**
@@ -331,14 +325,14 @@ export const WallConfig = {
   ZOffset: 0,
   /** Wall depth (screen-width of the wall slab) */
   Depth: 4,
-  /** Wall color (dark tactical blue-grey) */
-  Color: 0x1a2e38,
+  /** Wall color (dark brown) */
+  Color: 0x2a2420,
   /** PBR roughness for walls */
   Roughness: 0.85,
   /** PBR metalness for walls */
   Metalness: 0.05,
   /** Emissive color for walls */
-  EmissiveColor: 0x0a1520,
+  EmissiveColor: 0x100e0c,
   /** Emissive intensity for walls */
   EmissiveIntensity: 0.15,
   /** userData key used to identify wall meshes during scene traversal */
@@ -374,11 +368,39 @@ export const PostProcessConfig = {
   /** Enable bloom post-processing */
   EnableBloom: true,
   /** Bloom effect strength */
-  BloomStrength: 0.4,
+  BloomStrength: 0.8,
   /** Bloom effect radius */
-  BloomRadius: 0.3,
+  BloomRadius: 0.5,
   /** Bloom threshold (only pixels brighter than this bloom) */
-  BloomThreshold: 0.35,
+  BloomThreshold: 0.2,
+} as const;
+
+/**
+ * Shadow configuration
+ */
+export const ShadowConfig = {
+  /** Enable shadow maps */
+  Enabled: true,
+  /** Shadow map size (higher = sharper, more expensive) */
+  MapSize: 2048,
+  /** Shadow camera near clip */
+  CameraNear: 1,
+  /** Shadow camera far clip */
+  CameraFar: 2000,
+  /** Shadow camera orthographic half-size */
+  CameraSize: 800,
+} as const;
+
+/**
+ * Fog configuration
+ */
+export const FogConfig = {
+  /** Enable exponential fog */
+  Enabled: true,
+  /** Fog color (matches background) */
+  Color: 0x0a0a0a,
+  /** Fog density (higher = thicker) */
+  Density: 0.0008,
 } as const;
 
 /**
