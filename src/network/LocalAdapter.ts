@@ -79,13 +79,14 @@ export class LocalAdapter implements INetworkAdapter {
       this.resolveShot(action.playerId, action.shotAtNodeId, hits);
     }
 
-    const path = this.model.getPathToNode(fromNode.id, action.moveToNodeId, PlayerConfig.MoveRange);
+    const rawPath = this.model.getPathToNode(fromNode.id, action.moveToNodeId, PlayerConfig.MoveRange);
+    const pathNodeIds = (rawPath && rawPath.length >= 2) ? rawPath : [fromNode.id, action.moveToNodeId];
     this.turnResultCallback?.({
       movingPlayerId: action.playerId,
       newNodeId: action.moveToNodeId,
       newAngle,
       hits,
-      pathNodeIds: path ?? [fromNode.id, action.moveToNodeId],
+      pathNodeIds,
     });
   }
 
@@ -154,13 +155,14 @@ export class LocalAdapter implements INetworkAdapter {
         player.setAngle(newAngle);
       }
 
-      const path = this.model.getPathToNode(fromNode.id, action.moveToNodeId, PlayerConfig.MoveRange);
+      const rawPath = this.model.getPathToNode(fromNode.id, action.moveToNodeId, PlayerConfig.MoveRange);
+      const pathNodeIds = (rawPath && rawPath.length >= 2) ? rawPath : [fromNode.id, action.moveToNodeId];
       pendingResults.push({
         movingPlayerId: action.playerId,
         newNodeId: action.moveToNodeId,
         newAngle,
         hits: [],
-        pathNodeIds: path ?? [fromNode.id, action.moveToNodeId],
+        pathNodeIds,
       });
     }
 

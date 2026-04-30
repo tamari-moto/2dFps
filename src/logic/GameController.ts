@@ -88,6 +88,7 @@ export class GameController {
 
     const currentState = sm.getState();
 
+    let turnExecuted = false;
     if (currentState === State.Idle) {
       this.handleIdleStateClick(activePlayer, clickedNode, sm);
     } else if (currentState === State.Select) {
@@ -95,10 +96,12 @@ export class GameController {
     } else if (currentState === State.Move) {
       this.handleMoveStateClick(activePlayer, clickedNode, sm);
     } else if (currentState === State.Shot) {
-      this.handleShotStateClick(activePlayer, clickedNode, sm);
+      turnExecuted = this.handleShotStateClick(activePlayer, clickedNode, sm);
     }
 
-    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    if (!turnExecuted) {
+      this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    }
   }
 
   /**
@@ -140,11 +143,13 @@ export class GameController {
   /**
    * Handles clicks in Shot state
    */
-  private handleShotStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
+  private handleShotStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): boolean {
     if (this.currentShotNodeId === clickedNode.id) {
       this.executeTurn(sm);
+      return true;
     } else {
       this.tryShotTarget(activePlayer, clickedNode, sm);
+      return false;
     }
   }
 
