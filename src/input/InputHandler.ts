@@ -16,6 +16,7 @@ export class InputHandler {
   private eventBus: GameEventBus;
   private playerIds: string[];
   private activePlayerId: string;
+  private fpsActive = false;
   private readonly handleCanvasClickBound: (e: MouseEvent) => void;
   private readonly handleKeyDownBound: (e: KeyboardEvent) => void;
 
@@ -40,6 +41,11 @@ export class InputHandler {
     this.handleKeyDownBound = this.handleKeyDown.bind(this);
 
     this.setupEventListeners();
+
+    // FPS 観戦モード中はゲーム操作を全て無効化する
+    this.eventBus.on(GameEventType.FPS_MODE_CHANGED, (data: { enabled: boolean }) => {
+      this.fpsActive = data.enabled;
+    });
   }
 
   /** Updates the active player ID (call when the active player changes). */
@@ -59,6 +65,7 @@ export class InputHandler {
    * Handles canvas click events
    */
   private handleCanvasClick(event: MouseEvent): void {
+    if (this.fpsActive) return;
     const intersects = this.getIntersects(event);
 
     if (intersects.length > 0) {
@@ -80,15 +87,26 @@ export class InputHandler {
    * Handles keyboard events
    */
   private handleKeyDown(event: KeyboardEvent): void {
+    // T キーは FPS モードのトグルのため常時受け付ける（FPS 中の退出用も同経路）
+    if (event.key === KEYBOARD_KEYS.SPECTATOR_TOGGLE ||
+        event.key === KEYBOARD_KEYS.SPECTATOR_TOGGLE_UPPER) {
+      this.eventBus.emit(GameEventType.FPS_MODE_TOGGLE_REQUESTED);
+      return;
+    }
+
+    // F キー（ダンス）は観戦モード中も発火させる
+    if (event.key === KEYBOARD_KEYS.DANCE ||
+        event.key === KEYBOARD_KEYS.DANCE_UPPER) {
+      this.eventBus.emit(GameEventType.VIS_PLAY_DANCE, { playerId: this.activePlayerId });
+      return;
+    }
+
+    if (this.fpsActive) return;
+
     this.eventBus.emit(GameEventType.KEY_PRESSED, { key: event.key });
 
-    // Handle dance animation
-    if (event.key === KEYBOARD_KEYS.DANCE ||
-             event.key === KEYBOARD_KEYS.DANCE_UPPER) {
-      this.eventBus.emit(GameEventType.VIS_PLAY_DANCE, { playerId: this.activePlayerId });
-    }
     // Handle dynamic player selection (keys 1-9)
-    else if (event.key >= '1' && event.key <= '9') {
+    if (event.key >= '1' && event.key <= '9') {
       const keyNumber = parseInt(event.key, 10);
       const playerIndex = keyNumber - 1;
 

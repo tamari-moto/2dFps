@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import { NodeConfig, NodeVisualConfig, WallConfig } from '../config/GameConfig';
+import { NodeConfig, NodeVisualConfig, ShadowConfig, WallConfig } from '../config/GameConfig';
+import { gameToWorld } from './MeshUtils';
 
 /**
- * Creates a node circle mesh
+ * Creates a node circle mesh.
+ * x, y are game-space coordinates; converted to XZ world plane via gameToWorld.
  */
 export function createNodeCircle(x: number, y: number, size: number = NodeConfig.CircleSize): THREE.Mesh {
   const geometry = new THREE.CircleGeometry(size, NodeConfig.CircleSegments).center();
@@ -14,17 +16,21 @@ export function createNodeCircle(x: number, y: number, size: number = NodeConfig
     emissiveIntensity: NodeVisualConfig.EmissiveDefaultIntensity,
   });
   const circle = new THREE.Mesh(geometry, material);
-  circle.position.set(x, y, 0);
+  circle.rotation.x = -Math.PI / 2;
+  circle.position.copy(gameToWorld(x, y));
+  circle.receiveShadow = ShadowConfig.Enabled;
   return circle;
 }
 
 /**
- * Creates a 3D wall mesh for obstacle line segments
+ * Creates a 3D wall mesh for obstacle line segments.
+ * x1,y1,x2,y2 are game-space coordinates; placed on the XZ plane via gameToWorld.
  */
 export function createWallMesh(x1: number, y1: number, x2: number, y2: number): THREE.Mesh {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const length = Math.sqrt(dx * dx + dy * dy);
+  // In XZ plane, rotation around Y axis
   const angle = Math.atan2(dy, dx);
 
   const geo = new THREE.BoxGeometry(length, WallConfig.Height, WallConfig.Depth);
@@ -36,8 +42,10 @@ export function createWallMesh(x1: number, y1: number, x2: number, y2: number): 
     emissiveIntensity: WallConfig.EmissiveIntensity,
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set((x1 + x2) / 2, (y1 + y2) / 2, WallConfig.ZOffset);
-  mesh.rotation.z = angle;
+  mesh.position.copy(gameToWorld((x1 + x2) / 2, (y1 + y2) / 2, WallConfig.ZOffset));
+  mesh.rotation.y = -angle;
+  mesh.castShadow = ShadowConfig.Enabled;
+  mesh.receiveShadow = ShadowConfig.Enabled;
   mesh.userData[WallConfig.UserDataTag] = true;
   return mesh;
 }

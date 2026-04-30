@@ -66,23 +66,23 @@ export const NodeConfig = {
   /** Number of segments in circle geometry */
   CircleSegments: 100,
 
-  /** Default node color (dark tactical green) */
-  DefaultColor: 0x1a3a2a,
+  /** Default node color (charcoal) */
+  DefaultColor: 0x1c1c1c,
 
-  /** Visible node color (bright cyan) */
-  VisibleColor: 0x00e5cc,
+  /** Visible node color (muted gold) */
+  VisibleColor: 0xc8a96e,
 
-  /** Selected node color (dark orange) */
-  SelectedColor: 0xff8c00,
+  /** Selected node color (copper) */
+  SelectedColor: 0xb87333,
 
-  /** Next move node color (neon green) */
-  NextMoveColor: 0x39ff14,
+  /** Next move node color (sage green) */
+  NextMoveColor: 0x8fbc8f,
 
-  /** Shot target node color (red) */
-  ShotTargetColor: 0xff2020,
+  /** Shot target node color (dark red) */
+  ShotTargetColor: 0xc0392b,
 
-  /** Reachable node color (soft teal) */
-  ReachableColor: 0x2a7a6a,
+  /** Reachable node color (dark grey) */
+  ReachableColor: 0x3d3d3d,
 } as const;
 
 
@@ -198,6 +198,48 @@ export const AnimationConfig = {
 } as const;
 
 /**
+ * Text burst effect configuration (dance victory effect)
+ */
+export const TextBurstEffectConfig = {
+  /** 飛来開始距離（world units） */
+  FlyInDistance: 600,
+  /** スプライトのワールドスケール */
+  SpriteWorldSize: 30,
+  /** 1文字あたりの着地半径基準値（world units）。文字数が増えると自動で拡大 */
+  LandRadiusPerChar: 30,
+  /** 支点の Y 位置オフセット（プレイヤー Y + これ） */
+  PivotYOffset: 10,
+  /** 1文字あたりの扇半角基準値（度）。文字数が増えると自動で拡大 */
+  FanHalfAngleDegPerChar: 20,
+  /** 飛び込みアニメ秒数 */
+  FlyInDuration: 0.35,
+  /** 扇開きアニメ秒数 */
+  FanOpenDuration: 0.25,
+  /** 表示維持秒数 */
+  HoldDuration: 1.2,
+  /** フェードアウト秒数 */
+  FadeOutDuration: 0.4,
+  /** 文字色 */
+  TextColor: '#ffdd00',
+  /** キャンバス1辺サイズ（px） */
+  CanvasSize: 128,
+
+  // --- ダンスバースト ---
+  /** ダンス中の発射回数 */
+  DanceBurstCount: 6,
+  /** 発射間隔（ms） */
+  DanceBurstIntervalMs: 150,
+  /** バーストで使用する文字 */
+  DanceBurstChars: ['ダ', 'ン', 'ス'] as string[],
+  /** 飛び出し半径（world units） */
+  DanceBurstFlyRadius: 60,
+  /** 飛び出し＋フェードアウト秒数 */
+  DanceBurstDuration: 0.4,
+  /** バーストスプライトのワールドスケール */
+  DanceBurstSpriteSize: 25,
+} as const;
+
+/**
  * Camera configuration
  */
 export const CameraConfig = {
@@ -252,11 +294,11 @@ export const CameraConfig = {
  * Render / visual theme configuration
  */
 export const RenderConfig = {
-  /** Background clear color (very dark navy) */
-  BackgroundColor: 0x050d12,
+  /** Background clear color (near black) */
+  BackgroundColor: 0x0a0a0a,
 
   /** Grid line color for background grid */
-  GridLineColor: 0x0d2b20,
+  GridLineColor: 0x1a1a1a,
 
   /** Grid line opacity */
   GridLineOpacity: 0.6,
@@ -264,12 +306,14 @@ export const RenderConfig = {
   /** Player diamond marker size */
   PlayerMarkerSize: 20,
 
-  /** Y rotation offset applied to all player models so the face points forward (radians) */
+  /** Y rotation offset that aligns model's local +Z (forward) with world axes (radians).
+   *  Player rotation: rotation.y = -angle_rad + PlayerFacingOffset
+   *    where angle_rad is game angle (0° = +X, CCW positive), and gameToWorld maps game(x,y) → world(x,0,y).
+   *  At angle=0, rotation.y = π/2 turns local +Z to world +X (game +X). */
   PlayerFacingOffset: Math.PI / 2,
 
-  /** Z offset applied to player mesh groups to vertically center the Scout model over the node circle.
-   *  After rotation.x = π/2, local Y maps to world Z. The model's visual center is below Y=0,
-   *  so we lift by HS * 0.7 (HS = PlayerMarkerSize / 6.4). */
+  /** Y offset applied to player mesh groups to vertically center the Scout model over the node circle.
+   *  The model's visual center is below Y=0, so we lift by HS * 3.21 (HS = PlayerMarkerSize / 6.4). */
   PlayerZOffset: (20 / 6.4) * 3.21,
 
   // --- Player body material ---
@@ -279,6 +323,10 @@ export const RenderConfig = {
   PlayerBodyMetalness: 0.3,
 
   // --- Humanoid variant: handgun ---
+  /** Default player color when none is specified */
+  PlayerDefaultColor: 0xffff00,
+  /** Player color during hit effect */
+  PlayerHitColor: 0xff0000,
   /** Handgun barrel color (dark metallic) */
   PlayerGunBarrelColor: 0x222233,
 
@@ -294,31 +342,21 @@ export const RenderConfig = {
  */
 export const LightingConfig = {
   /** Ambient light intensity */
-  AmbientIntensity: 0.3,
+  AmbientIntensity: 0.8,
   /** Hemisphere light sky color */
-  HemisphereSkyColor: 0x223344,
+  HemisphereSkyColor: 0x1a1510,
   /** Hemisphere light ground color */
-  HemisphereGroundColor: 0x0d2b20,
+  HemisphereGroundColor: 0x0d0b08,
   /** Hemisphere light intensity */
-  HemisphereIntensity: 0.7,
+  HemisphereIntensity: 1.2,
   /** Main directional light intensity */
-  DirectionalIntensity: 1.2,
-  /** Main directional light X position */
-  DirectionalX: 30,
-  /** Main directional light Y position */
+  DirectionalIntensity: 2.0,
+  /** Main directional light Y height (fixed during orbit) */
   DirectionalY: 20,
-  /** Main directional light Z position */
-  DirectionalZ: 100,
-  /** Rim light color (cool blue) */
-  RimLightColor: 0x4488cc,
-  /** Rim light intensity */
-  RimLightIntensity: 0.4,
-  /** Rim light X position */
-  RimLightX: -50,
-  /** Rim light Y position */
-  RimLightY: -50,
-  /** Rim light Z position */
-  RimLightZ: 60,
+  /** Orbit radius of directional light in XZ plane */
+  DirectionalOrbitRadius: 10,
+  /** Orbit speed of directional light (radians per second) */
+  DirectionalOrbitSpeed: 0.3,
 } as const;
 
 /**
@@ -331,14 +369,14 @@ export const WallConfig = {
   ZOffset: 0,
   /** Wall depth (screen-width of the wall slab) */
   Depth: 4,
-  /** Wall color (dark tactical blue-grey) */
-  Color: 0x1a2e38,
+  /** Wall color (dark brown) */
+  Color: 0x2a2420,
   /** PBR roughness for walls */
   Roughness: 0.85,
   /** PBR metalness for walls */
   Metalness: 0.05,
   /** Emissive color for walls */
-  EmissiveColor: 0x0a1520,
+  EmissiveColor: 0x100e0c,
   /** Emissive intensity for walls */
   EmissiveIntensity: 0.15,
   /** userData key used to identify wall meshes during scene traversal */
@@ -374,11 +412,39 @@ export const PostProcessConfig = {
   /** Enable bloom post-processing */
   EnableBloom: true,
   /** Bloom effect strength */
-  BloomStrength: 0.4,
+  BloomStrength: 0.8,
   /** Bloom effect radius */
-  BloomRadius: 0.3,
+  BloomRadius: 0.5,
   /** Bloom threshold (only pixels brighter than this bloom) */
-  BloomThreshold: 0.35,
+  BloomThreshold: 0.2,
+} as const;
+
+/**
+ * Shadow configuration
+ */
+export const ShadowConfig = {
+  /** Enable shadow maps */
+  Enabled: true,
+  /** Shadow map size (higher = sharper, more expensive) */
+  MapSize: 2048,
+  /** Shadow camera near clip */
+  CameraNear: 1,
+  /** Shadow camera far clip */
+  CameraFar: 2000,
+  /** Shadow camera orthographic half-size */
+  CameraSize: 800,
+} as const;
+
+/**
+ * Fog configuration
+ */
+export const FogConfig = {
+  /** Enable exponential fog */
+  Enabled: true,
+  /** Fog color (matches background) */
+  Color: 0x0a0a0a,
+  /** Fog density (higher = thicker) */
+  Density: 0.0008,
 } as const;
 
 /**
@@ -453,8 +519,32 @@ export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
  * Keyboard key constants for game controls
  */
 export const KEYBOARD_KEYS = {
-  DANCE: 'd',
-  DANCE_UPPER: 'D',
+  DANCE: 'f',
+  DANCE_UPPER: 'F',
+  SPECTATOR_TOGGLE: 't',
+  SPECTATOR_TOGGLE_UPPER: 'T',
+} as const;
+
+/**
+ * FPS spectator mode parameters.
+ * 観戦モードは T キーで通常追従カメラと FPS フリーカメラを切り替える。
+ * 移動・視点・感度などすべてここで一元管理する。
+ */
+export const FPSConfig = {
+  /** 水平移動速度（world units / sec） */
+  MoveSpeed: 200,
+  /** Shift 押下時の速度乗数 */
+  SprintMultiplier: 2,
+  /** マウス感度（度 / pixel） */
+  MouseSensitivity: 0.15,
+  /** 観戦カメラの初期目線高さ（world Y、プレイヤー頭部相当） */
+  EyeHeight: 12,
+  /** ピッチ制限（度、上下対称）。±90° に近づくとジンバルロックするため少し内側に */
+  PitchLimit: 85,
+  /** FPS モード時の FOV（通常 90° → 75° に狭めて没入感を出す） */
+  FOV: 75,
+  /** dt のクランプ上限（秒）。タブ復帰時の巨大 dt で吹き飛ぶのを防ぐ */
+  MaxDeltaSeconds: 0.1,
 } as const;
 
 /**

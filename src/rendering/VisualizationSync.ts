@@ -1,25 +1,29 @@
 import * as THREE from 'three';
 import { Model } from '../model/model';
 import { SceneManager } from './SceneManager';
-import { CameraConfig, PlayerConfig } from '../config/GameConfig';
+import { CameraConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerAnimator } from './PlayerAnimator';
 import { PlayerLifecycleManager } from './PlayerLifecycleManager';
 import { CameraFollowController } from './CameraFollowController';
 import { NodeVisualizationManager } from './NodeVisualizationManager';
+import { TextBurstEffect } from './TextBurstEffect';
+import { gameToWorld } from './MeshUtils';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
  * to GameEventBus. External API is unchanged so threeSetup.ts needs no edits.
  */
 export class VisualizationSync {
-  private nodeVis:   NodeVisualizationManager;
-  private lifecycle: PlayerLifecycleManager;
-  private animator:  PlayerAnimator;
-  private camera:    CameraFollowController;
-  private model:     Model;
+  private nodeVis:       NodeVisualizationManager;
+  private lifecycle:     PlayerLifecycleManager;
+  private animator:      PlayerAnimator;
+  private camera:        CameraFollowController;
+  private textBurstEffect: TextBurstEffect;
+  private model:         Model;
 
   private activePlayerId: string;
+  private fpsModeActive = false;
 
   constructor(
     sceneManager: SceneManager,
@@ -32,10 +36,11 @@ export class VisualizationSync {
 
     // Shared map — PlayerAnimator and PlayerLifecycleManager both reference it
     const meshMap = new Map<string, THREE.Object3D>();
-    this.animator  = new PlayerAnimator(meshMap);
-    this.lifecycle = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
-    this.nodeVis   = new NodeVisualizationManager(sceneManager, model);
-    this.camera    = new CameraFollowController(sceneManager);
+    this.animator      = new PlayerAnimator(meshMap);
+    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
+    this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
+    this.camera        = new CameraFollowController(sceneManager);
+    this.textBurstEffect = new TextBurstEffect(sceneManager);
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -74,6 +79,16 @@ export class VisualizationSync {
     return this.nodeVis.getMeshToNodeMap();
   }
 
+  /** Returns the camera follow controller (used by FPSCameraController to snap on disable). */
+  getCameraFollow(): CameraFollowController {
+    return this.camera;
+  }
+
+  /** Returns the currently active player ID. */
+  getActivePlayerId(): string {
+    return this.activePlayerId;
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private doUpdateView(): void {
@@ -110,7 +125,7 @@ export class VisualizationSync {
       const moving = this.lifecycle.applyTransform(
         playerId, player.node.x, player.node.y, player.angle, isActive,
       );
-      if (isActive && moving) {
+      if (isActive && moving && !this.fpsModeActive) {
         this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
       }
     }
@@ -122,10 +137,14 @@ export class VisualizationSync {
     eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
       this.activePlayerId = data.playerId;
       const player = this.model.getPlayer(data.playerId);
-      if (player) {
+      if (player && !this.fpsModeActive) {
         this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowPanDuration, CameraConfig.FollowPanEase);
       }
       this.doUpdateView();
+    });
+
+    eventBus.on(GameEventType.FPS_MODE_CHANGED, (data: { enabled: boolean }) => {
+      this.fpsModeActive = data.enabled;
     });
 
     eventBus.on(GameEventType.VIS_SET_SELECT_MESH, (data: { nodeId: number }) => {
@@ -165,6 +184,12 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {
       this.animator.startDance(data.playerId);
+      const player = this.model.getPlayer(data.playerId);
+      if (player) {
+        const w = gameToWorld(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
+        this.textBurstEffect.play(w.x, w.y, w.z);
+        this.textBurstEffect.playDanceBurst(w.x, w.y, w.z);
+      }
     });
   }
 }

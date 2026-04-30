@@ -4,18 +4,27 @@ import type { ThreeSetup } from '../rendering/threeSetup';
 import GameHUD from './GameHUD';
 import LobbyUI from './LobbyUI';
 import ConsoleLogger from './ConsoleLogger';
+import FPSOverlay from './FPSOverlay';
 import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
+import { gameEventBus, GameEventType } from '../core/GameEventBus';
 
 type AppState = 'lobby' | 'connecting' | 'playing';
 
 const GRF_main = () => {
   const [appState, setAppState] = React.useState<AppState>('lobby');
   const [errorMsg, setErrorMsg] = React.useState('');
+  const [fpsMode, setFpsMode] = React.useState(false);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [threeSetup, setThreeSetup] = React.useState<ThreeSetup | null>(null);
   const initialized = React.useRef(false);
+
+  React.useEffect(() => {
+    const onChange = (data: { enabled: boolean }) => setFpsMode(data.enabled);
+    gameEventBus.on(GameEventType.FPS_MODE_CHANGED, onChange);
+    return () => gameEventBus.off(GameEventType.FPS_MODE_CHANGED, onChange);
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -68,8 +77,9 @@ const GRF_main = () => {
         ref={canvasRef}
         style={{ display: appState === 'playing' ? 'block' : 'none' }}
       />
-      {appState === 'playing' && <GameHUD threeSetup={threeSetup} />}
-      {appState === 'playing' && <ConsoleLogger />}
+      {appState === 'playing' && !fpsMode && <GameHUD threeSetup={threeSetup} />}
+      {appState === 'playing' && !fpsMode && <ConsoleLogger />}
+      {appState === 'playing' && fpsMode && <FPSOverlay />}
       {appState !== 'playing' && (
         <LobbyUI
           connecting={appState === 'connecting'}

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { EffectComposer, OrbitControls, RenderPass, UnrealBloomPass } from 'three-stdlib';
 import { Vector3 } from 'three';
-import { CameraConfig, LightingConfig, MapConfig, PostProcessConfig, RenderConfig } from '../config/GameConfig';
+import { CameraConfig, FogConfig, LightingConfig, MapConfig, PostProcessConfig, RenderConfig, ShadowConfig } from '../config/GameConfig';
 
 /**
  * Manages Three.js scene, camera, renderer, and controls setup
@@ -15,6 +15,7 @@ export class SceneManager {
   private composer: EffectComposer | null = null;
   private boundHandleResize: () => void;
   private boundHandleWheel: (e: WheelEvent) => void;
+  private tickCallbacks: Set<() => void> = new Set();
 
   constructor(canvas: HTMLCanvasElement) {
     // Setup renderer
@@ -27,18 +28,26 @@ export class SceneManager {
     this.renderer.setClearColor(RenderConfig.BackgroundColor);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+    if (ShadowConfig.Enabled) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
 
     // Setup scene
     this.scene = new THREE.Scene();
+    if (FogConfig.Enabled) {
+      this.scene.fog = new THREE.FogExp2(FogConfig.Color, FogConfig.Density);
+    }
 
     // Setup camera
     this.camera = new THREE.PerspectiveCamera(CameraConfig.FOV, 1.0);
     this.camera.aspect = width / height;
     this.camera.position.set(
       -CameraConfig.BackDistance,
-      0,
       CameraConfig.OffsetZ,
+      0,
     );
+    this.camera.up.set(0, 1, 0);
     this.camera.updateProjectionMatrix();
 
     // Setup controls
@@ -52,6 +61,9 @@ export class SceneManager {
 
     // Add background grid
     this.createBackgroundGrid();
+
+    // Add XYZ axes helper at origin (X=red, Y=green, Z=blue)
+    this.scene.add(new THREE.AxesHelper(MapConfig.NodeSpacing * 3));
 
     // Add lights
     this.addLighting();
@@ -94,12 +106,30 @@ export class SceneManager {
     this.scene.add(hemi);
 
     const dir = new THREE.DirectionalLight(0xffffff, LightingConfig.DirectionalIntensity);
-    dir.position.set(LightingConfig.DirectionalX, LightingConfig.DirectionalY, LightingConfig.DirectionalZ);
+    dir.position.set(LightingConfig.DirectionalOrbitRadius, LightingConfig.DirectionalY, 0);
+    if (ShadowConfig.Enabled) {
+      dir.castShadow = true;
+      dir.shadow.mapSize.set(ShadowConfig.MapSize, ShadowConfig.MapSize);
+      dir.shadow.camera.near = ShadowConfig.CameraNear;
+      dir.shadow.camera.far = ShadowConfig.CameraFar;
+      dir.shadow.camera.left = -ShadowConfig.CameraSize;
+      dir.shadow.camera.right = ShadowConfig.CameraSize;
+      dir.shadow.camera.top = ShadowConfig.CameraSize;
+      dir.shadow.camera.bottom = -ShadowConfig.CameraSize;
+    }
     this.scene.add(dir);
 
-    const rim = new THREE.DirectionalLight(LightingConfig.RimLightColor, LightingConfig.RimLightIntensity);
-    rim.position.set(LightingConfig.RimLightX, LightingConfig.RimLightY, LightingConfig.RimLightZ);
-    this.scene.add(rim);
+    let elapsed = 0;
+    let lastTime = performance.now();
+    this.addTickCallback(() => {
+      const now = performance.now();
+      elapsed += (now - lastTime) * 0.001;
+      lastTime = now;
+      const r = LightingConfig.DirectionalOrbitRadius;
+      const angle = elapsed * LightingConfig.DirectionalOrbitSpeed;
+      dir.position.x = r * Math.cos(angle);
+      dir.position.z = r * Math.sin(angle);
+    });
   }
 
   /**
@@ -118,15 +148,15 @@ export class SceneManager {
 
     for (let i = 0; i < size; i++) {
       const x = i * spacing;
-      const vPts = [new THREE.Vector3(x, 0, -0.5), new THREE.Vector3(x, total, -0.5)];
+      const vPts = [new THREE.Vector3(x, -0.5, 0), new THREE.Vector3(x, -0.5, total)];
       const vLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(vPts), material);
       vLine.userData['isGrid'] = true;
       this.scene.add(vLine);
     }
 
     for (let i = 0; i < size; i++) {
-      const y = i * spacing;
-      const hPts = [new THREE.Vector3(0, y, -0.5), new THREE.Vector3(total, y, -0.5)];
+      const z = i * spacing;
+      const hPts = [new THREE.Vector3(0, -0.5, z), new THREE.Vector3(total, -0.5, z)];
       const hLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hPts), material);
       hLine.userData['isGrid'] = true;
       this.scene.add(hLine);
@@ -149,11 +179,11 @@ export class SceneManager {
    */
   panCamera(screenDx: number, screenDy: number, sensitivity: number): void {
     const wx = screenDx * sensitivity;
-    const wy = -screenDy * sensitivity;
+    const wz = screenDy * sensitivity;
     this.camera.position.x += wx;
-    this.camera.position.y += wy;
+    this.camera.position.z += wz;
     this.orbitControls.target.x += wx;
-    this.orbitControls.target.y += wy;
+    this.orbitControls.target.z += wz;
     this.orbitControls.update();
   }
 
@@ -177,10 +207,21 @@ export class SceneManager {
     this.orbitControls.update();
   }
 
+  /** Registers a callback invoked every frame before rendering. */
+  addTickCallback(cb: () => void): void {
+    this.tickCallbacks.add(cb);
+  }
+
+  /** Unregisters a previously added tick callback. */
+  removeTickCallback(cb: () => void): void {
+    this.tickCallbacks.delete(cb);
+  }
+
   /**
    * Renders the scene (via EffectComposer if bloom is enabled)
    */
   render(): void {
+    for (const cb of this.tickCallbacks) cb();
     if (this.composer) {
       this.composer.render();
     } else {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RenderConfig } from '../config/GameConfig';
+import { RenderConfig, ShadowConfig } from '../config/GameConfig';
 
 // ── Character part name registry ──────────────────────────────────────────────
 /**
@@ -140,11 +140,11 @@ function buildArmGroup(s: number, HS: number, side: 'left' | 'right', mat: THREE
 }
 
 // ── Gear: handgun (SCOUT) ─────────────────────────────────────────────────────
-// 座標系: VisualizationSync が rotation.x = π/2 を適用するため
-//   ローカル +Y → 前方（プレイヤーが向く方向）
+// 座標系（rotation.x = 0、ローカル +Z = 前方／+Y = 上）:
+//   ローカル +Z → 前方（プレイヤーが向く方向）
 //   ローカル +X → 右
-//   ローカル +Z → カメラ向き（上から見える面）
-// CylinderGeometry はデフォルトで +Y 向き → 銃身に rotation 不要
+//   ローカル +Y → 上
+// CylinderGeometry はデフォルトで +Y 向き → 銃身に rotation.x = π/2 で +Z へ向ける
 function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.Group {
   const g = new THREE.Group();
   const x = rx + s * 0.06;
@@ -165,14 +165,15 @@ function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.G
   slide.position.set(x, HS * -0.3, 0);
   g.add(slide);
 
-  // 銃身（スライド上端から前方 +Y へ突き出る）
+  // 銃身（スライド前面から前方 +Z へ突き出る）
   const barrel = new THREE.Mesh(
     new THREE.CylinderGeometry(s * 0.03, s * 0.03, HS * 0.7, 6),
     new THREE.MeshStandardMaterial({ color: RenderConfig.PlayerGunBarrelColor, roughness: 0.3, metalness: 0.85 })
   );
   barrel.userData.fixedColor = true;
   barrel.userData.partName = 'barrel';
-  barrel.position.set(x, HS * 0.5, 0);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(x, HS * -0.3, HS * 0.5);
   g.add(barrel);
 
   return g;
@@ -182,13 +183,12 @@ function buildGearGun(s: number, HS: number, rx: number, color: number): THREE.G
 /**
  * Creates a humanoid Scout player character.
  *
- * Coordinate note: VisualizationSync applies rotation.x = π/2 to lay the group flat.
- * After that rotation:
- *   local +Y → screen forward (player facing direction)
- *   local ±X → screen left/right
- *   local +Z → toward camera (visible from above)
+ * Coordinate note (rotation.x = 0, model stands upright in world space):
+ *   local +Z → forward (player facing direction)
+ *   local ±X → right/left
+ *   local +Y → up
  */
-export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
+export function createVariantPlayer(color: number = RenderConfig.PlayerDefaultColor): THREE.Group {
   const group = new THREE.Group();
   const s = RenderConfig.PlayerMarkerSize;
   const HS = s / 6.4;
@@ -213,7 +213,18 @@ export function createVariantPlayer(color: number = 0xffff00): THREE.Group {
 
   group.add(buildGearGun(s, HS, rx, color));
 
+  group.add(new THREE.AxesHelper(s * 1.5));
+
   group.userData.partNames = SCOUT_PART_NAMES;
+
+  if (ShadowConfig.Enabled) {
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+  }
 
   return group;
 }
