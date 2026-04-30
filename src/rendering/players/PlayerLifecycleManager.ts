@@ -64,6 +64,53 @@ export class PlayerLifecycleManager {
    *   To face game angle θ, rotation.y = atan2(cosθ, sinθ) = π/2 − θ_rad
    *   = −θ_rad + PlayerFacingOffset (PlayerFacingOffset = π/2).
    */
+  /**
+   * Animates a player along a multi-node BFS path using a GSAP timeline.
+   * Each segment faces toward the next waypoint; the final segment uses finalAngle.
+   * Falls back to applyTransform when path has fewer than 2 nodes.
+   */
+  applyPathTransform(
+    playerId: string,
+    pathNodeIds: number[],
+    finalAngle: number,
+    isActive: boolean,
+  ): boolean {
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return false;
+
+    const waypoints = pathNodeIds.map(id => this.model.nodeList[id]).filter(Boolean);
+    if (waypoints.length < 2) {
+      const dest = waypoints[waypoints.length - 1];
+      if (!dest) return false;
+      return this.applyTransform(playerId, dest.x, dest.y, finalAngle, isActive);
+    }
+
+    const segmentDuration = AnimationConfig.MovementDuration / (waypoints.length - 1);
+    this.animator.killAll(playerId);
+    this.animator.startWalk(playerId);
+
+    const tl = gsap.timeline({
+      onComplete: () => { this.animator.startIdle(playerId); },
+    });
+
+    for (let i = 1; i < waypoints.length; i++) {
+      const node = waypoints[i];
+      const worldTarget = gameToWorld(node.x, node.y, RenderConfig.PlayerZOffset);
+      const segAngle = i < waypoints.length - 1
+        ? this.model.getAngleBetweenNodes(waypoints[i - 1], node)
+        : finalAngle;
+      const rotY = -(segAngle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
+      const offset = (i - 1) * segmentDuration;
+      tl.to(obj.position, { x: worldTarget.x, y: worldTarget.y, z: worldTarget.z, duration: segmentDuration }, offset);
+      tl.to(obj.rotation, { y: rotY, duration: segmentDuration * 0.25 }, offset);
+    }
+
+    const scale = isActive ? PLAYER_CONSTANTS.ACTIVE_SCALE : PLAYER_CONSTANTS.NORMAL_SCALE;
+    obj.scale.set(scale, scale, scale);
+
+    return true;
+  }
+
   applyTransform(
     playerId: string,
     targetX: number,

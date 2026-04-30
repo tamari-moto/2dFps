@@ -16,6 +16,8 @@ export interface TurnResult {
   newNodeId: number;
   newAngle: number;
   hits: Array<{ targetId: string; damage: number; isEliminated: boolean }>;
+  /** BFS path node IDs from start to destination (inclusive). Missing = straight-line fallback. */
+  pathNodeIds?: number[];
 }
 
 /** Obstacle segment data transferred over the network */

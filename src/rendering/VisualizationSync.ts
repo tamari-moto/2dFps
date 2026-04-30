@@ -25,6 +25,8 @@ export class VisualizationSync {
 
   private activePlayerId: string;
   private fpsModeActive = false;
+  /** Pending BFS paths to consume in the next updatePlayers call (playerId → pathNodeIds). */
+  private pendingPaths: Map<string, number[]> = new Map();
 
   constructor(
     sceneManager: SceneManager,
@@ -124,9 +126,16 @@ export class VisualizationSync {
       this.lifecycle.setVisible(playerId, shouldShow);
       if (!shouldShow) continue;
 
-      const moving = this.lifecycle.applyTransform(
-        playerId, player.node.x, player.node.y, player.angle, isActive,
-      );
+      const path = this.pendingPaths.get(playerId);
+      let moving: boolean;
+      if (path && path.length >= 2) {
+        this.pendingPaths.delete(playerId);
+        moving = this.lifecycle.applyPathTransform(playerId, path, player.angle, isActive);
+      } else {
+        moving = this.lifecycle.applyTransform(
+          playerId, player.node.x, player.node.y, player.angle, isActive,
+        );
+      }
       if (isActive && moving && !this.fpsModeActive) {
         this.camera.panTo(player.node.x, player.node.y, player.angle, CameraConfig.FollowMoveDuration, CameraConfig.FollowMoveEase);
       }
@@ -171,6 +180,10 @@ export class VisualizationSync {
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
       this.effects.hidePlayer(data.playerId);
+    });
+
+    eventBus.on(GameEventType.VIS_PLAYER_PATH, (data: { playerId: string; pathNodeIds: number[] }) => {
+      this.pendingPaths.set(data.playerId, data.pathNodeIds);
     });
 
     eventBus.on(GameEventType.VIS_SET_REACHABLE_NODES, (data: { nodeIds: number[] }) => {

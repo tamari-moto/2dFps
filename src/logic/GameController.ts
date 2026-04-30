@@ -236,6 +236,13 @@ export class GameController {
    * During batch (simultaneous) processing, VIS_UPDATE_VIEW is deferred to the caller.
    */
   private applyTurnResult(result: TurnResult): void {
+    if (result.pathNodeIds && result.pathNodeIds.length >= 2) {
+      this.eventBus.emit(GameEventType.VIS_PLAYER_PATH, {
+        playerId: result.movingPlayerId,
+        pathNodeIds: result.pathNodeIds,
+      });
+    }
+
     const movingPlayer = this.model.getPlayer(result.movingPlayerId);
     if (movingPlayer) {
       this.model.setPlayerRef(result.movingPlayerId, this.model.nodeList[result.newNodeId]);

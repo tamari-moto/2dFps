@@ -2,8 +2,7 @@ import { Model } from '../model/model';
 import { Node } from '../model/node';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
-import { PlayerConfig } from '../config/GameConfig';
-import { ENTITY_IDS } from '../config/GameConfig';
+import { PlayerConfig, ENTITY_IDS } from '../config/GameConfig';
 
 /**
  * Local-play implementation of INetworkAdapter.
@@ -80,11 +79,13 @@ export class LocalAdapter implements INetworkAdapter {
       this.resolveShot(action.playerId, action.shotAtNodeId, hits);
     }
 
+    const path = this.model.getPathToNode(fromNode.id, action.moveToNodeId, PlayerConfig.MoveRange);
     this.turnResultCallback?.({
       movingPlayerId: action.playerId,
       newNodeId: action.moveToNodeId,
       newAngle,
       hits,
+      pathNodeIds: path ?? [fromNode.id, action.moveToNodeId],
     });
   }
 
@@ -153,11 +154,13 @@ export class LocalAdapter implements INetworkAdapter {
         player.setAngle(newAngle);
       }
 
+      const path = this.model.getPathToNode(fromNode.id, action.moveToNodeId, PlayerConfig.MoveRange);
       pendingResults.push({
         movingPlayerId: action.playerId,
         newNodeId: action.moveToNodeId,
         newAngle,
         hits: [],
+        pathNodeIds: path ?? [fromNode.id, action.moveToNodeId],
       });
     }
 
