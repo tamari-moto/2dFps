@@ -46,6 +46,15 @@ export const CameraConfig = {
 
   /** 移動追従時の ease */
   FollowMoveEase: 'power2.out',
+
+  /** Ortho MAP カメラの初期 halfSize（マップ全体 1470 の半分より少し大きめ） */
+  OrthoViewHalfSize: 800,
+  /** Ortho ズームイン上限 */
+  OrthoViewHalfSizeMin: 200,
+  /** Ortho ズームアウト上限 */
+  OrthoViewHalfSizeMax: 1200,
+  /** Ortho ホイール 1 ステップあたりの halfSize 変化量 */
+  OrthoWheelStep: 40,
 } as const;
 
 /**

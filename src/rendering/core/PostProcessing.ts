@@ -28,7 +28,7 @@ export function applyFogToScene(scene: THREE.Scene): void {
 export function setupPostProcessing(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
-  camera: THREE.PerspectiveCamera,
+  camera: THREE.Camera,
   width: number,
   height: number,
 ): EffectComposer | null {

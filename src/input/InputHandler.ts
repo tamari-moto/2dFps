@@ -94,6 +94,14 @@ export class InputHandler {
       return;
     }
 
+    // O キーは Ortho MAP 俯瞰モードのトグル（FPS 中は無効）
+    if (!this.fpsActive &&
+        (event.key === KEYBOARD_KEYS.ORTHO_TOGGLE ||
+         event.key === KEYBOARD_KEYS.ORTHO_TOGGLE_UPPER)) {
+      this.eventBus.emit(GameEventType.ORTHO_MODE_TOGGLE_REQUESTED);
+      return;
+    }
+
     // F キー（ダンス）は観戦モード中も発火させる
     if (event.key === KEYBOARD_KEYS.DANCE ||
         event.key === KEYBOARD_KEYS.DANCE_UPPER) {
