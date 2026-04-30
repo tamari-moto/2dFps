@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { AnimationConfig, RenderConfig } from '../config/GameConfig';
+import { AnimationConfig, RenderConfig } from '../../config/GameConfig';
 import type { CharacterPartNames } from './PlayerMeshFactory';
 
 type AnimState = 'idle' | 'walk' | 'attack' | 'dance';

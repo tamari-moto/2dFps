@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { Model } from '../model/model';
-import { SceneManager } from './SceneManager';
+import { SceneManager } from './core/SceneManager';
 import { CameraConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerAnimator } from './PlayerAnimator';
-import { PlayerLifecycleManager } from './PlayerLifecycleManager';
-import { CameraFollowController } from './CameraFollowController';
-import { NodeVisualizationManager } from './NodeVisualizationManager';
-import { TextBurstEffect } from './TextBurstEffect';
-import { gameToWorld } from './MeshUtils';
+import { PlayerAnimator } from './players/PlayerAnimator';
+import { PlayerLifecycleManager } from './players/PlayerLifecycleManager';
+import { PlayerEffects } from './players/PlayerEffects';
+import { CameraFollowController } from './cameras/CameraFollowController';
+import { NodeVisualizationManager } from './world/NodeVisualizationManager';
+import { TextBurstEffect } from './effects/TextBurstEffect';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
@@ -17,6 +17,7 @@ import { gameToWorld } from './MeshUtils';
 export class VisualizationSync {
   private nodeVis:       NodeVisualizationManager;
   private lifecycle:     PlayerLifecycleManager;
+  private effects:       PlayerEffects;
   private animator:      PlayerAnimator;
   private camera:        CameraFollowController;
   private textBurstEffect: TextBurstEffect;
@@ -34,10 +35,11 @@ export class VisualizationSync {
     this.model = model;
     this.activePlayerId = activePlayerId;
 
-    // Shared map — PlayerAnimator and PlayerLifecycleManager both reference it
+    // Shared map — PlayerAnimator / PlayerLifecycleManager / PlayerEffects all reference it
     const meshMap = new Map<string, THREE.Object3D>();
     this.animator      = new PlayerAnimator(meshMap);
     this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
+    this.effects       = new PlayerEffects(meshMap, this.animator, model);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
     this.camera        = new CameraFollowController(sceneManager);
     this.textBurstEffect = new TextBurstEffect(sceneManager);
@@ -165,10 +167,10 @@ export class VisualizationSync {
     });
 
     eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
-      this.lifecycle.showHitEffect(data.playerId);
+      this.effects.showHitEffect(data.playerId);
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
-      this.lifecycle.hidePlayer(data.playerId);
+      this.effects.hidePlayer(data.playerId);
     });
 
     eventBus.on(GameEventType.VIS_SET_REACHABLE_NODES, (data: { nodeIds: number[] }) => {
@@ -186,9 +188,7 @@ export class VisualizationSync {
       this.animator.startDance(data.playerId);
       const player = this.model.getPlayer(data.playerId);
       if (player) {
-        const w = gameToWorld(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
-        this.textBurstEffect.play(w.x, w.y, w.z);
-        this.textBurstEffect.playDanceBurst(w.x, w.y, w.z);
+        this.textBurstEffect.playAtGameCoords(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
       }
     });
   }

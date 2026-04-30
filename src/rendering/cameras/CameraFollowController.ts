@@ -1,7 +1,7 @@
 import { gsap } from 'gsap';
-import { CameraConfig } from '../config/GameConfig';
-import type { SceneManager } from './SceneManager';
-import { gameToWorld } from './MeshUtils';
+import { CameraConfig } from '../../config/GameConfig';
+import type { SceneManager } from '../core/SceneManager';
+import { gameToWorld } from '../utils/MeshUtils';
 
 /**
  * Manages camera follow behaviour: smooth pan animations and instant snap.

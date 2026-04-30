@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import type { OrbitControls } from 'three-stdlib';
-import { SceneManager } from './SceneManager';
+import { SceneManager } from '../core/SceneManager';
 import { CameraFollowController } from './CameraFollowController';
-import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import type { Model } from '../model/model';
-import { CameraConfig, FPSConfig } from '../config/GameConfig';
-import { gameToWorld } from './MeshUtils';
+import { CameraInputController } from './CameraInputController';
+import { GameEventBus, GameEventType } from '../../core/GameEventBus';
+import type { Model } from '../../model/model';
+import { CameraConfig, FPSConfig } from '../../config/GameConfig';
+import { gameToWorld } from '../utils/MeshUtils';
 
 /**
  * FPS 観戦モードのカメラ制御。
@@ -19,6 +19,7 @@ export class FPSCameraController {
   private camera: THREE.PerspectiveCamera;
   private canvas: HTMLCanvasElement;
   private sceneManager: SceneManager;
+  private cameraInput: CameraInputController;
   private follow: CameraFollowController;
   private eventBus: GameEventBus;
   private model: Model;
@@ -47,6 +48,7 @@ export class FPSCameraController {
     camera: THREE.PerspectiveCamera,
     canvas: HTMLCanvasElement,
     sceneManager: SceneManager,
+    cameraInput: CameraInputController,
     follow: CameraFollowController,
     eventBus: GameEventBus,
     model: Model,
@@ -55,6 +57,7 @@ export class FPSCameraController {
     this.camera = camera;
     this.canvas = canvas;
     this.sceneManager = sceneManager;
+    this.cameraInput = cameraInput;
     this.follow = follow;
     this.eventBus = eventBus;
     this.model = model;
@@ -88,7 +91,7 @@ export class FPSCameraController {
 
     // 既存追従アニメーションを止める意味で snapTo は呼ばない（カメラ位置を直接設定）
     this.savedFov = this.camera.fov;
-    const orbit = this.sceneManager.getControls() as OrbitControls;
+    const orbit = this.cameraInput.getControls();
     this.savedOrbitEnabled = orbit.enabled;
     orbit.enabled = false;
 
@@ -140,7 +143,7 @@ export class FPSCameraController {
     this.camera.updateProjectionMatrix();
 
     // OrbitControls を元に戻す
-    const orbit = this.sceneManager.getControls() as OrbitControls;
+    const orbit = this.cameraInput.getControls();
     orbit.enabled = this.savedOrbitEnabled;
 
     // アクティブプレイヤーへスナップ（パン中で取り残されたカメラを定位置に戻す）
