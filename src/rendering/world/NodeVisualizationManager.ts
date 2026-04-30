@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { Model } from '../model/model';
-import { Player } from '../model/Player';
-import { SceneManager } from './SceneManager';
-import { createNodeCircle, createWallMesh } from './NodeWallMeshFactory';
-import { createUndefinedMesh, setNodeColor } from './MeshUtils';
+import { Model } from '../../model/model';
+import { Player } from '../../model/Player';
+import { SceneManager } from '../core/SceneManager';
+import { createNodeCircle } from './NodeMeshFactory';
+import { createWallMesh } from './WallMeshFactory';
+import { createUndefinedMesh, setNodeColor } from '../utils/MeshUtils';
 import {
   NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig,
-} from '../config/GameConfig';
+} from '../../config/GameConfig';
 
 /**
  * Manages all node circle and obstacle wall meshes:

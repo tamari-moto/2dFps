@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RenderConfig, ShadowConfig } from '../config/GameConfig';
+import { RenderConfig, ShadowConfig } from '../../config/GameConfig';
 
 // ── Character part name registry ──────────────────────────────────────────────
 /**

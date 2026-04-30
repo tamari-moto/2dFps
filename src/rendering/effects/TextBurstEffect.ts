@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { TextBurstEffectConfig } from '../config/GameConfig';
-import { SceneManager } from './SceneManager';
+import { TextBurstEffectConfig } from '../../config/GameConfig';
+import { SceneManager } from '../core/SceneManager';
+import { gameToWorld } from '../utils/MeshUtils';
 
 const CHARS = ['モ', 'ヒ', 'カ', 'ン'] as const;
 
@@ -10,6 +11,17 @@ export class TextBurstEffect {
   private burstTimers: ReturnType<typeof setInterval>[] = [];
 
   constructor(private sceneManager: SceneManager) {}
+
+  /**
+   * Convenience: takes game-space coords (XY) and a vertical offset, runs both
+   * the fan-out `play()` and the radial `playDanceBurst()` at that point.
+   * Lets callers stay in game-space and avoid importing gameToWorld.
+   */
+  playAtGameCoords(gx: number, gy: number, height: number): void {
+    const w = gameToWorld(gx, gy, height);
+    this.play(w.x, w.y, w.z);
+    this.playDanceBurst(w.x, w.y, w.z);
+  }
 
   playDanceBurst(worldX: number, worldY: number, worldZ: number): void {
     const cfg = TextBurstEffectConfig;

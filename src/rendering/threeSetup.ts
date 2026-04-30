@@ -1,6 +1,7 @@
-import { SceneManager } from './SceneManager';
+import { SceneManager } from './core/SceneManager';
 import { VisualizationSync } from './VisualizationSync';
-import { FPSCameraController } from './FPSCameraController';
+import { CameraInputController } from './cameras/CameraInputController';
+import { FPSCameraController } from './cameras/FPSCameraController';
 import { InputHandler } from '../input/InputHandler';
 import { GameController } from '../logic/GameController';
 import { GameEventBus, GameEventType, gameEventBus } from '../core/GameEventBus';
@@ -16,6 +17,7 @@ import { applyServerConfig } from '../config/GameConfig';
  */
 export class ThreeSetup {
   private sceneManager: SceneManager;
+  private cameraInput: CameraInputController;
   private visualizationSync: VisualizationSync;
   private inputHandler: InputHandler;
   private gameController: GameController;
@@ -31,6 +33,9 @@ export class ThreeSetup {
 
     // Initialize scene management
     this.sceneManager = new SceneManager(canvas);
+
+    // Camera input (OrbitControls / wheel FOV / panCamera)
+    this.cameraInput = new CameraInputController(this.sceneManager.getCamera(), canvas);
 
     // Apply server-authoritative config before building the model.
     // ColyseusAdapter fires this synchronously if server_config already arrived;
@@ -78,6 +83,7 @@ export class ThreeSetup {
       this.sceneManager.getCamera(),
       canvas,
       this.sceneManager,
+      this.cameraInput,
       this.visualizationSync.getCameraFollow(),
       this.eventBus,
       model,
@@ -158,6 +164,7 @@ export class ThreeSetup {
   dispose(): void {
     this.fpsCamera.dispose();
     this.eventBus.removeAllListeners();
+    this.cameraInput.dispose();
     this.sceneManager.dispose();
     this.inputHandler.dispose();
   }

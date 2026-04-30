@@ -66,18 +66,15 @@ src/
 │       ├── NPCBrain.ts         # NPC 行動決定（Facade: decideTurn()）
 │       ├── NodeScorer.ts       # 移動候補ノード評価スコアリング
 │       └── ShotSelector.ts     # 射撃対象選択
-├── rendering/                  # Three.js 描画（クライアント固有）
-│   ├── threeSetup.ts           # Three.js 統合・オーケストレーション
-│   ├── SceneManager.ts         # シーン管理
+├── rendering/                  # Three.js 描画（クライアント固有・サブフォルダ詳細は rendering/CLAUDE.md）
+│   ├── threeSetup.ts           # エントリ。各モジュールを構築・配線
 │   ├── VisualizationSync.ts    # オーケストレーター（VIS_* イベント → 各マネージャ委譲）
-│   ├── PlayerMeshFactory.ts    # プレイヤー3Dメッシュ生成
-│   ├── PlayerAnimator.ts       # GSAP によるプレイヤーアニメーション
-│   ├── PlayerLifecycleManager.ts # プレイヤーメッシュのライフサイクル管理
-│   ├── CameraFollowController.ts # カメラ追従・パンアニメーション
-│   ├── NodeVisualizationManager.ts # ノード色状態・双方向マッピング管理
-│   ├── NodeWallMeshFactory.ts  # ノード円形・障害物壁メッシュ生成
-│   ├── ViewAngleVisualizer.ts  # 視野角の可視化
-│   └── MeshUtils.ts            # メッシュユーティリティ
+│   ├── core/                   # Three.js 基盤（SceneManager / LightingRig / PostProcessing / BackgroundGrid）
+│   ├── cameras/                # CameraFollow / CameraInput / FPSCamera
+│   ├── players/                # PlayerLifecycle / PlayerAnimator / PlayerEffects / PlayerMeshFactory
+│   ├── world/                  # NodeVisualization / NodeMeshFactory / WallMeshFactory
+│   ├── effects/                # TextBurstEffect
+│   └── utils/                  # MeshUtils（gameToWorld 等）
 ├── input/                      # 入力処理（クライアント固有）
 │   └── InputHandler.ts
 ├── ui/                         # React UI コンポーネント（クライアント固有）
@@ -150,14 +147,16 @@ Idle → Select → Move → Shot → Idle
 
 ### 描画レイヤーの委譲構造
 
-VisualizationSync は薄いオーケストレーターとして、GameEventBus の `VIS_*` イベントを受け取り、4つの専門マネージャに処理を委譲する。
+VisualizationSync は薄いオーケストレーターとして、GameEventBus の `VIS_*` イベントを受け取り、専門マネージャに処理を委譲する（詳細は [src/rendering/CLAUDE.md](src/rendering/CLAUDE.md)）。
 
 ```
 VisualizationSync (オーケストレーター)
-├── PlayerAnimator           # GSAP アニメーション（移動、ダンス、被弾演出）
-├── PlayerLifecycleManager   # プレイヤーメッシュの生成・破棄・状態遷移
-├── NodeVisualizationManager # ノードの色状態管理（選択、移動先、射撃先）
-└── CameraFollowController   # カメラ追従・パンアニメーション
+├── players/PlayerLifecycleManager  # メッシュ生成・可視・Transform
+├── players/PlayerAnimator          # GSAP（idle/walk/attack/dance）
+├── players/PlayerEffects           # ヒットパルス・死亡フェード
+├── world/NodeVisualizationManager  # ノード色・双方向 ID マップ
+├── cameras/CameraFollowController  # カメラ追従
+└── effects/TextBurstEffect         # ダンス文字バースト
 ```
 
 ### Mesh ↔ Node 双方向マッピング
