@@ -68,4 +68,6 @@ export const FPSConfig = {
   FOV: 75,
   /** dt のクランプ上限（秒）。タブ復帰時の巨大 dt で吹き飛ぶのを防ぐ */
   MaxDeltaSeconds: 0.1,
+  /** 降下キー（Ctrl はブラウザショートカットと競合するため Q を使用） */
+  DescendKey: 'KeyQ',
 } as const;

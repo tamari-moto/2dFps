@@ -9,7 +9,7 @@ import { gameToWorld } from '../utils/MeshUtils';
 
 /**
  * FPS 観戦モードのカメラ制御。
- * - WASD で水平移動、Space/Ctrl で上下、Shift で加速
+ * - WASD で水平移動、Space/Q で上下、Shift で加速
  * - Pointer Lock + mousemove で yaw/pitch
  * - enable/disable は GameEventBus 経由で外部から呼ばれる
  *
@@ -30,7 +30,7 @@ export class FPSCameraController {
   private pitch = 0;  // degrees, +が上
   private prevTime = 0;
 
-  private keys = { w: false, a: false, s: false, d: false, space: false, ctrl: false, shift: false };
+  private keys = { w: false, a: false, s: false, d: false, space: false, q: false, shift: false };
 
   // 通常モード復帰用にカメラ状態を退避
   private savedFov: number = CameraConfig.FOV;
@@ -132,7 +132,7 @@ export class FPSCameraController {
 
     // 押下フラグを全リセット（FPS 中の押しっぱなしが漏れないように）
     this.keys.w = this.keys.a = this.keys.s = this.keys.d = false;
-    this.keys.space = this.keys.ctrl = this.keys.shift = false;
+    this.keys.space = this.keys.q = this.keys.shift = false;
 
     if (document.pointerLockElement === this.canvas) {
       document.exitPointerLock();
@@ -197,7 +197,7 @@ export class FPSCameraController {
       case 'KeyS': this.keys.s = true; e.preventDefault(); break;
       case 'KeyD': this.keys.d = true; e.preventDefault(); break;
       case 'Space': this.keys.space = true; e.preventDefault(); break;
-      case 'ControlLeft': case 'ControlRight': this.keys.ctrl = true; break;
+      case FPSConfig.DescendKey: this.keys.q = true; e.preventDefault(); break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = true; break;
     }
   }
@@ -209,7 +209,7 @@ export class FPSCameraController {
       case 'KeyS': this.keys.s = false; break;
       case 'KeyD': this.keys.d = false; break;
       case 'Space': this.keys.space = false; break;
-      case 'ControlLeft': case 'ControlRight': this.keys.ctrl = false; break;
+      case FPSConfig.DescendKey: this.keys.q = false; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = false; break;
     }
   }
@@ -268,7 +268,7 @@ export class FPSCameraController {
     if (this.keys.d) this.camera.position.addScaledVector(right, speed);
     if (this.keys.a) this.camera.position.addScaledVector(right, -speed);
     if (this.keys.space) this.camera.position.y += speed;
-    if (this.keys.ctrl)  this.camera.position.y -= speed;
+    if (this.keys.q)     this.camera.position.y -= speed;
 
     this.applyLook();
   }
