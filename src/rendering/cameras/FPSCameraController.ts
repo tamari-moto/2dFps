@@ -192,10 +192,10 @@ export class FPSCameraController {
 
   private handleKeyDown(e: KeyboardEvent): void {
     switch (e.code) {
-      case 'KeyW': this.keys.w = true; break;
-      case 'KeyA': this.keys.a = true; break;
-      case 'KeyS': this.keys.s = true; break;
-      case 'KeyD': this.keys.d = true; break;
+      case 'KeyW': this.keys.w = true; e.preventDefault(); break;
+      case 'KeyA': this.keys.a = true; e.preventDefault(); break;
+      case 'KeyS': this.keys.s = true; e.preventDefault(); break;
+      case 'KeyD': this.keys.d = true; e.preventDefault(); break;
       case 'Space': this.keys.space = true; e.preventDefault(); break;
       case 'ControlLeft': case 'ControlRight': this.keys.ctrl = true; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = true; break;
