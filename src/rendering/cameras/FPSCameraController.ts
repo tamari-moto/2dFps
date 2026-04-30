@@ -42,6 +42,7 @@ export class FPSCameraController {
   private readonly onKeyDown: (e: KeyboardEvent) => void;
   private readonly onKeyUp: (e: KeyboardEvent) => void;
   private readonly onPointerLockChange: () => void;
+  private readonly onFullscreenChange: () => void;
   private readonly tickBound: () => void;
 
   constructor(
@@ -68,10 +69,11 @@ export class FPSCameraController {
     this.onKeyDown = this.handleKeyDown.bind(this);
     this.onKeyUp = this.handleKeyUp.bind(this);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
+    this.onFullscreenChange = this.handleFullscreenChange.bind(this);
     this.tickBound = this.tick.bind(this);
 
-    // モード解除時にOSがPointer Lockを外したら自動で disable
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    document.addEventListener('fullscreenchange', this.onFullscreenChange);
   }
 
   isEnabled(): boolean {
@@ -116,7 +118,9 @@ export class FPSCameraController {
     this.enabled = true;
     this.eventBus.emit(GameEventType.FPS_MODE_CHANGED, { enabled: true });
 
-    // Pointer Lock 要求（ユーザージェスチャ起源で呼ばれる前提：T キー押下からの emit 経由）
+    // フルスクリーン要求（Ctrl+W 等のブラウザショートカットを無効化するため）
+    // ユーザージェスチャ起源（T キー押下）で呼ばれる前提
+    this.requestFullscreen();
     this.requestPointerLock();
   }
 
@@ -136,6 +140,9 @@ export class FPSCameraController {
 
     if (document.pointerLockElement === this.canvas) {
       document.exitPointerLock();
+    }
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => { /* 無視 */ });
     }
 
     // FOV 復元
@@ -160,15 +167,27 @@ export class FPSCameraController {
   dispose(): void {
     if (this.enabled) this.disable();
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange);
   }
 
   // ── private ──────────────────────────────────────────────────────────
 
   private requestPointerLock(): void {
-    // ブラウザによっては Promise を返す。失敗しても致命的ではないので握りつぶす。
     const req = this.canvas.requestPointerLock();
     if (req && typeof (req as Promise<void>).catch === 'function') {
       (req as Promise<void>).catch(() => { /* user 拒否 or 未対応 */ });
+    }
+  }
+
+  private requestFullscreen(): void {
+    if (document.fullscreenElement) return;
+    document.documentElement.requestFullscreen().catch(() => { /* user 拒否 or 未対応 */ });
+  }
+
+  private handleFullscreenChange(): void {
+    // ESC 等でフルスクリーンが解除されたら FPS モードも終了する
+    if (this.enabled && !document.fullscreenElement) {
+      this.disable();
     }
   }
 
@@ -192,10 +211,10 @@ export class FPSCameraController {
 
   private handleKeyDown(e: KeyboardEvent): void {
     switch (e.code) {
-      case 'KeyW': this.keys.w = true; break;
-      case 'KeyA': this.keys.a = true; break;
-      case 'KeyS': this.keys.s = true; break;
-      case 'KeyD': this.keys.d = true; break;
+      case 'KeyW': this.keys.w = true; e.preventDefault(); break;
+      case 'KeyA': this.keys.a = true; e.preventDefault(); break;
+      case 'KeyS': this.keys.s = true; e.preventDefault(); break;
+      case 'KeyD': this.keys.d = true; e.preventDefault(); break;
       case 'Space': this.keys.space = true; e.preventDefault(); break;
       case 'ControlLeft': case 'ControlRight': this.keys.ctrl = true; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = true; break;
