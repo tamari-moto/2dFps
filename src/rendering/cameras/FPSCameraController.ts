@@ -9,7 +9,7 @@ import { gameToWorld } from '../utils/MeshUtils';
 
 /**
  * FPS 観戦モードのカメラ制御。
- * - WASD で水平移動、Space/Q で上下、Shift で加速
+ * - WASD で水平移動、Space/Ctrl で上下、Shift で加速
  * - Pointer Lock + mousemove で yaw/pitch
  * - enable/disable は GameEventBus 経由で外部から呼ばれる
  *
@@ -30,7 +30,7 @@ export class FPSCameraController {
   private pitch = 0;  // degrees, +が上
   private prevTime = 0;
 
-  private keys = { w: false, a: false, s: false, d: false, space: false, q: false, shift: false };
+  private keys = { w: false, a: false, s: false, d: false, space: false, ctrl: false, shift: false };
 
   // 通常モード復帰用にカメラ状態を退避
   private savedFov: number = CameraConfig.FOV;
@@ -42,6 +42,7 @@ export class FPSCameraController {
   private readonly onKeyDown: (e: KeyboardEvent) => void;
   private readonly onKeyUp: (e: KeyboardEvent) => void;
   private readonly onPointerLockChange: () => void;
+  private readonly onFullscreenChange: () => void;
   private readonly tickBound: () => void;
 
   constructor(
@@ -68,10 +69,11 @@ export class FPSCameraController {
     this.onKeyDown = this.handleKeyDown.bind(this);
     this.onKeyUp = this.handleKeyUp.bind(this);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
+    this.onFullscreenChange = this.handleFullscreenChange.bind(this);
     this.tickBound = this.tick.bind(this);
 
-    // モード解除時にOSがPointer Lockを外したら自動で disable
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    document.addEventListener('fullscreenchange', this.onFullscreenChange);
   }
 
   isEnabled(): boolean {
@@ -116,7 +118,9 @@ export class FPSCameraController {
     this.enabled = true;
     this.eventBus.emit(GameEventType.FPS_MODE_CHANGED, { enabled: true });
 
-    // Pointer Lock 要求（ユーザージェスチャ起源で呼ばれる前提：T キー押下からの emit 経由）
+    // フルスクリーン要求（Ctrl+W 等のブラウザショートカットを無効化するため）
+    // ユーザージェスチャ起源（T キー押下）で呼ばれる前提
+    this.requestFullscreen();
     this.requestPointerLock();
   }
 
@@ -132,10 +136,13 @@ export class FPSCameraController {
 
     // 押下フラグを全リセット（FPS 中の押しっぱなしが漏れないように）
     this.keys.w = this.keys.a = this.keys.s = this.keys.d = false;
-    this.keys.space = this.keys.q = this.keys.shift = false;
+    this.keys.space = this.keys.ctrl = this.keys.shift = false;
 
     if (document.pointerLockElement === this.canvas) {
       document.exitPointerLock();
+    }
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => { /* 無視 */ });
     }
 
     // FOV 復元
@@ -160,15 +167,27 @@ export class FPSCameraController {
   dispose(): void {
     if (this.enabled) this.disable();
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange);
   }
 
   // ── private ──────────────────────────────────────────────────────────
 
   private requestPointerLock(): void {
-    // ブラウザによっては Promise を返す。失敗しても致命的ではないので握りつぶす。
     const req = this.canvas.requestPointerLock();
     if (req && typeof (req as Promise<void>).catch === 'function') {
       (req as Promise<void>).catch(() => { /* user 拒否 or 未対応 */ });
+    }
+  }
+
+  private requestFullscreen(): void {
+    if (document.fullscreenElement) return;
+    document.documentElement.requestFullscreen().catch(() => { /* user 拒否 or 未対応 */ });
+  }
+
+  private handleFullscreenChange(): void {
+    // ESC 等でフルスクリーンが解除されたら FPS モードも終了する
+    if (this.enabled && !document.fullscreenElement) {
+      this.disable();
     }
   }
 
@@ -197,7 +216,7 @@ export class FPSCameraController {
       case 'KeyS': this.keys.s = true; e.preventDefault(); break;
       case 'KeyD': this.keys.d = true; e.preventDefault(); break;
       case 'Space': this.keys.space = true; e.preventDefault(); break;
-      case FPSConfig.DescendKey: this.keys.q = true; e.preventDefault(); break;
+      case 'ControlLeft': case 'ControlRight': this.keys.ctrl = true; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = true; break;
     }
   }
@@ -209,7 +228,7 @@ export class FPSCameraController {
       case 'KeyS': this.keys.s = false; break;
       case 'KeyD': this.keys.d = false; break;
       case 'Space': this.keys.space = false; break;
-      case FPSConfig.DescendKey: this.keys.q = false; break;
+      case 'ControlLeft': case 'ControlRight': this.keys.ctrl = false; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = false; break;
     }
   }
@@ -268,7 +287,7 @@ export class FPSCameraController {
     if (this.keys.d) this.camera.position.addScaledVector(right, speed);
     if (this.keys.a) this.camera.position.addScaledVector(right, -speed);
     if (this.keys.space) this.camera.position.y += speed;
-    if (this.keys.q)     this.camera.position.y -= speed;
+    if (this.keys.ctrl)  this.camera.position.y -= speed;
 
     this.applyLook();
   }
