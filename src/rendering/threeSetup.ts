@@ -2,6 +2,7 @@ import { SceneManager } from './core/SceneManager';
 import { VisualizationSync } from './VisualizationSync';
 import { CameraInputController } from './cameras/CameraInputController';
 import { FPSCameraController } from './cameras/FPSCameraController';
+import { OrthoMapController } from './cameras/OrthoMapController';
 import { InputHandler } from '../input/InputHandler';
 import { GameController } from '../logic/GameController';
 import { GameEventBus, GameEventType, gameEventBus } from '../core/GameEventBus';
@@ -23,6 +24,7 @@ export class ThreeSetup {
   private gameController: GameController;
   private eventBus: GameEventBus;
   private fpsCamera: FPSCameraController;
+  private orthoController: OrthoMapController;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -94,6 +96,23 @@ export class ThreeSetup {
         this.fpsCamera.disable();
       } else {
         this.fpsCamera.enable();
+      }
+    });
+
+    // Ortho MAP 俯瞰モード（O キー）
+    this.orthoController = new OrthoMapController();
+    this.cameraInput.setOrthoController(this.orthoController);
+    this.eventBus.on(GameEventType.ORTHO_MODE_TOGGLE_REQUESTED, () => {
+      if (this.orthoController.isEnabled()) {
+        this.orthoController.disable();
+        this.cameraInput.setOrthoActive(false);
+        this.sceneManager.setActiveCamera(this.sceneManager.getCamera());
+        this.eventBus.emit(GameEventType.ORTHO_MODE_CHANGED, { enabled: false });
+      } else {
+        this.orthoController.enable();
+        this.cameraInput.setOrthoActive(true);
+        this.sceneManager.setActiveCamera(this.orthoController.getCamera());
+        this.eventBus.emit(GameEventType.ORTHO_MODE_CHANGED, { enabled: true });
       }
     });
 

@@ -6,4 +6,6 @@ export const KEYBOARD_KEYS = {
   DANCE_UPPER: 'F',
   SPECTATOR_TOGGLE: 't',
   SPECTATOR_TOGGLE_UPPER: 'T',
+  ORTHO_TOGGLE: 'o',
+  ORTHO_TOGGLE_UPPER: 'O',
 } as const;

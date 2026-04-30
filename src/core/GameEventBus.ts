@@ -60,6 +60,10 @@ export enum GameEventType {
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
   FPS_MODE_CHANGED = 'fps:mode_changed',
 
+  // Ortho MAP overview mode events
+  ORTHO_MODE_TOGGLE_REQUESTED = 'ortho:toggle_requested',
+  ORTHO_MODE_CHANGED = 'ortho:mode_changed',
+
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
   NETWORK_DISCONNECTED = 'network:disconnected',
@@ -179,6 +183,12 @@ export interface GameEventData {
   // Spectator (FPS) mode events
   [GameEventType.FPS_MODE_TOGGLE_REQUESTED]: void;
   [GameEventType.FPS_MODE_CHANGED]: {
+    enabled: boolean;
+  };
+
+  // Ortho MAP overview mode events
+  [GameEventType.ORTHO_MODE_TOGGLE_REQUESTED]: void;
+  [GameEventType.ORTHO_MODE_CHANGED]: {
     enabled: boolean;
   };
 

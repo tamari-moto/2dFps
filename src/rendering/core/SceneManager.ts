@@ -15,6 +15,7 @@ export class SceneManager {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
+  private activeCamera: THREE.Camera;
   private composer: EffectComposer | null;
   private backgroundGrid: BackgroundGrid;
   private boundHandleResize: () => void;
@@ -54,6 +55,8 @@ export class SceneManager {
 
     this.composer = setupPostProcessing(this.renderer, this.scene, this.camera, width, height);
 
+    this.activeCamera = this.camera;
+
     this.boundHandleResize = this.handleResize.bind(this);
     window.addEventListener('resize', this.boundHandleResize);
   }
@@ -73,7 +76,7 @@ export class SceneManager {
     if (this.composer) {
       this.composer.render();
     } else {
-      this.renderer.render(this.scene, this.camera);
+      this.renderer.render(this.scene, this.activeCamera);
     }
   }
 
@@ -103,6 +106,18 @@ export class SceneManager {
 
   getCamera(): THREE.PerspectiveCamera {
     return this.camera;
+  }
+
+  setActiveCamera(cam: THREE.Camera): void {
+    this.activeCamera = cam;
+    if (this.composer) {
+      // EffectComposer の passes[0] は RenderPass — カメラを差し替える
+      (this.composer.passes[0] as unknown as { camera: THREE.Camera }).camera = cam;
+    }
+  }
+
+  getActiveCamera(): THREE.Camera {
+    return this.activeCamera;
   }
 
   getRenderer(): THREE.WebGLRenderer {

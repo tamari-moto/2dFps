@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import { CameraConfig } from '../../config/GameConfig';
+import type { OrthoMapController } from './OrthoMapController';
 
 /**
  * Owns camera input: OrbitControls (rotate / pan), wheel-driven FOV zoom,
@@ -11,6 +12,8 @@ export class CameraInputController {
   private boundHandleWheel: (e: WheelEvent) => void;
   private camera: THREE.PerspectiveCamera;
   private canvas: HTMLCanvasElement;
+  private orthoController: OrthoMapController | null = null;
+  private orthoActive = false;
 
   constructor(camera: THREE.PerspectiveCamera, canvas: HTMLCanvasElement) {
     this.camera = camera;
@@ -28,15 +31,28 @@ export class CameraInputController {
     canvas.addEventListener('wheel', this.boundHandleWheel, { passive: false });
   }
 
-  /** Wheel-driven FOV adjustment (clamped). */
+  setOrthoController(ctrl: OrthoMapController): void {
+    this.orthoController = ctrl;
+  }
+
+  setOrthoActive(active: boolean): void {
+    this.orthoActive = active;
+  }
+
+  /** Wheel-driven zoom: Ortho モード時は halfSize 調整、Perspective 時は FOV 調整。 */
   private handleWheel(e: WheelEvent): void {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? CameraConfig.FOVWheelStep : -CameraConfig.FOVWheelStep;
-    this.camera.fov = Math.max(
-      CameraConfig.FOVMin,
-      Math.min(CameraConfig.FOVMax, this.camera.fov + delta),
-    );
-    this.camera.updateProjectionMatrix();
+    if (this.orthoActive && this.orthoController) {
+      const delta = e.deltaY > 0 ? CameraConfig.OrthoWheelStep : -CameraConfig.OrthoWheelStep;
+      this.orthoController.zoom(delta);
+    } else {
+      const delta = e.deltaY > 0 ? CameraConfig.FOVWheelStep : -CameraConfig.FOVWheelStep;
+      this.camera.fov = Math.max(
+        CameraConfig.FOVMin,
+        Math.min(CameraConfig.FOVMax, this.camera.fov + delta),
+      );
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   /**
