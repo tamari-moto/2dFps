@@ -124,6 +124,9 @@ export class VisualizationSync {
       this.lifecycle.setVisible(playerId, shouldShow);
       if (!shouldShow) continue;
 
+      // 経路アニメーション中は applyTransform の gsap.to / rotation 書き込みをスキップ
+      if (this.lifecycle.isPathAnimating(playerId)) continue;
+
       const moving = this.lifecycle.applyTransform(
         playerId, player.node.x, player.node.y, player.angle, isActive,
       );

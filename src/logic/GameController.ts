@@ -2,7 +2,7 @@ import { Model } from '../model/model';
 import type { ObstacleData } from '../model/MapGenerator';
 import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { AIConfig, PlayerConfig } from '../config/GameConfig';
+import { AIConfig, AnimationConfig, PlayerConfig } from '../config/GameConfig';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
@@ -136,9 +136,9 @@ export class GameController {
 
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
 
-    // Delay input re-enable by the longest path animation duration
-    const maxSteps = Math.max(...resolved.map(r => r.path.length - 1), 0);
-    const animDelay = maxSteps * AIConfig.RoundAnimationDelayMs + AIConfig.RoundAnimationDelayMs;
+    // Delay input re-enable by the longest path animation duration + buffer
+    const maxSteps = resolved.reduce((acc, r) => Math.max(acc, r.path.length - 1), 0);
+    const animDelay = maxSteps * AnimationConfig.MovementDuration * 1000 ;
     this.delay(animDelay).then(() => {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });

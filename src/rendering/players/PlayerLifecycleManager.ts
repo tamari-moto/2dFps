@@ -15,7 +15,7 @@ import { gameToWorld } from '../utils/MeshUtils';
  */
 export class PlayerLifecycleManager {
   readonly playerMeshes: Map<string, THREE.Object3D>;
-  private pathAnimatingPlayers: Set<string> = new Set();
+  private readonly pathAnimatingPlayers: Set<string> = new Set();
 
   constructor(
     private sceneManager: SceneManager,
@@ -44,6 +44,10 @@ export class PlayerLifecycleManager {
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
     this.animator.startIdle(playerId);
+  }
+
+  isPathAnimating(playerId: string): boolean {
+    return this.pathAnimatingPlayers.has(playerId);
   }
 
   setVisible(playerId: string, visible: boolean): void {
@@ -126,23 +130,20 @@ export class PlayerLifecycleManager {
     const dz = obj.position.z - worldTarget.z;
     const moving = Math.sqrt(dx * dx + dz * dz) > 0.5;
 
-    // animateAlongPath が動いている間は position/rotation を上書きしない
-    if (!this.pathAnimatingPlayers.has(playerId)) {
-      if (moving && this.animator.getState(playerId) === 'idle') {
-        this.animator.startWalk(playerId);
-      }
-
-      gsap.to(obj.position, {
-        x: worldTarget.x,
-        y: worldTarget.y,
-        z: worldTarget.z,
-        duration: AnimationConfig.MovementDuration,
-      });
-
-      obj.rotation.x = 0;
-      obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
-      obj.rotation.z = 0;
+    if (moving && this.animator.getState(playerId) === 'idle') {
+      this.animator.startWalk(playerId);
     }
+
+    gsap.to(obj.position, {
+      x: worldTarget.x,
+      y: worldTarget.y,
+      z: worldTarget.z,
+      duration: AnimationConfig.MovementDuration,
+    });
+
+    obj.rotation.x = 0;
+    obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
+    obj.rotation.z = 0;
 
     const scale = isActive ? PLAYER_CONSTANTS.ACTIVE_SCALE : PLAYER_CONSTANTS.NORMAL_SCALE;
     obj.scale.set(scale, scale, scale);
