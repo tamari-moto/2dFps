@@ -203,44 +203,37 @@ export interface GameEventData {
   [GameEventType.ROOM_STATE_CHANGED]: void;
 }
 
-/**
- * Type for event listeners
- */
-type EventListener<T = any> = (data: T) => void;
+type EventListener<T> = (data: T) => void;
 
-/**
- * Central event bus for decoupling game components
- * Implements the publish-subscribe pattern
- */
 export class GameEventBus {
-  private listeners: Map<GameEventType, Set<EventListener>> = new Map();
+  private listeners: Map<GameEventType, Set<EventListener<GameEventData[GameEventType]>>> = new Map();
 
   on<T extends GameEventType>(
     eventType: T,
-    listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
+    listener: EventListener<GameEventData[T]>
   ): void {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Set());
     }
-    this.listeners.get(eventType)!.add(listener);
+    this.listeners.get(eventType)!.add(listener as EventListener<GameEventData[GameEventType]>);
   }
 
   off<T extends GameEventType>(
     eventType: T,
-    listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
+    listener: EventListener<GameEventData[T]>
   ): void {
-    this.listeners.get(eventType)?.delete(listener);
+    this.listeners.get(eventType)?.delete(listener as EventListener<GameEventData[GameEventType]>);
   }
 
   emit<T extends GameEventType>(
     eventType: T,
-    data?: T extends keyof GameEventData ? GameEventData[T] : any
+    data?: GameEventData[T]
   ): void {
     const listeners = this.listeners.get(eventType);
     if (listeners) {
       listeners.forEach((listener) => {
         try {
-          listener(data);
+          listener(data as GameEventData[GameEventType]);
         } catch (error) {
           console.error(`[GameEventBus] Error in listener for ${eventType}:`, error);
         }
@@ -250,9 +243,9 @@ export class GameEventBus {
 
   once<T extends GameEventType>(
     eventType: T,
-    listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
+    listener: EventListener<GameEventData[T]>
   ): void {
-    const onceWrapper = (data: any) => {
+    const onceWrapper: EventListener<GameEventData[T]> = (data) => {
       listener(data);
       this.off(eventType, onceWrapper);
     };
