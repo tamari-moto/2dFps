@@ -21,7 +21,7 @@ export const MapConfig: {
  */
 export const BSPMapConfig = {
   /** Maximum BSP recursion depth */
-  MaxDepth: 8,
+  MaxDepth: 1,
 
   /** Minimum cell size (px) before stopping subdivision */
   MinCellSize: 200,
