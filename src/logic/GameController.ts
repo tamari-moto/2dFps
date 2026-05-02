@@ -7,6 +7,7 @@ import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
 import { InputCommandHandler } from './InputCommandHandler';
+import { resolveRoundPaths } from './PathResolver';
 
 export class GameController {
   private model: Model;
@@ -24,6 +25,7 @@ export class GameController {
   private batchProcessing = false;
 
   private inputCommandHandler: InputCommandHandler;
+  private pendingPaths: Map<string, number[]> = new Map();
 
   constructor(
     model: Model,
@@ -79,8 +81,12 @@ export class GameController {
   }
 
   /**
-   * Executes a simultaneous round: collects all player actions, resolves them atomically,
-   * then fires a single VIS_UPDATE_VIEW so all animations play in parallel.
+   * Executes a simultaneous round:
+   * 1. Resolves paths with collision detection (PathResolver)
+   * 2. Rewrites each action's moveToNodeId to the collision-adjusted final node
+   * 3. Sends to the adapter (which teleports each player to final node atomically)
+   * 4. Fires VIS_UPDATE_VIEW once + per-player VIS_ANIMATE_ALONG_PATH for multi-step moves
+   * 5. Delays input re-enable by the longest path animation duration
    */
   private executeTurn(sm: StateMachine): void {
     sm.transition(GameEvent.Complete);
@@ -96,11 +102,7 @@ export class GameController {
     this.currentShotNodeId = undefined;
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
-
-    this.reachableNodes = this.model.getReachableNodes(nextNodeId, PlayerConfig.MoveRange);
-    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
-      nodeIds: Array.from(this.reachableNodes),
-    });
+    this.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
 
     const allActions: TurnAction[] = [
       { playerId: this.activePlayerId, moveToNodeId: nextNodeId, shotAtNodeId: shotNodeId },
@@ -109,14 +111,35 @@ export class GameController {
       allActions.push(...this.turnManager.collectNPCActions());
     }
 
+    // Resolve paths with collision detection before sending to adapter
+    const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
+
+    // Store paths so applyTurnResult can emit per-player animation events
+    this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
+
+    // Rewrite actions to collision-adjusted final nodes
+    const rewrittenActions: TurnAction[] = resolved.map(r => ({
+      playerId: r.playerId,
+      moveToNodeId: r.finalNodeId,
+      shotAtNodeId: r.shotAtNodeId,
+    }));
+
+    this.reachableNodes = this.model.getReachableNodes(nextNodeId, PlayerConfig.MoveRange);
+    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
+      nodeIds: Array.from(this.reachableNodes),
+    });
+
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
     this.batchProcessing = true;
-    this.networkAdapter.sendRoundActions(allActions);
+    this.networkAdapter.sendRoundActions(rewrittenActions);
     this.batchProcessing = false;
 
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
 
-    this.delay(AIConfig.RoundAnimationDelayMs).then(() => {
+    // Delay input re-enable by the longest path animation duration
+    const maxSteps = Math.max(...resolved.map(r => r.path.length - 1), 0);
+    const animDelay = maxSteps * AIConfig.RoundAnimationDelayMs + AIConfig.RoundAnimationDelayMs;
+    this.delay(animDelay).then(() => {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
     });
@@ -136,6 +159,15 @@ export class GameController {
     if (movingPlayer) {
       this.model.setPlayerRef(result.movingPlayerId, this.model.nodeList[result.newNodeId]);
       movingPlayer.setAngle(result.newAngle);
+    }
+
+    // Emit path animation event for multi-step moves
+    const path = this.pendingPaths.get(result.movingPlayerId);
+    if (path && path.length > 1) {
+      this.eventBus.emit(GameEventType.VIS_ANIMATE_ALONG_PATH, {
+        playerId: result.movingPlayerId,
+        path,
+      });
     }
 
     for (const hit of result.hits) {

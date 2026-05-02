@@ -182,6 +182,19 @@ export class VisualizationSync {
       this.doUpdateView();
     });
 
+    eventBus.on(GameEventType.VIS_ANIMATE_ALONG_PATH, (data: { playerId: string; path: number[] }) => {
+      this.lifecycle.animateAlongPath(data.playerId, data.path);
+    });
+
+    eventBus.on(GameEventType.VIS_SET_MOVE_PATH, (data: { nodeIds: number[] }) => {
+      this.nodeVis.setMovePath(data.nodeIds);
+      this.doUpdateView();
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_MOVE_PATH, () => {
+      this.nodeVis.clearMovePath();
+      this.doUpdateView();
+    });
+
     eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
 
     eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {

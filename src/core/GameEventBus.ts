@@ -42,6 +42,9 @@ export enum GameEventType {
   VIS_PLAY_DANCE = 'vis:play_dance',
   VIS_SET_REACHABLE_NODES = 'vis:set_reachable_nodes',
   VIS_CLEAR_REACHABLE_NODES = 'vis:clear_reachable_nodes',
+  VIS_SET_MOVE_PATH = 'vis:set_move_path',
+  VIS_CLEAR_MOVE_PATH = 'vis:clear_move_path',
+  VIS_ANIMATE_ALONG_PATH = 'vis:animate_along_path',
 
   // Map events
   MAP_GENERATED = 'map:generated',
@@ -162,6 +165,9 @@ export interface GameEventData {
     nodeIds: number[];
   };
   [GameEventType.VIS_CLEAR_REACHABLE_NODES]: void;
+  [GameEventType.VIS_SET_MOVE_PATH]: { nodeIds: number[] };
+  [GameEventType.VIS_CLEAR_MOVE_PATH]: void;
+  [GameEventType.VIS_ANIMATE_ALONG_PATH]: { playerId: string; path: number[] };
 
   // Map events
   [GameEventType.MAP_GENERATED]: void;

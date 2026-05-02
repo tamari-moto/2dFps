@@ -72,6 +72,9 @@ export const NodeConfig = {
 
   /** Reachable node color (dark grey) */
   ReachableColor: 0x3d3d3d,
+
+  /** Move path node color (saddle brown) */
+  MovePathColor: 0x8b4513,
 } as const;
 
 /**
@@ -94,6 +97,8 @@ export const NodeVisualConfig = {
   EmissiveShotIntensity: 0.5,
   /** Emissive intensity for reachable nodes */
   EmissiveReachableIntensity: 0.15,
+  /** Emissive intensity for move-path nodes */
+  EmissiveMovePathIntensity: 0.35,
 } as const;
 
 /**

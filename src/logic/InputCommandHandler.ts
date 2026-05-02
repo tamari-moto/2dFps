@@ -90,6 +90,17 @@ export class InputCommandHandler {
       sm.transition(GameEvent.MovePlayer);
       this.ctx.setCurrentNextNodeId(clickedNode.id);
       this.ctx.eventBus.emit(GameEventType.VIS_SET_NEXT_MESH, { nodeId: clickedNode.id });
+
+      const path = this.ctx.model.getPathToNode(
+        activePlayer.node.id,
+        clickedNode.id,
+        Number.MAX_SAFE_INTEGER,
+      );
+      if (path && path.length > 2) {
+        this.ctx.eventBus.emit(GameEventType.VIS_SET_MOVE_PATH, { nodeIds: path.slice(1, -1) });
+      } else {
+        this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
+      }
     }
   }
 
@@ -132,6 +143,7 @@ export class InputCommandHandler {
     this.ctx.setCurrentNextNodeId(undefined);
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
+    this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
 
     const activePlayer = this.ctx.model.getPlayer(this.ctx.getActivePlayerId());
     if (activePlayer) {

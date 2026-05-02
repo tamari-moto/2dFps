@@ -25,6 +25,7 @@ export class NodeVisualizationManager {
   private wallMeshes:     THREE.Mesh[]        = [];
   private dirtyNodeIds:   Set<number>         = new Set();
   private reachableNodeIds: Set<number>      = new Set();
+  private movePathNodeIds:  Set<number>      = new Set();
 
   private playerSelectMesh: THREE.Mesh;
   private playerNextMesh:   THREE.Mesh;
@@ -105,13 +106,22 @@ export class NodeVisualizationManager {
     this.reachableNodeIds.clear();
   }
 
+  setMovePath(nodeIds: number[]): void {
+    this.movePathNodeIds = new Set(nodeIds);
+  }
+
+  clearMovePath(): void {
+    this.movePathNodeIds.clear();
+  }
+
   // ── Node color update ──────────────────────────────────────────────────────
 
-  /** Full node color pass: reset → reachable → visible → special. Call once per updateView. */
+  /** Full node color pass: reset → reachable → visible → path → special. Call once per updateView. */
   updateNodeColors(activePlayer: Player): void {
     this.resetNodeColors();
     this.updateReachableNodes();
     this.updateVisibleNodes(activePlayer);
+    this.updateMovePathNodes();
     this.updateSpecialNodes();
   }
 
@@ -146,6 +156,16 @@ export class NodeVisualizationManager {
 
   private markDirty(nodeId: number): void {
     this.dirtyNodeIds.add(nodeId);
+  }
+
+  private updateMovePathNodes(): void {
+    for (const nodeId of this.movePathNodeIds) {
+      const mesh = this.findMeshByNodeId(nodeId);
+      if (mesh) {
+        setNodeColor(mesh, NodeConfig.MovePathColor, NodeVisualConfig.EmissiveMovePathIntensity);
+        this.markDirty(nodeId);
+      }
+    }
   }
 
   private updateReachableNodes(): void {

@@ -15,6 +15,7 @@ import { gameToWorld } from '../utils/MeshUtils';
  */
 export class PlayerLifecycleManager {
   readonly playerMeshes: Map<string, THREE.Object3D>;
+  private pathAnimatingPlayers: Set<string> = new Set();
 
   constructor(
     private sceneManager: SceneManager,
@@ -64,6 +65,52 @@ export class PlayerLifecycleManager {
    *   To face game angle θ, rotation.y = atan2(cosθ, sinθ) = π/2 − θ_rad
    *   = −θ_rad + PlayerFacingOffset (PlayerFacingOffset = π/2).
    */
+  /**
+   * Animates a player mesh step-by-step through the given node ID path.
+   * Each step takes AnimationConfig.MovementDuration seconds.
+   * The active player's camera follows each intermediate node via the onStep callback.
+   */
+  animateAlongPath(playerId: string, nodeIds: number[]): void {
+    if (nodeIds.length < 2) return;
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const dur = AnimationConfig.MovementDuration;
+    this.pathAnimatingPlayers.add(playerId);
+    const tl = gsap.timeline({
+      onComplete: () => {
+        this.pathAnimatingPlayers.delete(playerId);
+        if (this.animator.getState(playerId) === 'walk') {
+          this.animator.startIdle(playerId);
+        }
+      },
+    });
+
+    // Fix rotation toward the final destination before animation starts
+    const lastNode = this.model.nodeList[nodeIds[nodeIds.length - 1]];
+    const firstNode = this.model.nodeList[nodeIds[0]];
+    if (lastNode && firstNode) {
+      const angle = Math.atan2(lastNode.y - firstNode.y, lastNode.x - firstNode.x) * (180 / Math.PI);
+      obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
+    }
+
+    this.animator.startWalk(playerId);
+
+    for (let i = 1; i < nodeIds.length; i++) {
+      const node = this.model.nodeList[nodeIds[i]];
+      if (!node) continue;
+
+      const worldTarget = gameToWorld(node.x, node.y, RenderConfig.PlayerZOffset);
+      tl.to(obj.position, {
+        x: worldTarget.x,
+        y: worldTarget.y,
+        z: worldTarget.z,
+        duration: dur,
+        ease: 'none',
+      });
+    }
+  }
+
   applyTransform(
     playerId: string,
     targetX: number,
@@ -79,20 +126,23 @@ export class PlayerLifecycleManager {
     const dz = obj.position.z - worldTarget.z;
     const moving = Math.sqrt(dx * dx + dz * dz) > 0.5;
 
-    if (moving && this.animator.getState(playerId) === 'idle') {
-      this.animator.startWalk(playerId);
+    // animateAlongPath が動いている間は position/rotation を上書きしない
+    if (!this.pathAnimatingPlayers.has(playerId)) {
+      if (moving && this.animator.getState(playerId) === 'idle') {
+        this.animator.startWalk(playerId);
+      }
+
+      gsap.to(obj.position, {
+        x: worldTarget.x,
+        y: worldTarget.y,
+        z: worldTarget.z,
+        duration: AnimationConfig.MovementDuration,
+      });
+
+      obj.rotation.x = 0;
+      obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
+      obj.rotation.z = 0;
     }
-
-    gsap.to(obj.position, {
-      x: worldTarget.x,
-      y: worldTarget.y,
-      z: worldTarget.z,
-      duration: AnimationConfig.MovementDuration,
-    });
-
-    obj.rotation.x = 0;
-    obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
-    obj.rotation.z = 0;
 
     const scale = isActive ? PLAYER_CONSTANTS.ACTIVE_SCALE : PLAYER_CONSTANTS.NORMAL_SCALE;
     obj.scale.set(scale, scale, scale);
