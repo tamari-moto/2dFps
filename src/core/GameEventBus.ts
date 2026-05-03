@@ -167,7 +167,7 @@ export interface GameEventData {
   [GameEventType.VIS_CLEAR_REACHABLE_NODES]: void;
   [GameEventType.VIS_SET_MOVE_PATH]: { nodeIds: number[] };
   [GameEventType.VIS_CLEAR_MOVE_PATH]: void;
-  [GameEventType.VIS_ANIMATE_ALONG_PATH]: { playerId: string; path: number[] };
+  [GameEventType.VIS_ANIMATE_ALONG_PATH]: { playerId: string; path: number[]; finalAngle: number };
 
   // Map events
   [GameEventType.MAP_GENERATED]: void;

@@ -74,13 +74,14 @@ export class PlayerLifecycleManager {
    * Each step takes AnimationConfig.MovementDuration seconds.
    * The active player's camera follows each intermediate node via the onStep callback.
    */
-  animateAlongPath(playerId: string, nodeIds: number[]): void {
+  animateAlongPath(playerId: string, nodeIds: number[], finalAngle: number): void {
     if (nodeIds.length < 2) return;
     const obj = this.playerMeshes.get(playerId);
     if (!obj) return;
 
     const dur = AnimationConfig.MovementDuration;
     this.pathAnimatingPlayers.add(playerId);
+
     const tl = gsap.timeline({
       onComplete: () => {
         this.pathAnimatingPlayers.delete(playerId);
@@ -89,14 +90,6 @@ export class PlayerLifecycleManager {
         }
       },
     });
-
-    // Fix rotation toward the final destination before animation starts
-    const lastNode = this.model.nodeList[nodeIds[nodeIds.length - 1]];
-    const firstNode = this.model.nodeList[nodeIds[0]];
-    if (lastNode && firstNode) {
-      const angle = Math.atan2(lastNode.y - firstNode.y, lastNode.x - firstNode.x) * (180 / Math.PI);
-      obj.rotation.y = -(angle * Math.PI / 180) + RenderConfig.PlayerFacingOffset;
-    }
 
     this.animator.startWalk(playerId);
 
@@ -113,6 +106,13 @@ export class PlayerLifecycleManager {
         ease: 'none',
       });
     }
+
+    // Turn to face shot target simultaneously with movement
+    tl.to(obj.rotation, {
+      y: -(finalAngle * Math.PI / 180) + RenderConfig.PlayerFacingOffset,
+      duration: dur,
+      ease: 'power2.out',
+    }, '<');
   }
 
   applyTransform(

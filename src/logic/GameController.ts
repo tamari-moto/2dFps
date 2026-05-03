@@ -167,6 +167,7 @@ export class GameController {
       this.eventBus.emit(GameEventType.VIS_ANIMATE_ALONG_PATH, {
         playerId: result.movingPlayerId,
         path,
+        finalAngle: result.newAngle,
       });
     }
 

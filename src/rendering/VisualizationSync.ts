@@ -185,8 +185,8 @@ export class VisualizationSync {
       this.doUpdateView();
     });
 
-    eventBus.on(GameEventType.VIS_ANIMATE_ALONG_PATH, (data: { playerId: string; path: number[] }) => {
-      this.lifecycle.animateAlongPath(data.playerId, data.path);
+    eventBus.on(GameEventType.VIS_ANIMATE_ALONG_PATH, (data: { playerId: string; path: number[]; finalAngle: number }) => {
+      this.lifecycle.animateAlongPath(data.playerId, data.path, data.finalAngle);
     });
 
     eventBus.on(GameEventType.VIS_SET_MOVE_PATH, (data: { nodeIds: number[] }) => {
