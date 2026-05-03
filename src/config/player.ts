@@ -36,7 +36,7 @@ export const PlayerConfig: {
  * Number of players in local-play mode.
  * Online mode uses the room's participant count instead.
  */
-export const LOCAL_PLAYER_COUNT = 5;
+export const LOCAL_PLAYER_COUNT = 20;
 
 /**
  * Generate a player ID from an index
