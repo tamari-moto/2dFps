@@ -45,6 +45,7 @@ export enum GameEventType {
   VIS_SET_MOVE_PATH = 'vis:set_move_path',
   VIS_CLEAR_MOVE_PATH = 'vis:clear_move_path',
   VIS_ANIMATE_ALONG_PATH = 'vis:animate_along_path',
+  VIS_PATH_ANIM_COMPLETE = 'vis:path_anim_complete',
 
   // Map events
   MAP_GENERATED = 'map:generated',
@@ -168,6 +169,7 @@ export interface GameEventData {
   [GameEventType.VIS_SET_MOVE_PATH]: { nodeIds: number[] };
   [GameEventType.VIS_CLEAR_MOVE_PATH]: void;
   [GameEventType.VIS_ANIMATE_ALONG_PATH]: { playerId: string; path: number[]; finalAngle: number };
+  [GameEventType.VIS_PATH_ANIM_COMPLETE]: { playerId: string };
 
   // Map events
   [GameEventType.MAP_GENERATED]: void;

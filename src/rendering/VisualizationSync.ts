@@ -38,7 +38,7 @@ export class VisualizationSync {
     // Shared map — PlayerAnimator / PlayerLifecycleManager / PlayerEffects all reference it
     const meshMap = new Map<string, THREE.Object3D>();
     this.animator      = new PlayerAnimator(meshMap);
-    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
+    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, eventBus);
     this.effects       = new PlayerEffects(meshMap, this.animator, model);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
     this.camera        = new CameraFollowController(sceneManager);

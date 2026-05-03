@@ -2,7 +2,7 @@ import { Model } from '../model/model';
 import type { ObstacleData } from '../model/MapGenerator';
 import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { AIConfig, AnimationConfig, PlayerConfig } from '../config/GameConfig';
+import { AIConfig, PlayerConfig } from '../config/GameConfig';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
@@ -23,6 +23,9 @@ export class GameController {
 
   /** True while sendRoundActions callbacks are being processed; suppresses per-result VIS_UPDATE_VIEW */
   private batchProcessing = false;
+
+  /** Number of path animations still in progress; input unlocks when this reaches 0 */
+  private pendingAnimCount = 0;
 
   private inputCommandHandler: InputCommandHandler;
   private pendingPaths: Map<string, number[]> = new Map();
@@ -70,6 +73,14 @@ export class GameController {
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
+    });
+    this.eventBus.on(GameEventType.VIS_PATH_ANIM_COMPLETE, () => {
+      this.pendingAnimCount--;
+      if (this.pendingAnimCount <= 0) {
+        this.pendingAnimCount = 0;
+        this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
+        this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+      }
     });
   }
 
@@ -136,13 +147,11 @@ export class GameController {
 
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
 
-    // Delay input re-enable by the longest path animation duration + buffer
-    const maxSteps = resolved.reduce((acc, r) => Math.max(acc, r.path.length - 1), 0);
-    const animDelay = maxSteps * AnimationConfig.MovementDuration * 1000 ;
-    this.delay(animDelay).then(() => {
+    this.pendingAnimCount = resolved.filter(r => r.path.length > 1).length;
+    if (this.pendingAnimCount === 0) {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
-    });
+    }
   }
 
   private handleGameStarted(): void {
@@ -224,9 +233,5 @@ export class GameController {
   importObstacles(obstaclesData: ObstacleData[]): void {
     this.model.importObstacles(obstaclesData);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

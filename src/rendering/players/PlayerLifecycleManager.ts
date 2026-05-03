@@ -6,6 +6,7 @@ import { PlayerAnimator } from './PlayerAnimator';
 import { createVariantPlayer } from './PlayerMeshFactory';
 import { AnimationConfig, RenderConfig, PLAYER_CONSTANTS } from '../../config/GameConfig';
 import { gameToWorld } from '../utils/MeshUtils';
+import { GameEventBus, GameEventType } from '../../core/GameEventBus';
 
 /**
  * Manages the lifecycle of player mesh objects:
@@ -22,6 +23,7 @@ export class PlayerLifecycleManager {
     private animator: PlayerAnimator,
     private model: Model,
     meshMap: Map<string, THREE.Object3D>,
+    private eventBus: GameEventBus,
   ) {
     this.playerMeshes = meshMap;
   }
@@ -88,6 +90,7 @@ export class PlayerLifecycleManager {
         if (this.animator.getState(playerId) === 'walk') {
           this.animator.startIdle(playerId);
         }
+        this.eventBus.emit(GameEventType.VIS_PATH_ANIM_COMPLETE, { playerId });
       },
     });
 
