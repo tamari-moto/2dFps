@@ -74,6 +74,10 @@ export class GameController {
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
     });
+    this.eventBus.on(GameEventType.NPC_ONLY_TURN, () => {
+      if (this.inputLocked) return;
+      this.executeNPCOnlyTurn();
+    });
     this.eventBus.on(GameEventType.VIS_PATH_ANIM_COMPLETE, () => {
       this.pendingAnimCount--;
       if (this.pendingAnimCount <= 0) {
@@ -139,6 +143,42 @@ export class GameController {
     this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
       nodeIds: Array.from(this.reachableNodes),
     });
+
+    this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
+    this.batchProcessing = true;
+    this.networkAdapter.sendRoundActions(rewrittenActions);
+    this.batchProcessing = false;
+
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+
+    this.pendingAnimCount = resolved.filter(r => r.path.length > 1).length;
+    if (this.pendingAnimCount === 0) {
+      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
+      this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+    }
+  }
+
+  private executeNPCOnlyTurn(): void {
+    if (!this.networkAdapter.supportsNPC()) return;
+
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (!activePlayer) return;
+
+    const stayAction: TurnAction = {
+      playerId: this.activePlayerId,
+      moveToNodeId: activePlayer.node.id,
+      shotAtNodeId: undefined,
+    };
+    const allActions: TurnAction[] = [stayAction, ...this.turnManager.collectNPCActions()];
+
+    const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
+    this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
+
+    const rewrittenActions: TurnAction[] = resolved.map(r => ({
+      playerId: r.playerId,
+      moveToNodeId: r.finalNodeId,
+      shotAtNodeId: r.shotAtNodeId,
+    }));
 
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
     this.batchProcessing = true;

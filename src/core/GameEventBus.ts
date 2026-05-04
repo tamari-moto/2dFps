@@ -60,6 +60,9 @@ export enum GameEventType {
   NPC_TURNS_COMPLETE = 'npc:turns_complete',
   INPUT_LOCKED = 'input:locked',
 
+  // NPC-only turn (e.g. R key in FPS mode — active player stays, NPCs act)
+  NPC_ONLY_TURN = 'input:npc_only_turn',
+
   // Spectator (FPS) mode events
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
   FPS_MODE_CHANGED = 'fps:mode_changed',
@@ -187,6 +190,9 @@ export interface GameEventData {
   [GameEventType.INPUT_LOCKED]: {
     locked: boolean;
   };
+
+  // NPC-only turn
+  [GameEventType.NPC_ONLY_TURN]: void;
 
   // Spectator (FPS) mode events
   [GameEventType.FPS_MODE_TOGGLE_REQUESTED]: void;

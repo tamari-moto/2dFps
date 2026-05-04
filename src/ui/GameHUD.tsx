@@ -62,7 +62,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
 
   const containerStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '10px',
+    bottom: '10px',
     left: '10px',
     zIndex: 1000,
     display: 'flex',

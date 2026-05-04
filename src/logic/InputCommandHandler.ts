@@ -25,7 +25,6 @@ export class InputCommandHandler {
   private boundHandleNodeClick: (data: { nodeId: number; position: { x: number; y: number } }) => void;
   private boundHandleCanvasEmptyClick: () => void;
   private boundHandlePlayerSwitch: (data: { currentPlayerId: string }) => void;
-
   constructor(private ctx: InputCommandContext) {
     this.boundHandleNodeClick = this.handleNodeClick.bind(this);
     this.boundHandleCanvasEmptyClick = this.handleCanvasEmptyClick.bind(this);
