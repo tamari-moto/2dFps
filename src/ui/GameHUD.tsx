@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import { gameEventBus, GameEventType } from '../core/GameEventBus';
+import { PlayerConfig } from '../config/GameConfig';
 
 interface GameHUDProps {
   threeSetup: ThreeSetup | null;
@@ -8,6 +9,7 @@ interface GameHUDProps {
 
 const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
+  const [fogEnabled, setFogEnabled] = React.useState(PlayerConfig.FogOfWarEnabled);
   const [playerIds, setPlayerIds] = React.useState<string[]>([]);
   const [activeId, setActiveId] = React.useState<string>('');
   const [activeAngle, setActiveAngle] = React.useState<number | null>(null);
@@ -41,6 +43,12 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     if (!threeSetup) return;
     threeSetup.toggleGrid();
     setGridVisible(v => !v);
+  };
+
+  const handleToggleFog = () => {
+    PlayerConfig.FogOfWarEnabled = !PlayerConfig.FogOfWarEnabled;
+    setFogEnabled(PlayerConfig.FogOfWarEnabled);
+    gameEventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   };
 
   const handleSwitchPlayer = (id: string) => {
@@ -77,6 +85,11 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     backgroundColor: gridVisible ? '#00bfbf' : '#444444',
   };
 
+  const fogButtonStyle: React.CSSProperties = {
+    ...baseButtonStyle,
+    backgroundColor: fogEnabled ? '#c0392b' : '#444444',
+  };
+
   const playerRowStyle: React.CSSProperties = {
     display: 'flex',
     gap: '4px',
@@ -90,6 +103,13 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
         aria-label={`グリッド: ${gridVisible ? 'ON' : 'OFF'}`}
       >
         グリッド: {gridVisible ? 'ON' : 'OFF'}
+      </button>
+      <button
+        onClick={handleToggleFog}
+        style={fogButtonStyle}
+        aria-label={`霧: ${fogEnabled ? 'ON' : 'OFF'}`}
+      >
+        霧: {fogEnabled ? 'ON' : 'OFF'}
       </button>
       {playerIds.length > 0 && (
         <div style={playerRowStyle}>
