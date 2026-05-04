@@ -19,3 +19,5 @@ export { AnimationConfig, TextBurstEffectConfig } from './animation';
 export { RenderConfig, NodeConfig, NodeVisualConfig, WallConfig, HPBarConfig } from './rendering';
 export { LightingConfig, FogConfig, ShadowConfig, PostProcessConfig } from './scene';
 export { applyServerConfig } from './server-sync';
+export type { TeamId } from './team';
+export { TeamConfig } from './team';

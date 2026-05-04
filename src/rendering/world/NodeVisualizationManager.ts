@@ -7,7 +7,7 @@ import { createNodeCircle } from './NodeMeshFactory';
 import { createWallMesh } from './WallMeshFactory';
 import { createUndefinedMesh, setNodeColor } from '../utils/MeshUtils';
 import {
-  NodeConfig, NodeVisualConfig, AnimationConfig, PlayerConfig,
+  NodeConfig, NodeVisualConfig, AnimationConfig,
 } from '../../config/GameConfig';
 
 /**
@@ -179,17 +179,13 @@ export class NodeVisualizationManager {
   }
 
   private updateVisibleNodes(activePlayer: Player): void {
-    const visibleNodes = this.model.getVisibleNodesAtAngle(
-      activePlayer.node,
-      activePlayer.angle,
-      PlayerConfig.MaxViewDistance,
-    );
+    const teamVisibleIds = this.model.getTeamVisibleNodes(activePlayer.id);
 
-    for (const node of visibleNodes) {
-      const mesh = this.findMeshByNodeId(node.id);
+    for (const nodeId of teamVisibleIds) {
+      const mesh = this.findMeshByNodeId(nodeId);
       if (mesh) {
         setNodeColor(mesh, NodeConfig.VisibleColor, NodeVisualConfig.EmissiveVisibleIntensity);
-        this.markDirty(node.id);
+        this.markDirty(nodeId);
       }
     }
   }

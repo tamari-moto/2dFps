@@ -119,10 +119,8 @@ export class InputCommandHandler {
     const nextNodeId = this.ctx.getCurrentNextNodeId();
     if (nextNodeId === undefined) return false;
 
-    const nextNode = this.ctx.model.nodeList[nextNodeId];
-    const isVisible = this.ctx.model
-      .getVisibleNodesAtAngle(nextNode, activePlayer.angle, PlayerConfig.MaxViewDistance)
-      .some(n => n.id === clickedNode.id);
+    const teamVisible = this.ctx.model.getTeamVisibleNodes(activePlayer.id);
+    const isVisible = teamVisible.has(clickedNode.id);
 
     if (isVisible) {
       sm.transition(GameEvent.ShotPlayer);
