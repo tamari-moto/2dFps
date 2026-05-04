@@ -38,22 +38,26 @@ const ConsoleLogger: React.FC = () => {
       });
     };
 
-    console.log = (...args: unknown[]) => {
+    console.log = (// eslint-disable-next-line @typescript-eslint/no-explicit-any
+...args: any[]) => {
       addLog(args.join(' '), 'log');
       originalLog(...args);
     };
 
-    console.info = (...args: unknown[]) => {
+    console.info = (// eslint-disable-next-line @typescript-eslint/no-explicit-any
+...args: any[]) => {
       addLog(args.join(' '), 'info');
       originalInfo(...args);
     };
 
-    console.warn = (...args: unknown[]) => {
+    console.warn = (// eslint-disable-next-line @typescript-eslint/no-explicit-any
+...args: any[]) => {
       addLog(args.join(' '), 'warn');
       originalWarn(...args);
     };
 
-    console.error = (...args: unknown[]) => {
+    console.error = (// eslint-disable-next-line @typescript-eslint/no-explicit-any
+...args: any[]) => {
       addLog(args.join(' '), 'error');
       originalError(...args);
     };

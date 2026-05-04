@@ -106,22 +106,24 @@ export class LocalAdapter implements INetworkAdapter {
     const maxRange = PlayerConfig.ShotHitRadius * PlayerConfig.ShotMaxRangeMultiplier;
     const damage = PlayerConfig.DamagePerShot;
 
+    const maxRangeSquared = maxRange * maxRange;
+
     for (const [targetId, target] of this.model.players) {
       if (targetId === attackerId) continue;
       if (!target.isAlive) continue;
 
-      if (!this.model.hasLineOfSight(attackerNode, target.node)) continue;
-
       const dx = target.node.x - shotNode.x;
       const dy = target.node.y - shotNode.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist >= maxRange) continue;
+      if (dx * dx + dy * dy >= maxRangeSquared) continue;
 
       const toTargetAngle = this.model.getAngleBetweenNodes(attackerNode, target.node);
       let angleDiff = Math.abs(toTargetAngle - attackerAngle);
       if (angleDiff > 180) angleDiff = 360 - angleDiff;
       if (angleDiff > halfFov) continue;
 
+      if (!this.model.hasLineOfSight(attackerNode, target.node)) continue;
+
+      const dist = Math.sqrt(dx * dx + dy * dy);
       const angleAccuracy = 1 - (angleDiff / halfFov);
       const distFactor = Math.max(0, 1 - dist / maxRange);
       const hitChance = Math.pow(angleAccuracy * distFactor, PlayerConfig.AccuracyExponent);
