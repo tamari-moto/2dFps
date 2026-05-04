@@ -16,6 +16,6 @@ export { AIConfig } from './ai';
 export { CameraConfig, FPSConfig } from './camera';
 export { KEYBOARD_KEYS } from './input';
 export { AnimationConfig, TextBurstEffectConfig } from './animation';
-export { RenderConfig, NodeConfig, NodeVisualConfig, WallConfig } from './rendering';
+export { RenderConfig, NodeConfig, NodeVisualConfig, WallConfig, HPBarConfig } from './rendering';
 export { LightingConfig, FogConfig, ShadowConfig, PostProcessConfig } from './scene';
 export { applyServerConfig } from './server-sync';

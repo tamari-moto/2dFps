@@ -9,6 +9,7 @@ import { PlayerEffects } from './players/PlayerEffects';
 import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
+import { HPBarManager } from './players/HPBarManager';
 import { isPointInCone } from '../logic/ConeIntersection';
 import { worldToGame } from './utils/MeshUtils';
 
@@ -23,6 +24,7 @@ export class VisualizationSync {
   private animator:      PlayerAnimator;
   private camera:        CameraFollowController;
   private textBurstEffect: TextBurstEffect;
+  private hpBarManager:  HPBarManager;
   private model:         Model;
 
   private activePlayerId: string;
@@ -40,7 +42,8 @@ export class VisualizationSync {
     // Shared map — PlayerAnimator / PlayerLifecycleManager / PlayerEffects all reference it
     const meshMap = new Map<string, THREE.Object3D>();
     this.animator      = new PlayerAnimator(meshMap);
-    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, eventBus);
+    this.hpBarManager  = new HPBarManager();
+    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, eventBus, this.hpBarManager);
     this.effects       = new PlayerEffects(meshMap, this.animator, model);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
     this.camera        = new CameraFollowController(sceneManager);
@@ -174,9 +177,12 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
       this.effects.showHitEffect(data.playerId);
+      const player = this.model.getPlayer(data.playerId);
+      if (player) this.hpBarManager.updateBar(data.playerId, player.health, player.maxHealth);
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
       this.effects.hidePlayer(data.playerId);
+      this.hpBarManager.removeBar(data.playerId);
     });
 
     eventBus.on(GameEventType.VIS_SET_REACHABLE_NODES, (data: { nodeIds: number[] }) => {

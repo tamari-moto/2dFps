@@ -25,7 +25,7 @@ export const PlayerConfig: {
   DamagePerShot: 34,
 
   /** Maximum number of grid steps a player can move per turn */
-  MoveRange: 8,
+  MoveRange: 1,
 
   /** Hit radius for shot resolution: unit scale for accuracy falloff (px) */
   ShotHitRadius: 20,

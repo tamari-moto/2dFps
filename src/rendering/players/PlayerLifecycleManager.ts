@@ -7,6 +7,7 @@ import { createVariantPlayer } from './PlayerMeshFactory';
 import { AnimationConfig, RenderConfig, PLAYER_CONSTANTS } from '../../config/GameConfig';
 import { gameToWorld } from '../utils/MeshUtils';
 import { GameEventBus, GameEventType } from '../../core/GameEventBus';
+import { HPBarManager } from './HPBarManager';
 
 /**
  * Manages the lifecycle of player mesh objects:
@@ -24,6 +25,7 @@ export class PlayerLifecycleManager {
     private model: Model,
     meshMap: Map<string, THREE.Object3D>,
     private eventBus: GameEventBus,
+    private hpBarManager: HPBarManager,
   ) {
     this.playerMeshes = meshMap;
   }
@@ -35,6 +37,7 @@ export class PlayerLifecycleManager {
       const obj = createVariantPlayer(player.color);
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
+      this.hpBarManager.attachBar(playerId, obj, player.isNPC);
       this.animator.startIdle(playerId);
     }
   }
@@ -45,6 +48,8 @@ export class PlayerLifecycleManager {
     const obj = createVariantPlayer(color);
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
+    const player = this.model.getPlayer(playerId);
+    this.hpBarManager.attachBar(playerId, obj, player?.isNPC ?? false);
     this.animator.startIdle(playerId);
   }
 
