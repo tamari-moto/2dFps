@@ -234,4 +234,5 @@ export class GameController {
     this.model.importObstacles(obstaclesData);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
   }
+
 }

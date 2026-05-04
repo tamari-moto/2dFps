@@ -9,6 +9,8 @@ import { PlayerEffects } from './players/PlayerEffects';
 import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
+import { isPointInCone } from '../logic/ConeIntersection';
+import { worldToGame } from './utils/MeshUtils';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
@@ -56,6 +58,7 @@ export class VisualizationSync {
     }
 
     this.subscribeToEvents(eventBus);
+    sceneManager.addTickCallback(() => this.tickUpdateVisibility());
   }
 
   // ── Public API (unchanged from original) ──────────────────────────────────
@@ -207,5 +210,33 @@ export class VisualizationSync {
         this.textBurstEffect.playAtGameCoords(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
       }
     });
+
   }
+
+  private tickUpdateVisibility(): void {
+    if (!PlayerConfig.FogOfWarEnabled) return;
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (!activePlayer) return;
+
+    const origin = { x: activePlayer.node.x, y: activePlayer.node.y };
+    const halfAngle = PlayerConfig.ViewAngle / 2;
+    const dirX = Math.cos(activePlayer.angle * Math.PI / 180);
+    const dirY = Math.sin(activePlayer.angle * Math.PI / 180);
+
+    for (const [playerId, player] of this.model.players) {
+      if (playerId === this.activePlayerId) continue;
+      if (!player.isAlive) continue;
+      if (!this.lifecycle.isPathAnimating(playerId)) continue;
+
+      const mesh = this.lifecycle.playerMeshes.get(playerId);
+      if (!mesh) continue;
+
+      const gamePos = worldToGame(mesh.position.x, mesh.position.z);
+      const inCone = isPointInCone(gamePos, origin, dirX, dirY, halfAngle, PlayerConfig.MaxViewDistance)
+        && !this.model.Lines.some(seg => seg.intersects(origin, gamePos));
+      this.lifecycle.setVisible(playerId, inCone);
+    }
+  }
+
+  dispose(): void { }
 }

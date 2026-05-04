@@ -9,6 +9,10 @@ export function gameToWorld(gx: number, gy: number, height = 0): THREE.Vector3 {
   return new THREE.Vector3(gx, height, gy);
 }
 
+export function worldToGame(worldX: number, worldZ: number): { x: number; y: number } {
+  return { x: worldX, y: worldZ };
+}
+
 /**
  * Creates a placeholder undefined mesh
  */
