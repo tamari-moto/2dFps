@@ -38,22 +38,22 @@ const ConsoleLogger: React.FC = () => {
       });
     };
 
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       addLog(args.join(' '), 'log');
       originalLog(...args);
     };
 
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       addLog(args.join(' '), 'info');
       originalInfo(...args);
     };
 
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       addLog(args.join(' '), 'warn');
       originalWarn(...args);
     };
 
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       addLog(args.join(' '), 'error');
       originalError(...args);
     };

@@ -2,7 +2,7 @@ import { Model } from '../model/model';
 import type { ObstacleData } from '../model/MapGenerator';
 import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { AIConfig, PlayerConfig } from '../config/GameConfig';
+import { PlayerConfig } from '../config/GameConfig';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';

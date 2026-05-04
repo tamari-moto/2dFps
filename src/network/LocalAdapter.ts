@@ -77,7 +77,7 @@ export class LocalAdapter implements INetworkAdapter {
     // 4. Shot resolution
     const hits: TurnResult['hits'] = [];
     if (action.shotAtNodeId !== undefined) {
-      this.resolveShot(action.playerId, action.shotAtNodeId, hits);
+      this.resolveShot(action.playerId, action.shotAtNodeId, hits, newAngle);
     }
 
     this.turnResultCallback?.({
@@ -93,23 +93,43 @@ export class LocalAdapter implements INetworkAdapter {
   private resolveShot(
     attackerId: string,
     shotNodeId: number,
-    hits: TurnResult['hits']
+    hits: TurnResult['hits'],
+    attackerAngle: number
   ): void {
-    const damage = PlayerConfig.DamagePerShot;
+    const attacker = this.model.getPlayer(attackerId);
+    if (!attacker) return;
+    const attackerNode = attacker.node;
     const shotNode = this.model.nodeList[shotNodeId];
     if (!shotNode) return;
+
+    const halfFov = PlayerConfig.ViewAngle / 2;
+    const maxRange = PlayerConfig.ShotHitRadius * PlayerConfig.ShotMaxRangeMultiplier;
+    const damage = PlayerConfig.DamagePerShot;
 
     for (const [targetId, target] of this.model.players) {
       if (targetId === attackerId) continue;
       if (!target.isAlive) continue;
 
+      if (!this.model.hasLineOfSight(attackerNode, target.node)) continue;
+
       const dx = target.node.x - shotNode.x;
       const dy = target.node.y - shotNode.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > PlayerConfig.ShotHitRadius) continue;
+      if (dist >= maxRange) continue;
 
-      const wouldBeEliminated = target.health - damage <= 0;
-      hits.push({ targetId, damage, isEliminated: wouldBeEliminated });
+      const toTargetAngle = this.model.getAngleBetweenNodes(attackerNode, target.node);
+      let angleDiff = Math.abs(toTargetAngle - attackerAngle);
+      if (angleDiff > 180) angleDiff = 360 - angleDiff;
+      if (angleDiff > halfFov) continue;
+
+      const angleAccuracy = 1 - (angleDiff / halfFov);
+      const distFactor = Math.max(0, 1 - dist / maxRange);
+      const hitChance = Math.pow(angleAccuracy * distFactor, PlayerConfig.AccuracyExponent);
+
+      if (Math.random() < hitChance) {
+        const wouldBeEliminated = target.health - damage <= 0;
+        hits.push({ targetId, damage, isEliminated: wouldBeEliminated });
+      }
     }
   }
 
@@ -164,7 +184,7 @@ export class LocalAdapter implements INetworkAdapter {
     // 3. Resolve all shots after all moves, before any damage is applied
     for (let i = 0; i < actions.length; i++) {
       if (actions[i].shotAtNodeId !== undefined) {
-        this.resolveShot(actions[i].playerId, actions[i].shotAtNodeId!, pendingResults[i].hits);
+        this.resolveShot(actions[i].playerId, actions[i].shotAtNodeId!, pendingResults[i].hits, pendingResults[i].newAngle);
       }
     }
 

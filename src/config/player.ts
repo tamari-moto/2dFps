@@ -9,6 +9,8 @@ export const PlayerConfig: {
   MoveRange: number;
   ShotHitRadius: number;
   FogOfWarEnabled: boolean;
+  AccuracyExponent: number;
+  ShotMaxRangeMultiplier: number;
 } = {
   /** Player's field of view angle in degrees */
   ViewAngle: 60,
@@ -25,11 +27,17 @@ export const PlayerConfig: {
   /** Maximum number of grid steps a player can move per turn */
   MoveRange: 8,
 
-  /** Hit radius for shot resolution: target must be within this distance of the shot node (px) */
+  /** Hit radius for shot resolution: unit scale for accuracy falloff (px) */
   ShotHitRadius: 20,
 
   /** 視界外の敵を非表示にするか */
   FogOfWarEnabled: true,
+
+  /** 命中確率の減衰カーブ: 1=線形 / >1=中心寄り急峻 / <1=広め */
+  AccuracyExponent: 1.5,
+
+  /** ShotHitRadius × この値 が実効最大射程 */
+  ShotMaxRangeMultiplier: 3,
 };
 
 /**
