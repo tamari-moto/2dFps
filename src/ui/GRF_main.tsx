@@ -35,9 +35,9 @@ const GRF_main = () => {
     };
   }, [threeSetup]);
 
-  const startGame = React.useCallback(async (adapter: INetworkAdapter) => {
+  const startGame = React.useCallback((adapter: INetworkAdapter): ThreeSetup | null => {
     const canvas = canvasRef.current;
-    if (!canvas || initialized.current) return;
+    if (!canvas || initialized.current) return null;
     initialized.current = true;
 
     const setup = setupThree(canvas, adapter);
@@ -52,10 +52,12 @@ const GRF_main = () => {
         if (sp) setup.addPlayer(playerId, sp.nodeId, sp.color);
       });
     }
+    return setup;
   }, []);
 
   const handleOffline = React.useCallback(() => {
-    startGame(new LocalAdapter());
+    const setup = startGame(new LocalAdapter());
+    setup?.enableFps();
   }, [startGame]);
 
   const handleOnline = React.useCallback(async (serverUrl: string) => {

@@ -177,6 +177,11 @@ export class ThreeSetup {
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   }
 
+  /** FPS モードを有効にする。ボタンクリック等のユーザージェスチャ内から呼ぶこと。 */
+  enableFps(): void {
+    if (!this.fpsCamera.isEnabled()) this.fpsCamera.enable();
+  }
+
   /**
    * Disposes all resources
    */

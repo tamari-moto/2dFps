@@ -31,7 +31,7 @@ export const PlayerConfig: {
   ShotHitRadius: 20,
 
   /** 視界外の敵を非表示にするか */
-  FogOfWarEnabled: true,
+  FogOfWarEnabled: false,
 
   /** 命中確率の減衰カーブ: 1=線形 / >1=中心寄り急峻 / <1=広め */
   AccuracyExponent: 1.5,
