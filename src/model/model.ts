@@ -67,12 +67,14 @@ class Model {
     const size = this.NodesInGridSize;
     const h = size * MapConfig.NodeSpacing;
 
-    // 3チームをマップ下部・中部・上部にスポーン
-    const spawnPools = [
-      this.nodeList.filter(n => n.y < h * 0.25 && this.Edges.List[n.id] !== undefined),
-      this.nodeList.filter(n => n.y >= h * 0.375 && n.y < h * 0.625 && this.Edges.List[n.id] !== undefined),
-      this.nodeList.filter(n => n.y >= h * 0.75 && this.Edges.List[n.id] !== undefined),
-    ];
+    // チーム数に応じてマップをY軸方向に均等分割してスポーンプールを生成
+    const spawnPools = Array.from({ length: LOCAL_TEAM_COUNT }, (_, team) => {
+      const yMin = (team / LOCAL_TEAM_COUNT) * h;
+      const yMax = ((team + 1) / LOCAL_TEAM_COUNT) * h;
+      return this.nodeList.filter(
+        n => n.y >= yMin && n.y < yMax && this.Edges.List[n.id] !== undefined
+      );
+    });
 
     let playerIndex = 0;
     for (let team = 0; team < LOCAL_TEAM_COUNT; team++) {

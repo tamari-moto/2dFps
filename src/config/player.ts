@@ -47,10 +47,10 @@ export const PlayerConfig: {
 export const LOCAL_PLAYER_COUNT = 0;
 
 /** チーム数 */
-export const LOCAL_TEAM_COUNT = 3;
+export const LOCAL_TEAM_COUNT = 6;
 
 /** チームごとのNPC数 */
-export const LOCAL_NPC_PER_TEAM = 5;
+export const LOCAL_NPC_PER_TEAM = 10;
 
 /**
  * Number of NPC opponents in local-play mode.

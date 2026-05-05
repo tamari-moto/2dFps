@@ -7,7 +7,7 @@ export const MapConfig: {
   ObstacleMargin: number;
 } = {
   /** Number of nodes in grid (map will be NodesInGridSize x NodesInGridSize) */
-  NodesInGridSize: 20,
+  NodesInGridSize: 30,
 
   /** Spacing between nodes in pixels */
   NodeSpacing: 30,
@@ -21,10 +21,10 @@ export const MapConfig: {
  */
 export const BSPMapConfig = {
   /** Maximum BSP recursion depth */
-  MaxDepth: 1,
+  MaxDepth: 3,
 
   /** Minimum cell size (px) before stopping subdivision */
-  MinCellSize: 200,
+  MinCellSize: 300,
 
   /** Split ratio range minimum (prevents extreme thin cells) */
   SplitMinRatio: 0.35,
