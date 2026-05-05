@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { HPBarConfig } from '../../config/GameConfig';
+import { HPBarConfig, TEAM_COLORS } from '../../config/GameConfig';
+import type { TeamId } from '../../config/GameConfig';
 
 interface BarEntry {
   fg: THREE.Mesh;
@@ -27,7 +28,7 @@ interface BarEntry {
 export class HPBarManager {
   private readonly bars: Map<string, BarEntry> = new Map();
 
-  attachBar(playerId: string, group: THREE.Object3D, isNPC: boolean): void {
+  attachBar(playerId: string, group: THREE.Object3D, isNPC: boolean, team?: TeamId): void {
     if (this.bars.has(playerId)) return;
 
     const W = HPBarConfig.Width;
@@ -45,7 +46,7 @@ export class HPBarManager {
     bg.userData.fixedColor = true;
     group.add(bg);
 
-    const fgColor = isNPC ? HPBarConfig.NPCFgColor : HPBarConfig.HumanFgColor;
+    const fgColor = team !== undefined ? TEAM_COLORS[team] : (isNPC ? HPBarConfig.NPCFgColor : HPBarConfig.HumanFgColor);
     const fg = new THREE.Mesh(
       new THREE.BoxGeometry(W, H, D),
       new THREE.MeshStandardMaterial({ color: fgColor, emissive: fgColor, emissiveIntensity: 0.3 }),

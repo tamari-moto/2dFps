@@ -3,7 +3,7 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './MapGenerator';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { LOCAL_PLAYER_COUNT, LOCAL_NPC_COUNT, createPlayerId } from '../config/GameConfig';
+import { LOCAL_TEAM_COUNT, LOCAL_NPC_PER_TEAM, createPlayerId } from '../config/GameConfig';
 import type { TeamId } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
@@ -65,32 +65,32 @@ class Model {
   public initLocalPlayers(): void {
     const usedNodeIds = new Set<number>();
     const size = this.NodesInGridSize;
-    const totalCount = LOCAL_PLAYER_COUNT + LOCAL_NPC_COUNT;
+    const h = size * MapConfig.NodeSpacing;
 
-    // Players spawn at bottom (low y), NPCs spawn at top (high y)
-    const bottomNodes = this.nodeList.filter(n => n.y < (size * MapConfig.NodeSpacing) * 0.25 && this.Edges.List[n.id] !== undefined);
-    const topNodes    = this.nodeList.filter(n => n.y >= (size * MapConfig.NodeSpacing) * 0.75 && this.Edges.List[n.id] !== undefined);
+    // 3チームをマップ下部・中部・上部にスポーン
+    const spawnPools = [
+      this.nodeList.filter(n => n.y < h * 0.25 && this.Edges.List[n.id] !== undefined),
+      this.nodeList.filter(n => n.y >= h * 0.375 && n.y < h * 0.625 && this.Edges.List[n.id] !== undefined),
+      this.nodeList.filter(n => n.y >= h * 0.75 && this.Edges.List[n.id] !== undefined),
+    ];
 
-    for (let i = 0; i < totalCount && i < this.nodeList.length; i++) {
-      const isNPC = i >= LOCAL_PLAYER_COUNT;
-      const playerId = createPlayerId(i);
-      const team: TeamId = isNPC ? 1 : 0;
-      const pool = isNPC ? topNodes : bottomNodes;
-
-      let nodeIndex: number;
-      let attempts = 0;
-      do {
-        const candidate = pool[Math.floor(Math.random() * pool.length)];
-        nodeIndex = candidate?.id ?? Math.floor(Math.random() * this.nodeList.length);
-        attempts++;
-        // fallback to full list if pool is exhausted
-        if (attempts > pool.length * 2) {
-          nodeIndex = Math.floor(Math.random() * this.nodeList.length);
-        }
-      } while (usedNodeIds.has(nodeIndex));
-
-      usedNodeIds.add(nodeIndex);
-      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team, 100, isNPC));
+    let playerIndex = 0;
+    for (let team = 0; team < LOCAL_TEAM_COUNT; team++) {
+      const pool = spawnPools[team];
+      for (let i = 0; i < LOCAL_NPC_PER_TEAM; i++) {
+        const playerId = createPlayerId(playerIndex++);
+        let nodeIndex: number;
+        let attempts = 0;
+        do {
+          const candidate = pool[Math.floor(Math.random() * pool.length)];
+          nodeIndex = candidate?.id ?? Math.floor(Math.random() * this.nodeList.length);
+          if (++attempts > pool.length * 2) {
+            nodeIndex = Math.floor(Math.random() * this.nodeList.length);
+          }
+        } while (usedNodeIds.has(nodeIndex));
+        usedNodeIds.add(nodeIndex);
+        this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team as TeamId, 100, true));
+      }
     }
   }
 

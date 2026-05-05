@@ -42,14 +42,20 @@ export const PlayerConfig: {
 
 /**
  * Number of human players in local-play mode.
- * Online mode uses the room's participant count instead.
+ * 0 = 観戦モード（全員NPC）
  */
-export const LOCAL_PLAYER_COUNT = 5;
+export const LOCAL_PLAYER_COUNT = 0;
+
+/** チーム数 */
+export const LOCAL_TEAM_COUNT = 3;
+
+/** チームごとのNPC数 */
+export const LOCAL_NPC_PER_TEAM = 5;
 
 /**
  * Number of NPC opponents in local-play mode.
  */
-export const LOCAL_NPC_COUNT = 5;
+export const LOCAL_NPC_COUNT = LOCAL_TEAM_COUNT * LOCAL_NPC_PER_TEAM;
 
 /**
  * Generate a player ID from an index

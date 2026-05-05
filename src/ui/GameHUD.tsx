@@ -1,7 +1,8 @@
 import React from 'react';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import { gameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig } from '../config/GameConfig';
+import { PlayerConfig, TEAM_COLORS } from '../config/GameConfig';
+import type { TeamId } from '../config/GameConfig';
 
 interface GameHUDProps {
   threeSetup: ThreeSetup | null;
@@ -14,6 +15,7 @@ interface PlayerHUDState {
   isActive: boolean;
   isConfirmed: boolean;
   isDead: boolean;
+  team: TeamId;
 }
 
 const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
@@ -30,6 +32,8 @@ const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
     : state.isConfirmed ? 'rgba(20,100,50,0.85)'
     : 'rgba(40,40,60,0.7)';
 
+  const teamColor = '#' + TEAM_COLORS[state.team].toString(16).padStart(6, '0');
+
   return (
     <div style={{
       padding: '6px 10px',
@@ -40,6 +44,7 @@ const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
       color: 'white',
       fontSize: '12px',
       fontFamily: 'monospace',
+      border: `2px solid ${teamColor}`,
     }}>
       <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>{state.id}</div>
       <div style={{
@@ -74,7 +79,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     const model = threeSetup.getModel();
     const states: PlayerHUDState[] = [];
     for (const [id, p] of model.players) {
-      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive });
+      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive, team: p.team });
     }
     if (states.length > 0) states[0].isActive = true;
     setPlayerStates(states);

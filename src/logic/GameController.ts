@@ -95,7 +95,11 @@ export class GameController {
         this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
         this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
         this.resetAllStateMachines();
-        this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+        if (this.allHumanPlayerIds.length > 0) {
+          this.enterSelectMode(this.allHumanPlayerIds[0]);
+        } else {
+          this.startAutoLoop();
+        }
       }
     });
   }
@@ -217,7 +221,11 @@ export class GameController {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
       this.resetAllStateMachines();
-      this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+      if (this.allHumanPlayerIds.length > 0) {
+        this.enterSelectMode(this.allHumanPlayerIds[0]);
+      } else {
+        this.startAutoLoop();
+      }
     }
   }
 
@@ -235,14 +243,12 @@ export class GameController {
     if (!this.networkAdapter.supportsNPC()) return;
 
     const activePlayer = this.model.getPlayer(this.activePlayerId);
-    if (!activePlayer) return;
-
-    const stayAction: TurnAction = {
+    const stayActions: TurnAction[] = activePlayer ? [{
       playerId: this.activePlayerId,
       moveToNodeId: activePlayer.node.id,
       shotAtNodeId: undefined,
-    };
-    const allActions: TurnAction[] = [stayAction, ...this.turnManager.collectNPCActions()];
+    }] : [];
+    const allActions: TurnAction[] = [...stayActions, ...this.turnManager.collectNPCActions()];
 
     const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
     this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
@@ -264,13 +270,24 @@ export class GameController {
     if (this.pendingAnimCount === 0) {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+      this.startAutoLoop();
+    }
+  }
+
+  private startAutoLoop(): void {
+    if (this.allHumanPlayerIds.length === 0) {
+      this.eventBus.emit(GameEventType.NPC_ONLY_TURN);
     }
   }
 
   private handleGameStarted(): void {
     console.log(`▶ Game started! (${this.networkAdapter.getMyPlayerId()})`);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
-    this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+    if (this.allHumanPlayerIds.length > 0) {
+      this.enterSelectMode(this.allHumanPlayerIds[0]);
+    } else {
+      this.startAutoLoop();
+    }
   }
 
   /**
