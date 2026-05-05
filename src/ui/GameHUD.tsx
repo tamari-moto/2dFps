@@ -74,6 +74,7 @@ const PlayerCard: React.FC<{ state: PlayerHUDState; onSelect?: () => void }> = (
 
 const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
+  const [losVisible, setLosVisible] = React.useState(true);
   const [fogEnabled, setFogEnabled] = React.useState(PlayerConfig.FogOfWarEnabled);
   const [playerStates, setPlayerStates] = React.useState<PlayerHUDState[]>([]);
   const [confirmedCount, setConfirmedCount] = React.useState(0);
@@ -155,6 +156,12 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     setGridVisible(v => !v);
   };
 
+  const handleToggleLOS = () => {
+    if (!threeSetup) return;
+    const next = threeSetup.toggleLOS();
+    setLosVisible(next);
+  };
+
   const handleToggleFog = () => {
     PlayerConfig.FogOfWarEnabled = !PlayerConfig.FogOfWarEnabled;
     setFogEnabled(PlayerConfig.FogOfWarEnabled);
@@ -206,6 +213,13 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
         aria-label={`グリッド: ${gridVisible ? 'ON' : 'OFF'}`}
       >
         グリッド: {gridVisible ? 'ON' : 'OFF'}
+      </button>
+      <button
+        onClick={handleToggleLOS}
+        style={{ ...baseButtonStyle, backgroundColor: losVisible ? '#e67e22' : '#444444' }}
+        aria-label={`視線: ${losVisible ? 'ON' : 'OFF'}`}
+      >
+        視線: {losVisible ? 'ON' : 'OFF'}
       </button>
       <button
         onClick={handleToggleFog}

@@ -11,6 +11,12 @@ export const RenderConfig = {
   /** Grid line opacity */
   GridLineOpacity: 0.6,
 
+  /** LOS (line-of-sight) ray color */
+  LOSLineColor: 0x334455,
+
+  /** LOS ray opacity */
+  LOSLineOpacity: 0.35,
+
   /** Player diamond marker size */
   PlayerMarkerSize: 20,
 

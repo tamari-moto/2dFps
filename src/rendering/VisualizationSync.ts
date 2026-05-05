@@ -8,6 +8,7 @@ import { PlayerLifecycleManager } from './players/PlayerLifecycleManager';
 import { PlayerEffects } from './players/PlayerEffects';
 import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
+import { LOSLineManager } from './world/LOSLineManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
 import { HPBarManager } from './players/HPBarManager';
 import { isPointInCone } from '../logic/ConeIntersection';
@@ -19,6 +20,7 @@ import { worldToGame } from './utils/MeshUtils';
  */
 export class VisualizationSync {
   private nodeVis:       NodeVisualizationManager;
+  private losLines:      LOSLineManager;
   private lifecycle:     PlayerLifecycleManager;
   private effects:       PlayerEffects;
   private animator:      PlayerAnimator;
@@ -46,6 +48,7 @@ export class VisualizationSync {
     this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, eventBus, this.hpBarManager);
     this.effects       = new PlayerEffects(meshMap, this.animator, model);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
+    this.losLines      = new LOSLineManager(sceneManager.getScene());
     this.camera        = new CameraFollowController(sceneManager);
     this.textBurstEffect = new TextBurstEffect(sceneManager);
 
@@ -79,6 +82,11 @@ export class VisualizationSync {
     this.lifecycle.addPlayer(playerId, color);
   }
 
+  toggleLOS(): boolean {
+    this.losLines.toggle();
+    return this.losLines.isVisible();
+  }
+
   getMeshList(): THREE.Mesh[] {
     return this.nodeVis.getMeshList();
   }
@@ -106,6 +114,7 @@ export class VisualizationSync {
 
     this.updatePlayers(activePlayer);
     this.nodeVis.updateNodeColors(activePlayer);
+    this.losLines.update(this.model);
   }
 
   private updatePlayers(activePlayer?: ReturnType<typeof this.model.getPlayer>): void {

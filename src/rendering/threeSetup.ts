@@ -160,6 +160,10 @@ export class ThreeSetup {
     this.sceneManager.toggleGrid();
   }
 
+  toggleLOS(): boolean {
+    return this.visualizationSync.toggleLOS();
+  }
+
   /**
    * Returns all player IDs in the current game
    */
