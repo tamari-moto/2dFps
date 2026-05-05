@@ -10,7 +10,7 @@ import type { Model } from '../../model/model';
 export class LOSLineManager {
   private lines: THREE.Line[] = [];
   private material: THREE.LineBasicMaterial;
-  private visible = true;
+  private visible = false;
 
   constructor(private scene: THREE.Scene) {
     this.material = new THREE.LineBasicMaterial({
