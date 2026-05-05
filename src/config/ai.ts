@@ -25,4 +25,13 @@ export const AIConfig = {
 
   /** Waiting time after a simultaneous round resolves before re-enabling input (ms) */
   RoundAnimationDelayMs: 1500,
+
+  /** BFS radius used when searching for a goal node */
+  GoalSearchRadius: 8,
+
+  /** Force goal re-evaluation after this many turns without reaching the goal */
+  GoalTimeoutTurns: 10,
+
+  /** Re-evaluate goal if HP drops by this amount since goal was set */
+  GoalHPChangeThreshold: 30,
 } as const;

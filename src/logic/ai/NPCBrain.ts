@@ -2,36 +2,34 @@ import { Model } from '../../model/model';
 import { Player } from '../../model/Player';
 import { PlayerConfig } from '../../config/GameConfig';
 import { TurnAction } from '../../schema/types';
-import { scoreNode } from './NodeScorer';
 import { selectShotTarget } from './ShotSelector';
+import { isNodeOccupied } from './NPCGoalManager';
+import { NPCGoalState } from './NPCGoalState';
 
 /**
  * Top-level NPC decision maker.
- * Produces a complete TurnAction for one NPC.
+ * Produces a complete TurnAction for one NPC, following the given goal state.
  */
-export function decideTurn(model: Model, npc: Player): TurnAction {
+export function decideTurn(model: Model, npc: Player, goal: NPCGoalState): TurnAction {
   const enemies = model.getEnemyPlayers(npc.id);
 
-  // 1. Evaluate candidate move nodes: reachable within MoveRange + current (stay)
-  const reachable = model.getReachableNodes(npc.node.id, PlayerConfig.MoveRange);
-  const candidates = [npc.node.id, ...reachable];
+  // 1. Follow path toward goal node, advance one step
+  let moveToNodeId = npc.node.id;
 
-  let bestNodeId = npc.node.id;
-  let bestScore = -Infinity;
-
-  for (const nodeId of candidates) {
-    // Skip nodes occupied by other alive players
-    if (isNodeOccupied(model, nodeId, npc.id)) continue;
-
-    const score = scoreNode(model, npc, nodeId, enemies);
-    if (score > bestScore) {
-      bestScore = score;
-      bestNodeId = nodeId;
+  if (goal.goalNodeId !== npc.node.id) {
+    const path = model.getPathToNode(npc.node.id, goal.goalNodeId, Infinity);
+    // path = [currentNode, step1, step2, ...]; take MoveRange steps forward
+    if (path && path.length > 1) {
+      const nextIndex = Math.min(PlayerConfig.MoveRange, path.length - 1);
+      const candidate = path[nextIndex];
+      if (!isNodeOccupied(model, candidate, npc.id)) {
+        moveToNodeId = candidate;
+      }
     }
   }
 
-  // 2. Calculate facing angle toward nearest visible enemy from chosen node
-  const moveToNode = model.nodeList[bestNodeId];
+  // 2. Calculate facing angle toward nearest enemy from chosen node
+  const moveToNode = model.nodeList[moveToNodeId];
   let facingAngle = npc.angle;
 
   if (enemies.length > 0) {
@@ -54,15 +52,7 @@ export function decideTurn(model: Model, npc: Player): TurnAction {
 
   return {
     playerId: npc.id,
-    moveToNodeId: bestNodeId,
+    moveToNodeId,
     shotAtNodeId,
   };
-}
-
-function isNodeOccupied(model: Model, nodeId: number, excludeId: string): boolean {
-  for (const [id, player] of model.players) {
-    if (id === excludeId) continue;
-    if (player.isAlive && player.node.id === nodeId) return true;
-  }
-  return false;
 }
