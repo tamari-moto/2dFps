@@ -47,6 +47,9 @@ export class ThreeSetup {
     // Initialize game model via adapter
     const model = adapter.initializeModel();
 
+    // Build edge graph lines from the initial model state
+    this.sceneManager.buildEdgeGrid(model);
+
     // Initialize visualization synchronization
     this.visualizationSync = new VisualizationSync(
       this.sceneManager,
@@ -122,6 +125,7 @@ export class ThreeSetup {
       // them to LineSegment instances internally via MapGenerator.importObstacles().
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.gameController.importObstacles(obstacles as any);
+      this.sceneManager.buildEdgeGrid(model);
     });
 
     // Start render loop
