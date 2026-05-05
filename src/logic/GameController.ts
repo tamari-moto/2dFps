@@ -17,6 +17,7 @@ export class GameController {
   private stateMachines: Map<string, StateMachine> = new Map();
   private turnManager: TurnManager;
   private inputLocked: boolean = false;
+  private autoLoop: boolean = true;
 
   private allHumanPlayerIds: string[] = [];
   private pendingNextNodeId: Map<string, number | undefined> = new Map();
@@ -83,6 +84,11 @@ export class GameController {
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
+    });
+    this.eventBus.on(GameEventType.SPECTATOR_SET_AUTO_LOOP, ({ enabled }) => {
+      this.autoLoop = enabled;
+      this.eventBus.emit(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, { enabled });
+      if (enabled) this.startAutoLoop();
     });
     this.eventBus.on(GameEventType.NPC_ONLY_TURN, () => {
       if (this.inputLocked) return;
@@ -275,8 +281,8 @@ export class GameController {
   }
 
   private startAutoLoop(): void {
-    if (this.allHumanPlayerIds.length === 0) {
-      this.eventBus.emit(GameEventType.NPC_ONLY_TURN);
+    if (this.allHumanPlayerIds.length === 0 && this.autoLoop) {
+      setTimeout(() => this.eventBus.emit(GameEventType.NPC_ONLY_TURN), 0);
     }
   }
 

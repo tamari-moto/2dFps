@@ -16,6 +16,7 @@ interface PlayerHUDState {
   isConfirmed: boolean;
   isDead: boolean;
   team: TeamId;
+  isNPC: boolean;
 }
 
 const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
@@ -73,13 +74,15 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [fogEnabled, setFogEnabled] = React.useState(PlayerConfig.FogOfWarEnabled);
   const [playerStates, setPlayerStates] = React.useState<PlayerHUDState[]>([]);
   const [confirmedCount, setConfirmedCount] = React.useState(0);
+  const [autoLoop, setAutoLoop] = React.useState(true);
+  const [inputLocked, setInputLocked] = React.useState(false);
 
   React.useEffect(() => {
     if (!threeSetup) return;
     const model = threeSetup.getModel();
     const states: PlayerHUDState[] = [];
     for (const [id, p] of model.players) {
-      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive, team: p.team });
+      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive, team: p.team, isNPC: p.isNPC });
     }
     if (states.length > 0) states[0].isActive = true;
     setPlayerStates(states);
@@ -101,13 +104,6 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
       });
     };
 
-    const onInputLocked = (data: { locked: boolean }) => {
-      if (!data.locked) {
-        setPlayerStates(prev => prev.map(s => ({ ...s, isConfirmed: false, isActive: false })));
-        setConfirmedCount(0);
-      }
-    };
-
     const onHit = (data: { targetId: string }) => {
       if (!threeSetup) return;
       const model = threeSetup.getModel();
@@ -124,18 +120,29 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
       ));
     };
 
+    const onAutoLoopChanged = (data: { enabled: boolean }) => setAutoLoop(data.enabled);
+    const onInputLockedChange = (data: { locked: boolean }) => {
+      setInputLocked(data.locked);
+      if (!data.locked) {
+        setPlayerStates(prev => prev.map(s => ({ ...s, isConfirmed: false, isActive: false })));
+        setConfirmedCount(0);
+      }
+    };
+
     gameEventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, onActivePlayer);
     gameEventBus.on(GameEventType.PLAYER_ACTION_CONFIRMED, onActionConfirmed);
-    gameEventBus.on(GameEventType.INPUT_LOCKED, onInputLocked);
+    gameEventBus.on(GameEventType.INPUT_LOCKED, onInputLockedChange);
     gameEventBus.on(GameEventType.HIT_DETECTED, onHit);
     gameEventBus.on(GameEventType.VIS_HIDE_PLAYER, onHidePlayer);
+    gameEventBus.on(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, onAutoLoopChanged);
 
     return () => {
       gameEventBus.off(GameEventType.VIS_SET_ACTIVE_PLAYER, onActivePlayer);
       gameEventBus.off(GameEventType.PLAYER_ACTION_CONFIRMED, onActionConfirmed);
-      gameEventBus.off(GameEventType.INPUT_LOCKED, onInputLocked);
+      gameEventBus.off(GameEventType.INPUT_LOCKED, onInputLockedChange);
       gameEventBus.off(GameEventType.HIT_DETECTED, onHit);
       gameEventBus.off(GameEventType.VIS_HIDE_PLAYER, onHidePlayer);
+      gameEventBus.off(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, onAutoLoopChanged);
     };
   }, [threeSetup]);
 
@@ -151,6 +158,17 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     gameEventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   };
 
+  const handleToggleAutoLoop = () => {
+    gameEventBus.emit(GameEventType.SPECTATOR_SET_AUTO_LOOP, { enabled: !autoLoop });
+  };
+
+  const handleNextRound = () => {
+    if (!inputLocked) {
+      gameEventBus.emit(GameEventType.NPC_ONLY_TURN);
+    }
+  };
+
+  const isSpectatorMode = playerStates.length > 0 && playerStates.every(s => s.isNPC);
   const aliveCount = playerStates.filter(s => !s.isDead).length;
 
   const containerStyle: React.CSSProperties = {
@@ -189,6 +207,25 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
       >
         霧: {fogEnabled ? 'ON' : 'OFF'}
       </button>
+      {isSpectatorMode && (
+        <>
+          <button
+            onClick={handleToggleAutoLoop}
+            style={{ ...baseButtonStyle, backgroundColor: autoLoop ? '#8e44ad' : '#444444' }}
+          >
+            {autoLoop ? '自動実行中' : '手動モード'}
+          </button>
+          {!autoLoop && (
+            <button
+              onClick={handleNextRound}
+              disabled={inputLocked}
+              style={{ ...baseButtonStyle, backgroundColor: inputLocked ? '#555' : '#27ae60', opacity: inputLocked ? 0.5 : 1, cursor: inputLocked ? 'not-allowed' : 'pointer' }}
+            >
+              次のラウンド ▶
+            </button>
+          )}
+        </>
+      )}
       {playerStates.length > 0 && (
         <>
           <div style={{

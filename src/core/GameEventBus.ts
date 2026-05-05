@@ -70,6 +70,10 @@ export enum GameEventType {
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
   FPS_MODE_CHANGED = 'fps:mode_changed',
 
+  // Spectator auto-loop control
+  SPECTATOR_SET_AUTO_LOOP = 'spectator:set_auto_loop',
+  SPECTATOR_AUTO_LOOP_CHANGED = 'spectator:auto_loop_changed',
+
   // Ortho MAP overview mode events
   ORTHO_MODE_TOGGLE_REQUESTED = 'ortho:toggle_requested',
   ORTHO_MODE_CHANGED = 'ortho:mode_changed',
@@ -211,6 +215,10 @@ export interface GameEventData {
   [GameEventType.FPS_MODE_CHANGED]: {
     enabled: boolean;
   };
+
+  // Spectator auto-loop control
+  [GameEventType.SPECTATOR_SET_AUTO_LOOP]: { enabled: boolean };
+  [GameEventType.SPECTATOR_AUTO_LOOP_CHANGED]: { enabled: boolean };
 
   // Ortho MAP overview mode events
   [GameEventType.ORTHO_MODE_TOGGLE_REQUESTED]: void;

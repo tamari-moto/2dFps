@@ -218,7 +218,6 @@ export class FPSCameraController {
       case 'Space': this.keys.space = true; e.preventDefault(); break;
       case 'ControlLeft': case 'ControlRight': this.keys.ctrl = true; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = true; break;
-      case 'KeyR': this.eventBus.emit(GameEventType.NPC_ONLY_TURN); break;
     }
   }
 
