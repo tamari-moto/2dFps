@@ -28,22 +28,28 @@ export function decideTurn(model: Model, npc: Player, goal: NPCGoalState): TurnA
     }
   }
 
-  // 2. Calculate facing angle toward nearest enemy from chosen node
+  // 2. Calculate facing angle: prefer nearest visible enemy, else keep current angle
   const moveToNode = model.nodeList[moveToNodeId];
   let facingAngle = npc.angle;
 
   if (enemies.length > 0) {
-    let nearestEnemy: Player | undefined;
-    let nearestDist = Infinity;
-    for (const enemy of enemies) {
-      const dist = model.getNodeDistance(moveToNode, enemy.node);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearestEnemy = enemy;
+    const visibleNodes = model.getVisibleNodesAtAngle(moveToNode, npc.angle, PlayerConfig.MaxViewDistance);
+    const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+    const visibleEnemies = enemies.filter(e => visibleNodeIds.has(e.node.id));
+
+    if (visibleEnemies.length > 0) {
+      let nearestEnemy: Player | undefined;
+      let nearestDist = Infinity;
+      for (const enemy of visibleEnemies) {
+        const dist = model.getNodeDistance(moveToNode, enemy.node);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestEnemy = enemy;
+        }
       }
-    }
-    if (nearestEnemy) {
-      facingAngle = model.getAngleBetweenNodes(moveToNode, nearestEnemy.node);
+      if (nearestEnemy) {
+        facingAngle = model.getAngleBetweenNodes(moveToNode, nearestEnemy.node);
+      }
     }
   }
 
@@ -54,5 +60,6 @@ export function decideTurn(model: Model, npc: Player, goal: NPCGoalState): TurnA
     playerId: npc.id,
     moveToNodeId,
     shotAtNodeId,
+    angle: facingAngle,
   };
 }

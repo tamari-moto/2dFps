@@ -163,16 +163,17 @@ export class LocalAdapter implements INetworkAdapter {
       this.model.setPlayerRef(action.playerId, newNode);
 
       let newAngle = player.angle;
-      if (action.shotAtNodeId !== undefined) {
+      if (action.angle !== undefined) {
+        newAngle = action.angle;
+      } else if (action.shotAtNodeId !== undefined) {
         const shotNode = this.model.nodeList[action.shotAtNodeId];
         if (shotNode) {
           newAngle = this.model.getAngleBetweenNodes(newNode, shotNode);
-          player.setAngle(newAngle);
         }
       } else if (action.moveToNodeId !== fromNode.id) {
         newAngle = this.model.getAngleBetweenNodes(fromNode, newNode);
-        player.setAngle(newAngle);
       }
+      player.setAngle(newAngle);
 
       pendingResults.push({
         movingPlayerId: action.playerId,
