@@ -44,6 +44,7 @@ export class NodeVisualizationManager {
 
   initializeNodes(): void {
     for (const node of this.model.nodeList) {
+      if (!this.model.Edges.List[node.id]) continue;
       const mesh = createNodeCircle(node.x, node.y);
       this.sceneManager.addToScene(mesh);
       this.meshList.push(mesh);

@@ -54,6 +54,7 @@ class Model {
       this.obstacles = bspResult.obstacles;
       this.Lines = bspResult.lines;
       MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+      MapGenerator.removeNodesInsideObstacles(this.Edges, this.nodeList, this.obstacles);
     }
   }
 
@@ -67,8 +68,8 @@ class Model {
     const totalCount = LOCAL_PLAYER_COUNT + LOCAL_NPC_COUNT;
 
     // Players spawn at bottom (low y), NPCs spawn at top (high y)
-    const bottomNodes = this.nodeList.filter(n => n.y < (size * MapConfig.NodeSpacing) * 0.25);
-    const topNodes    = this.nodeList.filter(n => n.y >= (size * MapConfig.NodeSpacing) * 0.75);
+    const bottomNodes = this.nodeList.filter(n => n.y < (size * MapConfig.NodeSpacing) * 0.25 && this.Edges.List[n.id] !== undefined);
+    const topNodes    = this.nodeList.filter(n => n.y >= (size * MapConfig.NodeSpacing) * 0.75 && this.Edges.List[n.id] !== undefined);
 
     for (let i = 0; i < totalCount && i < this.nodeList.length; i++) {
       const isNPC = i >= LOCAL_PLAYER_COUNT;
@@ -209,6 +210,7 @@ class Model {
         if (nodeId === centerNode.id) continue;
 
         const node = this.nodeList[nodeId];
+        if (!node || !this.Edges.List[nodeId]) continue;
         const nodeDistance = this.getNodeDistance(centerNode, node);
         if (nodeDistance > distance) continue;
 
