@@ -9,6 +9,7 @@ import { PlayerEffects } from './players/PlayerEffects';
 import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
 import { LOSLineManager } from './world/LOSLineManager';
+import { ThreatHeatmapManager } from './world/ThreatHeatmapManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
 import { HPBarManager } from './players/HPBarManager';
 import { isPointInCone } from '../logic/ConeIntersection';
@@ -27,6 +28,7 @@ export class VisualizationSync {
   private camera:        CameraFollowController;
   private textBurstEffect: TextBurstEffect;
   private hpBarManager:  HPBarManager;
+  private heatmap:       ThreatHeatmapManager;
   private model:         Model;
 
   private activePlayerId: string;
@@ -51,6 +53,8 @@ export class VisualizationSync {
     this.losLines      = new LOSLineManager(sceneManager.getScene());
     this.camera        = new CameraFollowController(sceneManager);
     this.textBurstEffect = new TextBurstEffect(sceneManager);
+    this.heatmap       = new ThreatHeatmapManager(sceneManager);
+    this.heatmap.init(model.nodeList, model.Edges.List);
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -115,6 +119,11 @@ export class VisualizationSync {
     this.updatePlayers(activePlayer);
     this.nodeVis.updateNodeColors(activePlayer);
     this.losLines.update(this.model);
+
+    // Clear heatmap when not observing team 5
+    if (activePlayer.team !== 5) {
+      this.heatmap.clear();
+    }
   }
 
   private updatePlayers(activePlayer?: ReturnType<typeof this.model.getPlayer>): void {
@@ -234,6 +243,10 @@ export class VisualizationSync {
       if (player) {
         this.textBurstEffect.playAtGameCoords(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
       }
+    });
+
+    eventBus.on(GameEventType.VIS_THREAT_MAP_UPDATED, (data: { scores: Float32Array; teamColor: number }) => {
+      this.heatmap.update(data.scores, data.teamColor);
     });
 
   }

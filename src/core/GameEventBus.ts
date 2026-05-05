@@ -81,6 +81,9 @@ export enum GameEventType {
   ORTHO_MODE_TOGGLE_REQUESTED = 'ortho:toggle_requested',
   ORTHO_MODE_CHANGED = 'ortho:mode_changed',
 
+  // ThreatMap heatmap visualization
+  VIS_THREAT_MAP_UPDATED = 'vis:threat_map_updated',
+
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
   NETWORK_DISCONNECTED = 'network:disconnected',
@@ -230,6 +233,12 @@ export interface GameEventData {
   [GameEventType.ORTHO_MODE_TOGGLE_REQUESTED]: void;
   [GameEventType.ORTHO_MODE_CHANGED]: {
     enabled: boolean;
+  };
+
+  // ThreatMap heatmap visualization
+  [GameEventType.VIS_THREAT_MAP_UPDATED]: {
+    scores: Float32Array;
+    teamColor: number;
   };
 
   // Network events

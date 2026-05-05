@@ -59,7 +59,7 @@ export class GameController {
       this.reachableNodesPerPlayer.set(id, new Set());
     }
 
-    this.turnManager = new TurnManager(model, () => this.roundNumber);
+    this.turnManager = new TurnManager(model, () => this.roundNumber, eventBus);
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
