@@ -90,6 +90,13 @@ export class GameController {
       this.eventBus.emit(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, { enabled });
       if (enabled) this.startAutoLoop();
     });
+    this.eventBus.on(GameEventType.SPECTATOR_SELECT_PLAYER, ({ playerId }) => {
+      if (this.inputLocked) return;
+      const player = this.model.getPlayer(playerId);
+      if (!player || !player.isAlive) return;
+      this.activePlayerId = playerId;
+      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId });
+    });
     this.eventBus.on(GameEventType.NPC_ONLY_TURN, () => {
       if (this.inputLocked) return;
       this.executeNPCOnlyTurn();

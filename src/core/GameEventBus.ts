@@ -74,6 +74,9 @@ export enum GameEventType {
   SPECTATOR_SET_AUTO_LOOP = 'spectator:set_auto_loop',
   SPECTATOR_AUTO_LOOP_CHANGED = 'spectator:auto_loop_changed',
 
+  // Spectator player selection
+  SPECTATOR_SELECT_PLAYER = 'spectator:select_player',
+
   // Ortho MAP overview mode events
   ORTHO_MODE_TOGGLE_REQUESTED = 'ortho:toggle_requested',
   ORTHO_MODE_CHANGED = 'ortho:mode_changed',
@@ -219,6 +222,9 @@ export interface GameEventData {
   // Spectator auto-loop control
   [GameEventType.SPECTATOR_SET_AUTO_LOOP]: { enabled: boolean };
   [GameEventType.SPECTATOR_AUTO_LOOP_CHANGED]: { enabled: boolean };
+
+  // Spectator player selection
+  [GameEventType.SPECTATOR_SELECT_PLAYER]: { playerId: string };
 
   // Ortho MAP overview mode events
   [GameEventType.ORTHO_MODE_TOGGLE_REQUESTED]: void;

@@ -19,7 +19,7 @@ interface PlayerHUDState {
   isNPC: boolean;
 }
 
-const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
+const PlayerCard: React.FC<{ state: PlayerHUDState; onSelect?: () => void }> = ({ state, onSelect }) => {
   const hpPct = Math.max(0, state.hp / state.maxHp);
   const hpColor = hpPct > 0.5 ? '#27ae60' : hpPct > 0.25 ? '#e67e22' : '#c0392b';
 
@@ -36,17 +36,20 @@ const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
   const teamColor = '#' + TEAM_COLORS[state.team].toString(16).padStart(6, '0');
 
   return (
-    <div style={{
-      padding: '6px 10px',
-      borderRadius: '5px',
-      background: bgColor,
-      opacity: state.isDead ? 0.45 : 1,
-      minWidth: '90px',
-      color: 'white',
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      border: `2px solid ${teamColor}`,
-    }}>
+    <div
+      onClick={onSelect}
+      style={{
+        padding: '6px 10px',
+        borderRadius: '5px',
+        background: bgColor,
+        opacity: state.isDead ? 0.45 : 1,
+        minWidth: '90px',
+        color: 'white',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        border: `2px solid ${teamColor}`,
+        cursor: onSelect ? 'pointer' : 'default',
+      }}>
       <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>{state.id}</div>
       <div style={{
         height: '6px',
@@ -168,6 +171,10 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     }
   };
 
+  const handleSelectPlayer = (playerId: string) => {
+    gameEventBus.emit(GameEventType.SPECTATOR_SELECT_PLAYER, { playerId });
+  };
+
   const isSpectatorMode = playerStates.length > 0 && playerStates.every(s => s.isNPC);
   const aliveCount = playerStates.filter(s => !s.isDead).length;
 
@@ -250,7 +257,13 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
             scrollbarWidth: 'thin',
             scrollbarColor: '#555 transparent',
           }}>
-            {playerStates.map(s => <PlayerCard key={s.id} state={s} />)}
+            {playerStates.map(s => (
+              <PlayerCard
+                key={s.id}
+                state={s}
+                onSelect={isSpectatorMode && !s.isDead ? () => handleSelectPlayer(s.id) : undefined}
+              />
+            ))}
           </div>
         </>
       )}
