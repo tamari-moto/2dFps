@@ -109,6 +109,13 @@ export class InputHandler {
       return;
     }
 
+    // R キー（手動ラウンド実行）は FPS モード中も受け付ける
+    if (event.key === KEYBOARD_KEYS.NEXT_ROUND ||
+        event.key === KEYBOARD_KEYS.NEXT_ROUND_UPPER) {
+      this.eventBus.emit(GameEventType.NPC_ONLY_TURN);
+      return;
+    }
+
     if (this.fpsActive) return;
 
     this.eventBus.emit(GameEventType.KEY_PRESSED, { key: event.key });
