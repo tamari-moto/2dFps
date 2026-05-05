@@ -34,4 +34,22 @@ export const AIConfig = {
 
   /** Re-evaluate goal if HP drops by this amount since goal was set */
   GoalHPChangeThreshold: 30,
+
+  /** Enable ThreatMap-based facing angle when no visible enemies */
+  ThreatMapAngleEnabled: true,
+
+  /** Time constant for threat score decay (rounds) */
+  ThreatTau: 8,
+
+  /** BFS diffusion distance scale */
+  ThreatSigma: 2,
+
+  /** Maximum BFS steps for threat diffusion */
+  ThreatMaxDiffusionSteps: 6,
+
+  /** Upper bound for ambient threat score on long-unobserved nodes */
+  ThreatAmbientCap: 0.3,
+
+  /** BFS range when searching for highest-threat node to face */
+  ThreatMapMaxLookDistance: 8,
 } as const;

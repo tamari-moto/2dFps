@@ -31,6 +31,9 @@ export class GameController {
   /** Number of path animations still in progress; input unlocks when this reaches 0 */
   private pendingAnimCount = 0;
 
+  /** Monotonically increasing round counter, injected into TurnManager for ThreatMap. */
+  private roundNumber: number = 0;
+
   private inputCommandHandler: InputCommandHandler;
   private pendingPaths: Map<string, number[]> = new Map();
 
@@ -56,7 +59,7 @@ export class GameController {
       this.reachableNodesPerPlayer.set(id, new Set());
     }
 
-    this.turnManager = new TurnManager(model);
+    this.turnManager = new TurnManager(model, () => this.roundNumber);
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
@@ -207,6 +210,7 @@ export class GameController {
    * Executes all confirmed actions simultaneously once every human player has confirmed.
    */
   private executeRound(): void {
+    ++this.roundNumber;
     const allActions: TurnAction[] = Array.from(this.confirmedActions.values());
 
     if (this.networkAdapter.supportsNPC()) {
@@ -254,6 +258,7 @@ export class GameController {
 
   private executeNPCOnlyTurn(): void {
     if (!this.networkAdapter.supportsNPC()) return;
+    ++this.roundNumber;
 
     const activePlayer = this.model.getPlayer(this.activePlayerId);
     const stayActions: TurnAction[] = activePlayer ? [{
