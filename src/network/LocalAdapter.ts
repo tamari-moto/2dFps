@@ -3,8 +3,6 @@ import { Node } from '../model/node';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
-import { ENTITY_IDS } from '../config/GameConfig';
-
 /**
  * Local-play implementation of INetworkAdapter.
  * Executes all game logic in-process (no network), preserving the original behavior.
@@ -12,7 +10,7 @@ import { ENTITY_IDS } from '../config/GameConfig';
  */
 export class LocalAdapter implements INetworkAdapter {
   private model!: Model;
-  private readonly myPlayerId: string = ENTITY_IDS.PLAYER_1;
+  private readonly myPlayerId: string = '';
   private turnResultCallback?: (result: TurnResult) => void;
 
   // ---- INetworkAdapter -------------------------------------------------------

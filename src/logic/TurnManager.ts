@@ -1,6 +1,5 @@
 import { Model } from '../model/model';
 import { TurnAction } from '../schema/types';
-import { HUMAN_PLAYER_ID } from '../config/GameConfig';
 import { decideTurn } from './ai/NPCBrain';
 
 /**
@@ -24,6 +23,6 @@ export class TurnManager {
 
   private getAliveNPCs() {
     return Array.from(this.model.players.values())
-      .filter(p => p.isNPC && p.isAlive && p.id !== HUMAN_PLAYER_ID);
+      .filter(p => p.isNPC && p.isAlive);
   }
 }

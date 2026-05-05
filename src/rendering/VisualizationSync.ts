@@ -100,15 +100,17 @@ export class VisualizationSync {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private doUpdateView(): void {
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    const activePlayer = this.model.getPlayer(this.activePlayerId)
+      ?? Array.from(this.model.players.values()).find(p => p.isAlive);
     if (!activePlayer) return;
 
-    this.updatePlayers();
+    this.updatePlayers(activePlayer);
     this.nodeVis.updateNodeColors(activePlayer);
   }
 
-  private updatePlayers(): void {
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
+  private updatePlayers(activePlayer?: ReturnType<typeof this.model.getPlayer>): void {
+    activePlayer ??= this.model.getPlayer(this.activePlayerId)
+      ?? Array.from(this.model.players.values()).find(p => p.isAlive);
 
     const visibleNodeIds = new Set<number>();
     if (PlayerConfig.FogOfWarEnabled && activePlayer) {
