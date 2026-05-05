@@ -41,10 +41,15 @@ export const PlayerConfig: {
 };
 
 /**
- * Number of players in local-play mode.
+ * Number of human players in local-play mode.
  * Online mode uses the room's participant count instead.
  */
-export const LOCAL_PLAYER_COUNT = 20;
+export const LOCAL_PLAYER_COUNT = 5;
+
+/**
+ * Number of NPC opponents in local-play mode.
+ */
+export const LOCAL_NPC_COUNT = 5;
 
 /**
  * Generate a player ID from an index
@@ -62,6 +67,14 @@ export const ENTITY_IDS = {
  * Human-controlled player ID
  */
 export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
+
+/**
+ * All human-controlled player IDs in local-play mode
+ */
+export const HUMAN_PLAYER_IDS: string[] = Array.from(
+  { length: LOCAL_PLAYER_COUNT },
+  (_, i) => createPlayerId(i)
+);
 
 /**
  * Player-related constants

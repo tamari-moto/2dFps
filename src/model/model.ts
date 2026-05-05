@@ -3,7 +3,7 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './MapGenerator';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { LOCAL_PLAYER_COUNT, createPlayerId } from '../config/GameConfig';
+import { LOCAL_PLAYER_COUNT, LOCAL_NPC_COUNT, createPlayerId } from '../config/GameConfig';
 import type { TeamId } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
@@ -63,21 +63,30 @@ class Model {
    */
   public initLocalPlayers(): void {
     const usedNodeIds = new Set<number>();
+    const size = this.NodesInGridSize;
+    const totalCount = LOCAL_PLAYER_COUNT + LOCAL_NPC_COUNT;
 
-    for (let i = 0; i < LOCAL_PLAYER_COUNT && i < this.nodeList.length; i++) {
+    // Players spawn at bottom (low y), NPCs spawn at top (high y)
+    const bottomNodes = this.nodeList.filter(n => n.y < (size * MapConfig.NodeSpacing) * 0.25);
+    const topNodes    = this.nodeList.filter(n => n.y >= (size * MapConfig.NodeSpacing) * 0.75);
+
+    for (let i = 0; i < totalCount && i < this.nodeList.length; i++) {
+      const isNPC = i >= LOCAL_PLAYER_COUNT;
       const playerId = createPlayerId(i);
-      const isNPC = i > 0;
-      const team: TeamId = (i % 2) as TeamId;
+      const team: TeamId = isNPC ? 1 : 0;
+      const pool = isNPC ? topNodes : bottomNodes;
 
       let nodeIndex: number;
-      if (isNPC) {
-        // NPC: pick a random unoccupied node
-        do {
+      let attempts = 0;
+      do {
+        const candidate = pool[Math.floor(Math.random() * pool.length)];
+        nodeIndex = candidate?.id ?? Math.floor(Math.random() * this.nodeList.length);
+        attempts++;
+        // fallback to full list if pool is exhausted
+        if (attempts > pool.length * 2) {
           nodeIndex = Math.floor(Math.random() * this.nodeList.length);
-        } while (usedNodeIds.has(nodeIndex));
-      } else {
-        nodeIndex = i;
-      }
+        }
+      } while (usedNodeIds.has(nodeIndex));
 
       usedNodeIds.add(nodeIndex);
       this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team, 100, isNPC));

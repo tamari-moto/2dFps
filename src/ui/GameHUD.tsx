@@ -7,37 +7,132 @@ interface GameHUDProps {
   threeSetup: ThreeSetup | null;
 }
 
+interface PlayerHUDState {
+  id: string;
+  hp: number;
+  maxHp: number;
+  isActive: boolean;
+  isConfirmed: boolean;
+  isDead: boolean;
+}
+
+const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
+  const hpPct = Math.max(0, state.hp / state.maxHp);
+  const hpColor = hpPct > 0.5 ? '#27ae60' : hpPct > 0.25 ? '#e67e22' : '#c0392b';
+
+  let statusLabel = '待機中';
+  if (state.isDead) statusLabel = '戦闘不能';
+  else if (state.isActive) statusLabel = '操作中';
+  else if (state.isConfirmed) statusLabel = '確定済み';
+
+  const bgColor = state.isDead ? 'rgba(40,40,40,0.7)'
+    : state.isActive ? 'rgba(25,70,150,0.85)'
+    : state.isConfirmed ? 'rgba(20,100,50,0.85)'
+    : 'rgba(40,40,60,0.7)';
+
+  return (
+    <div style={{
+      padding: '6px 10px',
+      borderRadius: '5px',
+      background: bgColor,
+      opacity: state.isDead ? 0.45 : 1,
+      minWidth: '90px',
+      color: 'white',
+      fontSize: '12px',
+      fontFamily: 'monospace',
+    }}>
+      <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>{state.id}</div>
+      <div style={{
+        height: '6px',
+        borderRadius: '3px',
+        background: '#333',
+        marginBottom: '3px',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${hpPct * 100}%`,
+          background: hpColor,
+          transition: 'width 0.3s, background 0.3s',
+        }} />
+      </div>
+      <div style={{ fontSize: '10px', color: '#ccc' }}>
+        {state.hp}/{state.maxHp} · {statusLabel}
+      </div>
+    </div>
+  );
+};
+
 const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
   const [fogEnabled, setFogEnabled] = React.useState(PlayerConfig.FogOfWarEnabled);
-  const [playerIds, setPlayerIds] = React.useState<string[]>([]);
-  const [activeId, setActiveId] = React.useState<string>('');
-  const [activeAngle, setActiveAngle] = React.useState<number | null>(null);
+  const [playerStates, setPlayerStates] = React.useState<PlayerHUDState[]>([]);
+  const [confirmedCount, setConfirmedCount] = React.useState(0);
 
-  const refreshAngle = React.useCallback((id: string) => {
+  React.useEffect(() => {
     if (!threeSetup) return;
-    const player = threeSetup.getModel().players.get(id);
-    setActiveAngle(player ? Math.round(player.angle) : null);
+    const model = threeSetup.getModel();
+    const states: PlayerHUDState[] = [];
+    for (const [id, p] of model.players) {
+      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive });
+    }
+    if (states.length > 0) states[0].isActive = true;
+    setPlayerStates(states);
   }, [threeSetup]);
 
   React.useEffect(() => {
-    if (!threeSetup) return;
-    const ids = threeSetup.getPlayerIds();
-    setPlayerIds(ids);
-    const firstId = ids[0] ?? '';
-    setActiveId(firstId);
-    refreshAngle(firstId);
-  }, [threeSetup, refreshAngle]);
+    const onActivePlayer = (data: { playerId: string }) => {
+      setPlayerStates(prev => prev.map(s => ({
+        ...s,
+        isActive: s.id === data.playerId,
+      })));
+    };
 
-  React.useEffect(() => {
-    const onView = () => setActiveAngle(prev => {
-      if (!threeSetup || !activeId) return prev;
-      const player = threeSetup.getModel().players.get(activeId);
-      return player ? Math.round(player.angle) : prev;
-    });
-    gameEventBus.on(GameEventType.VIS_UPDATE_VIEW, onView);
-    return () => gameEventBus.off(GameEventType.VIS_UPDATE_VIEW, onView);
-  }, [threeSetup, activeId]);
+    const onActionConfirmed = (data: { playerId: string }) => {
+      setPlayerStates(prev => {
+        const next = prev.map(s => s.id === data.playerId ? { ...s, isConfirmed: true, isActive: false } : s);
+        setConfirmedCount(next.filter(s => s.isConfirmed && !s.isDead).length);
+        return next;
+      });
+    };
+
+    const onInputLocked = (data: { locked: boolean }) => {
+      if (!data.locked) {
+        setPlayerStates(prev => prev.map(s => ({ ...s, isConfirmed: false, isActive: false })));
+        setConfirmedCount(0);
+      }
+    };
+
+    const onHit = (data: { targetId: string }) => {
+      if (!threeSetup) return;
+      const model = threeSetup.getModel();
+      const p = model.getPlayer(data.targetId);
+      if (!p) return;
+      setPlayerStates(prev => prev.map(s =>
+        s.id === data.targetId ? { ...s, hp: p.health } : s
+      ));
+    };
+
+    const onHidePlayer = (data: { playerId: string }) => {
+      setPlayerStates(prev => prev.map(s =>
+        s.id === data.playerId ? { ...s, isDead: true, isActive: false, isConfirmed: false } : s
+      ));
+    };
+
+    gameEventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, onActivePlayer);
+    gameEventBus.on(GameEventType.PLAYER_ACTION_CONFIRMED, onActionConfirmed);
+    gameEventBus.on(GameEventType.INPUT_LOCKED, onInputLocked);
+    gameEventBus.on(GameEventType.HIT_DETECTED, onHit);
+    gameEventBus.on(GameEventType.VIS_HIDE_PLAYER, onHidePlayer);
+
+    return () => {
+      gameEventBus.off(GameEventType.VIS_SET_ACTIVE_PLAYER, onActivePlayer);
+      gameEventBus.off(GameEventType.PLAYER_ACTION_CONFIRMED, onActionConfirmed);
+      gameEventBus.off(GameEventType.INPUT_LOCKED, onInputLocked);
+      gameEventBus.off(GameEventType.HIT_DETECTED, onHit);
+      gameEventBus.off(GameEventType.VIS_HIDE_PLAYER, onHidePlayer);
+    };
+  }, [threeSetup]);
 
   const handleToggleGrid = () => {
     if (!threeSetup) return;
@@ -51,14 +146,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     gameEventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   };
 
-  const handleSwitchPlayer = (id: string) => {
-    setActiveId(id);
-    refreshAngle(id);
-    gameEventBus.emit(GameEventType.PLAYER_SWITCHED, {
-      previousPlayerId: activeId,
-      currentPlayerId: id,
-    });
-  };
+  const aliveCount = playerStates.filter(s => !s.isDead).length;
 
   const containerStyle: React.CSSProperties = {
     position: 'absolute',
@@ -80,66 +168,49 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     color: 'white',
   };
 
-  const gridButtonStyle: React.CSSProperties = {
-    ...baseButtonStyle,
-    backgroundColor: gridVisible ? '#00bfbf' : '#444444',
-  };
-
-  const fogButtonStyle: React.CSSProperties = {
-    ...baseButtonStyle,
-    backgroundColor: fogEnabled ? '#c0392b' : '#444444',
-  };
-
-  const playerRowStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: '4px',
-  };
-
   return (
     <div style={containerStyle}>
       <button
         onClick={handleToggleGrid}
-        style={gridButtonStyle}
+        style={{ ...baseButtonStyle, backgroundColor: gridVisible ? '#00bfbf' : '#444444' }}
         aria-label={`グリッド: ${gridVisible ? 'ON' : 'OFF'}`}
       >
         グリッド: {gridVisible ? 'ON' : 'OFF'}
       </button>
       <button
         onClick={handleToggleFog}
-        style={fogButtonStyle}
+        style={{ ...baseButtonStyle, backgroundColor: fogEnabled ? '#c0392b' : '#444444' }}
         aria-label={`霧: ${fogEnabled ? 'ON' : 'OFF'}`}
       >
         霧: {fogEnabled ? 'ON' : 'OFF'}
       </button>
-      {playerIds.length > 0 && (
-        <div style={playerRowStyle}>
-          {playerIds.map((id) => (
-            <button
-              key={id}
-              onClick={() => handleSwitchPlayer(id)}
-              style={{
-                ...baseButtonStyle,
-                backgroundColor: '#1a5276',
-                opacity: id === activeId ? 1 : 0.45,
-              }}
-              aria-label={`プレイヤー ${id} に切り替え`}
-            >
-              {id}
-            </button>
-          ))}
-        </div>
-      )}
-      {activeAngle !== null && (
-        <div style={{
-          color: '#00e5ff',
-          fontSize: '12px',
-          fontFamily: 'monospace',
-          background: 'rgba(0,0,0,0.5)',
-          padding: '3px 8px',
-          borderRadius: '3px',
-        }}>
-          angle: {activeAngle}°
-        </div>
+      {playerStates.length > 0 && (
+        <>
+          <div style={{
+            color: '#aaa',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            background: 'rgba(0,0,0,0.4)',
+            padding: '2px 8px',
+            borderRadius: '3px',
+          }}>
+            {confirmedCount} / {aliveCount} 確定済み
+          </div>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '4px',
+            maxWidth: '400px',
+            maxHeight: '240px',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingRight: '4px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#555 transparent',
+          }}>
+            {playerStates.map(s => <PlayerCard key={s.id} state={s} />)}
+          </div>
+        </>
       )}
     </div>
   );

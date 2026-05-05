@@ -5,7 +5,7 @@ import { Player } from '../../model/Player';
 import { SceneManager } from '../core/SceneManager';
 import { createNodeCircle } from './NodeMeshFactory';
 import { createWallMesh } from './WallMeshFactory';
-import { createUndefinedMesh, setNodeColor } from '../utils/MeshUtils';
+import { createUndefinedMesh, setNodeColor, gameToWorld } from '../utils/MeshUtils';
 import {
   NodeConfig, NodeVisualConfig, AnimationConfig,
 } from '../../config/GameConfig';
@@ -31,6 +31,7 @@ export class NodeVisualizationManager {
   private playerNextMesh:   THREE.Mesh;
   private playerShotMesh:   THREE.Mesh;
   private undefinedMesh:    THREE.Mesh;
+  private ghostMarkers:     Map<string, THREE.Group> = new Map();
 
   constructor(private sceneManager: SceneManager, private model: Model) {
     this.playerSelectMesh = createUndefinedMesh();
@@ -112,6 +113,82 @@ export class NodeVisualizationManager {
 
   clearMovePath(): void {
     this.movePathNodeIds.clear();
+  }
+
+  // ── Ghost markers (confirmed move destinations) ────────────────────────────
+
+  setConfirmedMove(playerId: string, nodeId: number, angle: number, color: number): void {
+    this.removeGhostMarker(playerId);
+
+    const node = this.model.nodeList[nodeId];
+    if (!node) return;
+
+    const group = new THREE.Group();
+    const pos = gameToWorld(node.x, node.y, 0.5);
+    group.position.copy(pos);
+
+    const diskGeo = new THREE.CircleGeometry(NodeConfig.CircleSize * 1.2, 24);
+    const diskMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.35,
+      depthTest: false,
+    });
+    const disk = new THREE.Mesh(diskGeo, diskMat);
+    disk.rotation.x = -Math.PI / 2;
+    group.add(disk);
+
+    const ringGeo = new THREE.RingGeometry(NodeConfig.CircleSize * 1.1, NodeConfig.CircleSize * 1.4, 24);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.75,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    group.add(ring);
+
+    // Facing arrow: triangle pointing in the angle direction (XZ plane)
+    const arrowSize = NodeConfig.CircleSize * 0.9;
+    const arrowGeo = new THREE.BufferGeometry();
+    const verts = new Float32Array([
+      0, 0, -arrowSize,
+      arrowSize * 0.5, 0, arrowSize * 0.4,
+      -arrowSize * 0.5, 0, arrowSize * 0.4,
+    ]);
+    arrowGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    arrowGeo.setIndex([0, 1, 2]);
+    arrowGeo.computeVertexNormals();
+    const arrowMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+    // angle is in degrees, atan2(dy,dx) convention → rotation.y = -(angle * PI/180) + PI/2
+    arrow.rotation.y = -(angle * Math.PI / 180) + Math.PI / 2;
+    group.add(arrow);
+
+    this.sceneManager.addToScene(group);
+    this.ghostMarkers.set(playerId, group);
+  }
+
+  removeGhostMarker(playerId: string): void {
+    const group = this.ghostMarkers.get(playerId);
+    if (group) {
+      this.sceneManager.removeFromScene(group);
+      this.ghostMarkers.delete(playerId);
+    }
+  }
+
+  clearConfirmedMoves(): void {
+    for (const playerId of this.ghostMarkers.keys()) {
+      this.removeGhostMarker(playerId);
+    }
   }
 
   // ── Node color update ──────────────────────────────────────────────────────

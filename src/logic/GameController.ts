@@ -2,7 +2,7 @@ import { Model } from '../model/model';
 import type { ObstacleData } from '../model/MapGenerator';
 import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig } from '../config/GameConfig';
+import { PlayerConfig, HUMAN_PLAYER_IDS } from '../config/GameConfig';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
@@ -17,9 +17,12 @@ export class GameController {
   private stateMachines: Map<string, StateMachine> = new Map();
   private turnManager: TurnManager;
   private inputLocked: boolean = false;
-  private reachableNodes: Set<number> = new Set();
-  private currentNextNodeId: number | undefined;
-  private currentShotNodeId: number | undefined;
+
+  private allHumanPlayerIds: string[] = [];
+  private pendingNextNodeId: Map<string, number | undefined> = new Map();
+  private pendingShotNodeId: Map<string, number | undefined> = new Map();
+  private reachableNodesPerPlayer: Map<string, Set<number>> = new Map();
+  private confirmedActions: Map<string, TurnAction> = new Map();
 
   /** True while sendRoundActions callbacks are being processed; suppresses per-result VIS_UPDATE_VIEW */
   private batchProcessing = false;
@@ -45,6 +48,13 @@ export class GameController {
       this.stateMachines.set(playerId, new StateMachine());
     }
 
+    this.allHumanPlayerIds = HUMAN_PLAYER_IDS.filter((id: string) => model.players.has(id));
+    for (const id of this.allHumanPlayerIds) {
+      this.pendingNextNodeId.set(id, undefined);
+      this.pendingShotNodeId.set(id, undefined);
+      this.reachableNodesPerPlayer.set(id, new Set());
+    }
+
     this.turnManager = new TurnManager(model);
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
@@ -57,14 +67,14 @@ export class GameController {
       getActivePlayerId: () => this.activePlayerId,
       setActivePlayerId: (id) => { this.activePlayerId = id; },
       getStateMachine: (id) => this.getStateMachine(id),
-      getReachableNodes: () => this.reachableNodes,
-      setReachableNodes: (s) => { this.reachableNodes = s; },
-      getCurrentNextNodeId: () => this.currentNextNodeId,
-      setCurrentNextNodeId: (v) => { this.currentNextNodeId = v; },
-      getCurrentShotNodeId: () => this.currentShotNodeId,
-      setCurrentShotNodeId: (v) => { this.currentShotNodeId = v; },
+      getReachableNodesForPlayer: (id) => this.reachableNodesPerPlayer.get(id) ?? new Set(),
+      setReachableNodesForPlayer: (id, s) => { this.reachableNodesPerPlayer.set(id, s); },
+      getPendingNextNodeIdForPlayer: (id) => this.pendingNextNodeId.get(id),
+      setPendingNextNodeIdForPlayer: (id, v) => { this.pendingNextNodeId.set(id, v); },
+      getPendingShotNodeIdForPlayer: (id) => this.pendingShotNodeId.get(id),
+      setPendingShotNodeIdForPlayer: (id, v) => { this.pendingShotNodeId.set(id, v); },
       isInputLocked: () => this.inputLocked,
-      executeTurn: (sm) => this.executeTurn(sm),
+      confirmPlayerAction: (sm) => this.confirmPlayerAction(sm),
     });
     this.inputCommandHandler.attach();
   }
@@ -84,6 +94,8 @@ export class GameController {
         this.pendingAnimCount = 0;
         this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
         this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+        this.resetAllStateMachines();
+        this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
       }
     });
   }
@@ -96,53 +108,102 @@ export class GameController {
   }
 
   /**
-   * Executes a simultaneous round:
-   * 1. Resolves paths with collision detection (PathResolver)
-   * 2. Rewrites each action's moveToNodeId to the collision-adjusted final node
-   * 3. Sends to the adapter (which teleports each player to final node atomically)
-   * 4. Fires VIS_UPDATE_VIEW once + per-player VIS_ANIMATE_ALONG_PATH for multi-step moves
-   * 5. Delays input re-enable by the longest path animation duration
+   * Called when a human player confirms their action (move + optional shot).
+   * Records the action and either switches to the next unconfirmed player
+   * or executes the round if all players have confirmed.
    */
-  private executeTurn(sm: StateMachine): void {
-    sm.transition(GameEvent.Complete);
+  confirmPlayerAction(sm: StateMachine): void {
+    // Shot→Idle (Complete) or Move→Idle (Cancel)
+    sm.transition(GameEvent.Complete) || sm.transition(GameEvent.Cancel);
 
-    const nextNodeId = this.currentNextNodeId;
-    const shotNodeId = this.currentShotNodeId;
+    const playerId = this.activePlayerId;
+    const nextNodeId = this.pendingNextNodeId.get(playerId);
+    const shotNodeId = this.pendingShotNodeId.get(playerId);
 
     if (nextNodeId === undefined) return;
 
     sm.transition(GameEvent.SelectPlayer);
     this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: nextNodeId });
-    this.currentNextNodeId = undefined;
-    this.currentShotNodeId = undefined;
+    this.pendingNextNodeId.set(playerId, undefined);
+    this.pendingShotNodeId.set(playerId, undefined);
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
 
-    const allActions: TurnAction[] = [
-      { playerId: this.activePlayerId, moveToNodeId: nextNodeId, shotAtNodeId: shotNodeId },
-    ];
+    this.confirmedActions.set(playerId, {
+      playerId,
+      moveToNodeId: nextNodeId,
+      shotAtNodeId: shotNodeId,
+    });
+
+    const player = this.model.getPlayer(playerId);
+    this.eventBus.emit(GameEventType.PLAYER_ACTION_CONFIRMED, {
+      playerId,
+      moveToNodeId: nextNodeId,
+      shotAtNodeId: shotNodeId,
+      angle: player?.angle ?? 0,
+      color: player?.color ?? 0xffffff,
+    });
+
+    if (this.areAllPlayersConfirmed()) {
+      this.executeRound();
+    } else {
+      this.switchToNextUnconfirmed();
+    }
+  }
+
+  private areAllPlayersConfirmed(): boolean {
+    return this.allHumanPlayerIds.every(id => {
+      const p = this.model.getPlayer(id);
+      return !p || !p.isAlive || this.confirmedActions.has(id);
+    });
+  }
+
+  private switchToNextUnconfirmed(): void {
+    const next = this.allHumanPlayerIds.find(id => {
+      const p = this.model.getPlayer(id);
+      return p && p.isAlive && !this.confirmedActions.has(id);
+    });
+    if (next) {
+      this.enterSelectMode(next);
+    }
+  }
+
+  private enterSelectMode(playerId: string): void {
+    this.activePlayerId = playerId;
+    this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId });
+
+    const sm = this.getStateMachine(playerId);
+    const player = this.model.getPlayer(playerId);
+    if (!player) return;
+
+    const reachable = this.model.getReachableNodes(player.node.id, PlayerConfig.MoveRange);
+    this.reachableNodesPerPlayer.set(playerId, reachable);
+    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, { nodeIds: Array.from(reachable) });
+    this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: player.node.id });
+
+    sm.transition(GameEvent.Cancel);
+    sm.transition(GameEvent.SelectPlayer);
+  }
+
+  /**
+   * Executes all confirmed actions simultaneously once every human player has confirmed.
+   */
+  private executeRound(): void {
+    const allActions: TurnAction[] = Array.from(this.confirmedActions.values());
+
     if (this.networkAdapter.supportsNPC()) {
       allActions.push(...this.turnManager.collectNPCActions());
     }
 
-    // Resolve paths with collision detection before sending to adapter
     const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
-
-    // Store paths so applyTurnResult can emit per-player animation events
     this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
 
-    // Rewrite actions to collision-adjusted final nodes
     const rewrittenActions: TurnAction[] = resolved.map(r => ({
       playerId: r.playerId,
       moveToNodeId: r.finalNodeId,
       shotAtNodeId: r.shotAtNodeId,
     }));
-
-    this.reachableNodes = this.model.getReachableNodes(nextNodeId, PlayerConfig.MoveRange);
-    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
-      nodeIds: Array.from(this.reachableNodes),
-    });
 
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
     this.batchProcessing = true;
@@ -155,6 +216,18 @@ export class GameController {
     if (this.pendingAnimCount === 0) {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+      this.resetAllStateMachines();
+      this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+    }
+  }
+
+  private resetAllStateMachines(): void {
+    this.confirmedActions.clear();
+    for (const id of this.allHumanPlayerIds) {
+      this.pendingNextNodeId.set(id, undefined);
+      this.pendingShotNodeId.set(id, undefined);
+      const sm = this.stateMachines.get(id);
+      if (sm) sm.transition(GameEvent.Cancel);
     }
   }
 
@@ -197,6 +270,7 @@ export class GameController {
   private handleGameStarted(): void {
     console.log(`▶ Game started! (${this.networkAdapter.getMyPlayerId()})`);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
   }
 
   /**
@@ -210,7 +284,6 @@ export class GameController {
       movingPlayer.setAngle(result.newAngle);
     }
 
-    // Emit path animation event for multi-step moves
     const path = this.pendingPaths.get(result.movingPlayerId);
     if (path && path.length > 1) {
       this.eventBus.emit(GameEventType.VIS_ANIMATE_ALONG_PATH, {
@@ -231,10 +304,6 @@ export class GameController {
         targetId: hit.targetId,
         nodeId: result.newNodeId,
       });
-    }
-
-    if (result.hits.length === 0) {
-      console.log(`❌ ${result.movingPlayerId} missed!`);
     }
 
     if (!this.batchProcessing) {

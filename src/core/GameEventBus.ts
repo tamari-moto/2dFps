@@ -63,6 +63,9 @@ export enum GameEventType {
   // NPC-only turn (e.g. R key in FPS mode — active player stays, NPCs act)
   NPC_ONLY_TURN = 'input:npc_only_turn',
 
+  // Player action confirmed (human player confirmed their move/shot for this round)
+  PLAYER_ACTION_CONFIRMED = 'player:action_confirmed',
+
   // Spectator (FPS) mode events
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
   FPS_MODE_CHANGED = 'fps:mode_changed',
@@ -193,6 +196,15 @@ export interface GameEventData {
 
   // NPC-only turn
   [GameEventType.NPC_ONLY_TURN]: void;
+
+  // Player action confirmed
+  [GameEventType.PLAYER_ACTION_CONFIRMED]: {
+    playerId: string;
+    moveToNodeId: number;
+    shotAtNodeId: number | undefined;
+    angle: number;
+    color: number;
+  };
 
   // Spectator (FPS) mode events
   [GameEventType.FPS_MODE_TOGGLE_REQUESTED]: void;

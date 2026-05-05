@@ -7,7 +7,7 @@ export const MapConfig: {
   ObstacleMargin: number;
 } = {
   /** Number of nodes in grid (map will be NodesInGridSize x NodesInGridSize) */
-  NodesInGridSize: 50,
+  NodesInGridSize: 20,
 
   /** Spacing between nodes in pixels */
   NodeSpacing: 30,

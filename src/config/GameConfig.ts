@@ -9,7 +9,9 @@ export {
   PLAYER_CONSTANTS,
   ENTITY_IDS,
   HUMAN_PLAYER_ID,
+  HUMAN_PLAYER_IDS,
   LOCAL_PLAYER_COUNT,
+  LOCAL_NPC_COUNT,
   createPlayerId,
 } from './player';
 export { AIConfig } from './ai';

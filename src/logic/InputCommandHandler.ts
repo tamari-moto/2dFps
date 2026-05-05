@@ -11,14 +11,14 @@ export interface InputCommandContext {
   getActivePlayerId(): string;
   setActivePlayerId(id: string): void;
   getStateMachine(playerId: string): StateMachine;
-  getReachableNodes(): Set<number>;
-  setReachableNodes(nodes: Set<number>): void;
-  getCurrentNextNodeId(): number | undefined;
-  setCurrentNextNodeId(id: number | undefined): void;
-  getCurrentShotNodeId(): number | undefined;
-  setCurrentShotNodeId(id: number | undefined): void;
+  getReachableNodesForPlayer(playerId: string): Set<number>;
+  setReachableNodesForPlayer(playerId: string, nodes: Set<number>): void;
+  getPendingNextNodeIdForPlayer(playerId: string): number | undefined;
+  setPendingNextNodeIdForPlayer(playerId: string, id: number | undefined): void;
+  getPendingShotNodeIdForPlayer(playerId: string): number | undefined;
+  setPendingShotNodeIdForPlayer(playerId: string, id: number | undefined): void;
   isInputLocked(): boolean;
-  executeTurn(sm: StateMachine): void;
+  confirmPlayerAction(sm: StateMachine): void;
 }
 
 export class InputCommandHandler {
@@ -46,10 +46,11 @@ export class InputCommandHandler {
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
     if (this.ctx.isInputLocked()) return;
 
-    const activePlayer = this.ctx.model.getPlayer(this.ctx.getActivePlayerId());
+    const activePlayerId = this.ctx.getActivePlayerId();
+    const activePlayer = this.ctx.model.getPlayer(activePlayerId);
     if (!activePlayer) return;
 
-    const sm = this.ctx.getStateMachine(this.ctx.getActivePlayerId());
+    const sm = this.ctx.getStateMachine(activePlayerId);
     const clickedNode = this.ctx.model.nodeList[data.nodeId];
 
     if (!clickedNode) return;
@@ -75,7 +76,7 @@ export class InputCommandHandler {
       this.ctx.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: clickedNode.id });
 
       const reachableNodes = this.ctx.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
-      this.ctx.setReachableNodes(reachableNodes);
+      this.ctx.setReachableNodesForPlayer(activePlayer.id, reachableNodes);
       this.ctx.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
         nodeIds: Array.from(reachableNodes),
       });
@@ -83,11 +84,11 @@ export class InputCommandHandler {
   }
 
   private handleSelectStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
-    const canMove = activePlayer.node.id === clickedNode.id ||
-                    this.ctx.getReachableNodes().has(clickedNode.id);
+    const reachable = this.ctx.getReachableNodesForPlayer(activePlayer.id);
+    const canMove = activePlayer.node.id === clickedNode.id || reachable.has(clickedNode.id);
     if (canMove) {
       sm.transition(GameEvent.MovePlayer);
-      this.ctx.setCurrentNextNodeId(clickedNode.id);
+      this.ctx.setPendingNextNodeIdForPlayer(activePlayer.id, clickedNode.id);
       this.ctx.eventBus.emit(GameEventType.VIS_SET_NEXT_MESH, { nodeId: clickedNode.id });
 
       const path = this.ctx.model.getPathToNode(
@@ -108,15 +109,15 @@ export class InputCommandHandler {
   }
 
   private handleShotStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
-    if (this.ctx.getCurrentShotNodeId() === clickedNode.id) {
-      this.ctx.executeTurn(sm);
+    if (this.ctx.getPendingShotNodeIdForPlayer(activePlayer.id) === clickedNode.id) {
+      this.ctx.confirmPlayerAction(sm);
     } else {
       this.tryShotTarget(activePlayer, clickedNode, sm);
     }
   }
 
   private tryShotTarget(activePlayer: Player, clickedNode: Node, sm: StateMachine): boolean {
-    const nextNodeId = this.ctx.getCurrentNextNodeId();
+    const nextNodeId = this.ctx.getPendingNextNodeIdForPlayer(activePlayer.id);
     if (nextNodeId === undefined) return false;
 
     const teamVisible = this.ctx.model.getTeamVisibleNodes(activePlayer.id);
@@ -124,7 +125,7 @@ export class InputCommandHandler {
 
     if (isVisible) {
       sm.transition(GameEvent.ShotPlayer);
-      this.ctx.setCurrentShotNodeId(clickedNode.id);
+      this.ctx.setPendingShotNodeIdForPlayer(activePlayer.id, clickedNode.id);
       this.ctx.eventBus.emit(GameEventType.VIS_SET_SHOT_MESH, { nodeId: clickedNode.id });
       return true;
     }
@@ -134,18 +135,19 @@ export class InputCommandHandler {
   private handleCanvasEmptyClick(): void {
     if (this.ctx.isInputLocked()) return;
 
-    const sm = this.ctx.getStateMachine(this.ctx.getActivePlayerId());
+    const activePlayerId = this.ctx.getActivePlayerId();
+    const sm = this.ctx.getStateMachine(activePlayerId);
     sm.transition(GameEvent.Cancel);
-    this.ctx.setCurrentShotNodeId(undefined);
-    this.ctx.setCurrentNextNodeId(undefined);
+    this.ctx.setPendingShotNodeIdForPlayer(activePlayerId, undefined);
+    this.ctx.setPendingNextNodeIdForPlayer(activePlayerId, undefined);
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
 
-    const activePlayer = this.ctx.model.getPlayer(this.ctx.getActivePlayerId());
+    const activePlayer = this.ctx.model.getPlayer(activePlayerId);
     if (activePlayer) {
       const reachableNodes = this.ctx.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
-      this.ctx.setReachableNodes(reachableNodes);
+      this.ctx.setReachableNodesForPlayer(activePlayerId, reachableNodes);
       this.ctx.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
         nodeIds: Array.from(reachableNodes),
       });

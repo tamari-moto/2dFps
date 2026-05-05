@@ -207,6 +207,16 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
 
+    eventBus.on(GameEventType.PLAYER_ACTION_CONFIRMED, (data: { playerId: string; moveToNodeId: number; shotAtNodeId: number | undefined; angle: number; color: number }) => {
+      this.nodeVis.setConfirmedMove(data.playerId, data.moveToNodeId, data.angle, data.color);
+    });
+
+    eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
+      if (!data.locked) {
+        this.nodeVis.clearConfirmedMoves();
+      }
+    });
+
     eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {
       this.animator.startDance(data.playerId);
       const player = this.model.getPlayer(data.playerId);
