@@ -42,6 +42,10 @@ export enum GameEventType {
   VIS_PLAY_DANCE = 'vis:play_dance',
   VIS_SET_REACHABLE_NODES = 'vis:set_reachable_nodes',
   VIS_CLEAR_REACHABLE_NODES = 'vis:clear_reachable_nodes',
+  VIS_SET_MOVE_PATH = 'vis:set_move_path',
+  VIS_CLEAR_MOVE_PATH = 'vis:clear_move_path',
+  VIS_ANIMATE_ALONG_PATH = 'vis:animate_along_path',
+  VIS_PATH_ANIM_COMPLETE = 'vis:path_anim_complete',
 
   // Map events
   MAP_GENERATED = 'map:generated',
@@ -55,6 +59,12 @@ export enum GameEventType {
   NPC_TURN_STARTED = 'npc:turn_started',
   NPC_TURNS_COMPLETE = 'npc:turns_complete',
   INPUT_LOCKED = 'input:locked',
+
+  // NPC-only turn (e.g. R key in FPS mode — active player stays, NPCs act)
+  NPC_ONLY_TURN = 'input:npc_only_turn',
+
+  // Player action confirmed (human player confirmed their move/shot for this round)
+  PLAYER_ACTION_CONFIRMED = 'player:action_confirmed',
 
   // Spectator (FPS) mode events
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
@@ -162,6 +172,10 @@ export interface GameEventData {
     nodeIds: number[];
   };
   [GameEventType.VIS_CLEAR_REACHABLE_NODES]: void;
+  [GameEventType.VIS_SET_MOVE_PATH]: { nodeIds: number[] };
+  [GameEventType.VIS_CLEAR_MOVE_PATH]: void;
+  [GameEventType.VIS_ANIMATE_ALONG_PATH]: { playerId: string; path: number[]; finalAngle: number };
+  [GameEventType.VIS_PATH_ANIM_COMPLETE]: { playerId: string };
 
   // Map events
   [GameEventType.MAP_GENERATED]: void;
@@ -178,6 +192,18 @@ export interface GameEventData {
   [GameEventType.NPC_TURNS_COMPLETE]: void;
   [GameEventType.INPUT_LOCKED]: {
     locked: boolean;
+  };
+
+  // NPC-only turn
+  [GameEventType.NPC_ONLY_TURN]: void;
+
+  // Player action confirmed
+  [GameEventType.PLAYER_ACTION_CONFIRMED]: {
+    playerId: string;
+    moveToNodeId: number;
+    shotAtNodeId: number | undefined;
+    angle: number;
+    color: number;
   };
 
   // Spectator (FPS) mode events
@@ -203,44 +229,37 @@ export interface GameEventData {
   [GameEventType.ROOM_STATE_CHANGED]: void;
 }
 
-/**
- * Type for event listeners
- */
-type EventListener<T = any> = (data: T) => void;
+type EventListener<T> = (data: T) => void;
 
-/**
- * Central event bus for decoupling game components
- * Implements the publish-subscribe pattern
- */
 export class GameEventBus {
-  private listeners: Map<GameEventType, Set<EventListener>> = new Map();
+  private listeners: Map<GameEventType, Set<EventListener<GameEventData[GameEventType]>>> = new Map();
 
   on<T extends GameEventType>(
     eventType: T,
-    listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
+    listener: EventListener<GameEventData[T]>
   ): void {
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Set());
     }
-    this.listeners.get(eventType)!.add(listener);
+    this.listeners.get(eventType)!.add(listener as EventListener<GameEventData[GameEventType]>);
   }
 
   off<T extends GameEventType>(
     eventType: T,
-    listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
+    listener: EventListener<GameEventData[T]>
   ): void {
-    this.listeners.get(eventType)?.delete(listener);
+    this.listeners.get(eventType)?.delete(listener as EventListener<GameEventData[GameEventType]>);
   }
 
   emit<T extends GameEventType>(
     eventType: T,
-    data?: T extends keyof GameEventData ? GameEventData[T] : any
+    data?: GameEventData[T]
   ): void {
     const listeners = this.listeners.get(eventType);
     if (listeners) {
       listeners.forEach((listener) => {
         try {
-          listener(data);
+          listener(data as GameEventData[GameEventType]);
         } catch (error) {
           console.error(`[GameEventBus] Error in listener for ${eventType}:`, error);
         }
@@ -250,9 +269,9 @@ export class GameEventBus {
 
   once<T extends GameEventType>(
     eventType: T,
-    listener: EventListener<T extends keyof GameEventData ? GameEventData[T] : any>
+    listener: EventListener<GameEventData[T]>
   ): void {
-    const onceWrapper = (data: any) => {
+    const onceWrapper: EventListener<GameEventData[T]> = (data) => {
       listener(data);
       this.off(eventType, onceWrapper);
     };

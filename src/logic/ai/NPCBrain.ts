@@ -10,7 +10,7 @@ import { selectShotTarget } from './ShotSelector';
  * Produces a complete TurnAction for one NPC.
  */
 export function decideTurn(model: Model, npc: Player): TurnAction {
-  const enemies = getAliveEnemies(model, npc.id);
+  const enemies = model.getEnemyPlayers(npc.id);
 
   // 1. Evaluate candidate move nodes: reachable within MoveRange + current (stay)
   const reachable = model.getReachableNodes(npc.node.id, PlayerConfig.MoveRange);
@@ -57,16 +57,6 @@ export function decideTurn(model: Model, npc: Player): TurnAction {
     moveToNodeId: bestNodeId,
     shotAtNodeId,
   };
-}
-
-function getAliveEnemies(model: Model, npcId: string): Player[] {
-  const enemies: Player[] = [];
-  for (const [id, player] of model.players) {
-    if (id !== npcId && player.isAlive) {
-      enemies.push(player);
-    }
-  }
-  return enemies;
 }
 
 function isNodeOccupied(model: Model, nodeId: number, excludeId: string): boolean {

@@ -6,6 +6,8 @@ import { PlayerAnimator } from './PlayerAnimator';
 import { createVariantPlayer } from './PlayerMeshFactory';
 import { AnimationConfig, RenderConfig, PLAYER_CONSTANTS } from '../../config/GameConfig';
 import { gameToWorld } from '../utils/MeshUtils';
+import { GameEventBus, GameEventType } from '../../core/GameEventBus';
+import { HPBarManager } from './HPBarManager';
 
 /**
  * Manages the lifecycle of player mesh objects:
@@ -15,12 +17,15 @@ import { gameToWorld } from '../utils/MeshUtils';
  */
 export class PlayerLifecycleManager {
   readonly playerMeshes: Map<string, THREE.Object3D>;
+  private readonly pathAnimatingPlayers: Set<string> = new Set();
 
   constructor(
     private sceneManager: SceneManager,
     private animator: PlayerAnimator,
     private model: Model,
     meshMap: Map<string, THREE.Object3D>,
+    private eventBus: GameEventBus,
+    private hpBarManager: HPBarManager,
   ) {
     this.playerMeshes = meshMap;
   }
@@ -32,6 +37,7 @@ export class PlayerLifecycleManager {
       const obj = createVariantPlayer(player.color);
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
+      this.hpBarManager.attachBar(playerId, obj, player.isNPC);
       this.animator.startIdle(playerId);
     }
   }
@@ -42,7 +48,13 @@ export class PlayerLifecycleManager {
     const obj = createVariantPlayer(color);
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
+    const player = this.model.getPlayer(playerId);
+    this.hpBarManager.attachBar(playerId, obj, player?.isNPC ?? false);
     this.animator.startIdle(playerId);
+  }
+
+  isPathAnimating(playerId: string): boolean {
+    return this.pathAnimatingPlayers.has(playerId);
   }
 
   setVisible(playerId: string, visible: boolean): void {
@@ -64,6 +76,53 @@ export class PlayerLifecycleManager {
    *   To face game angle θ, rotation.y = atan2(cosθ, sinθ) = π/2 − θ_rad
    *   = −θ_rad + PlayerFacingOffset (PlayerFacingOffset = π/2).
    */
+  /**
+   * Animates a player mesh step-by-step through the given node ID path.
+   * Each step takes AnimationConfig.MovementDuration seconds.
+   * The active player's camera follows each intermediate node via the onStep callback.
+   */
+  animateAlongPath(playerId: string, nodeIds: number[], finalAngle: number): void {
+    if (nodeIds.length < 2) return;
+    const obj = this.playerMeshes.get(playerId);
+    if (!obj) return;
+
+    const dur = AnimationConfig.MovementDuration;
+    this.pathAnimatingPlayers.add(playerId);
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        this.pathAnimatingPlayers.delete(playerId);
+        if (this.animator.getState(playerId) === 'walk') {
+          this.animator.startIdle(playerId);
+        }
+        this.eventBus.emit(GameEventType.VIS_PATH_ANIM_COMPLETE, { playerId });
+      },
+    });
+
+    this.animator.startWalk(playerId);
+
+    for (let i = 1; i < nodeIds.length; i++) {
+      const node = this.model.nodeList[nodeIds[i]];
+      if (!node) continue;
+
+      const worldTarget = gameToWorld(node.x, node.y, RenderConfig.PlayerZOffset);
+      tl.to(obj.position, {
+        x: worldTarget.x,
+        y: worldTarget.y,
+        z: worldTarget.z,
+        duration: dur,
+        ease: 'none',
+      });
+    }
+
+    // Turn to face shot target simultaneously with movement
+    tl.to(obj.rotation, {
+      y: -(finalAngle * Math.PI / 180) + RenderConfig.PlayerFacingOffset,
+      duration: dur,
+      ease: 'power2.out',
+    }, '<');
+  }
+
   applyTransform(
     playerId: string,
     targetX: number,

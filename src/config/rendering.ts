@@ -72,6 +72,9 @@ export const NodeConfig = {
 
   /** Reachable node color (dark grey) */
   ReachableColor: 0x3d3d3d,
+
+  /** Move path node color (saddle brown) */
+  MovePathColor: 0x8b4513,
 } as const;
 
 /**
@@ -94,6 +97,8 @@ export const NodeVisualConfig = {
   EmissiveShotIntensity: 0.5,
   /** Emissive intensity for reachable nodes */
   EmissiveReachableIntensity: 0.15,
+  /** Emissive intensity for move-path nodes */
+  EmissiveMovePathIntensity: 0.35,
 } as const;
 
 /**
@@ -118,4 +123,21 @@ export const WallConfig = {
   EmissiveIntensity: 0.15,
   /** userData key used to identify wall meshes during scene traversal */
   UserDataTag: 'isWall',
+} as const;
+
+/**
+ * 3D HP bar configuration (bars attached as children of player Groups).
+ * All sizes are in Three.js world units (PlayerMarkerSize = 20 scale).
+ * Head top Y ≈ 13.26 (HS*1.3 + headR*s = 4.06 + 9.2), bar at YOffset=16 gives 2.74 units clearance.
+ */
+export const HPBarConfig = {
+  Width:        14,
+  Height:       1.5,
+  YOffset:      16.0,
+  ZOffset:      0.3,
+  Depth:        0.5,
+  BgColor:      0x333333,
+  HumanFgColor: 0x44ff44,
+  NPCFgColor:   0xff3333,
+  AnimDuration: 0.25,
 } as const;

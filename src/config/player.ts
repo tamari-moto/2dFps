@@ -9,6 +9,8 @@ export const PlayerConfig: {
   MoveRange: number;
   ShotHitRadius: number;
   FogOfWarEnabled: boolean;
+  AccuracyExponent: number;
+  ShotMaxRangeMultiplier: number;
 } = {
   /** Player's field of view angle in degrees */
   ViewAngle: 60,
@@ -23,20 +25,31 @@ export const PlayerConfig: {
   DamagePerShot: 34,
 
   /** Maximum number of grid steps a player can move per turn */
-  MoveRange: 8,
+  MoveRange: 1,
 
-  /** Hit radius for shot resolution: target must be within this distance of the shot node (px) */
+  /** Hit radius for shot resolution: unit scale for accuracy falloff (px) */
   ShotHitRadius: 20,
 
   /** 視界外の敵を非表示にするか */
-  FogOfWarEnabled: true,
+  FogOfWarEnabled: false,
+
+  /** 命中確率の減衰カーブ: 1=線形 / >1=中心寄り急峻 / <1=広め */
+  AccuracyExponent: 1.5,
+
+  /** ShotHitRadius × この値 が実効最大射程 */
+  ShotMaxRangeMultiplier: 3,
 };
 
 /**
- * Number of players in local-play mode.
+ * Number of human players in local-play mode.
  * Online mode uses the room's participant count instead.
  */
 export const LOCAL_PLAYER_COUNT = 5;
+
+/**
+ * Number of NPC opponents in local-play mode.
+ */
+export const LOCAL_NPC_COUNT = 5;
 
 /**
  * Generate a player ID from an index
@@ -54,6 +67,14 @@ export const ENTITY_IDS = {
  * Human-controlled player ID
  */
 export const HUMAN_PLAYER_ID = ENTITY_IDS.PLAYER_1;
+
+/**
+ * All human-controlled player IDs in local-play mode
+ */
+export const HUMAN_PLAYER_IDS: string[] = Array.from(
+  { length: LOCAL_PLAYER_COUNT },
+  (_, i) => createPlayerId(i)
+);
 
 /**
  * Player-related constants

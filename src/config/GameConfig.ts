@@ -9,13 +9,17 @@ export {
   PLAYER_CONSTANTS,
   ENTITY_IDS,
   HUMAN_PLAYER_ID,
+  HUMAN_PLAYER_IDS,
   LOCAL_PLAYER_COUNT,
+  LOCAL_NPC_COUNT,
   createPlayerId,
 } from './player';
 export { AIConfig } from './ai';
 export { CameraConfig, FPSConfig } from './camera';
 export { KEYBOARD_KEYS } from './input';
 export { AnimationConfig, TextBurstEffectConfig } from './animation';
-export { RenderConfig, NodeConfig, NodeVisualConfig, WallConfig } from './rendering';
+export { RenderConfig, NodeConfig, NodeVisualConfig, WallConfig, HPBarConfig } from './rendering';
 export { LightingConfig, FogConfig, ShadowConfig, PostProcessConfig } from './scene';
 export { applyServerConfig } from './server-sync';
+export type { TeamId } from './team';
+export { TeamConfig } from './team';

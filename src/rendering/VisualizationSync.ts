@@ -9,6 +9,9 @@ import { PlayerEffects } from './players/PlayerEffects';
 import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
+import { HPBarManager } from './players/HPBarManager';
+import { isPointInCone } from '../logic/ConeIntersection';
+import { worldToGame } from './utils/MeshUtils';
 
 /**
  * Thin orchestrator: constructs the four specialized managers and wires them
@@ -21,6 +24,7 @@ export class VisualizationSync {
   private animator:      PlayerAnimator;
   private camera:        CameraFollowController;
   private textBurstEffect: TextBurstEffect;
+  private hpBarManager:  HPBarManager;
   private model:         Model;
 
   private activePlayerId: string;
@@ -38,7 +42,8 @@ export class VisualizationSync {
     // Shared map — PlayerAnimator / PlayerLifecycleManager / PlayerEffects all reference it
     const meshMap = new Map<string, THREE.Object3D>();
     this.animator      = new PlayerAnimator(meshMap);
-    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap);
+    this.hpBarManager  = new HPBarManager();
+    this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, eventBus, this.hpBarManager);
     this.effects       = new PlayerEffects(meshMap, this.animator, model);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
     this.camera        = new CameraFollowController(sceneManager);
@@ -56,6 +61,7 @@ export class VisualizationSync {
     }
 
     this.subscribeToEvents(eventBus);
+    sceneManager.addTickCallback(() => this.tickUpdateVisibility());
   }
 
   // ── Public API (unchanged from original) ──────────────────────────────────
@@ -106,24 +112,25 @@ export class VisualizationSync {
 
     const visibleNodeIds = new Set<number>();
     if (PlayerConfig.FogOfWarEnabled && activePlayer) {
-      const nodes = this.model.getVisibleNodesAtAngle(
-        activePlayer.node, activePlayer.angle, PlayerConfig.MaxViewDistance,
-      );
-      for (const n of nodes) visibleNodeIds.add(n.id);
-      visibleNodeIds.add(activePlayer.node.id);
+      const teamNodes = this.model.getTeamVisibleNodes(this.activePlayerId);
+      for (const id of teamNodes) visibleNodeIds.add(id);
     }
 
     for (const [playerId, player] of this.model.players) {
       if (!player.isAlive) continue;
 
-      const isActive = playerId === this.activePlayerId;
+      const isOnMyTeam = activePlayer && player.team === activePlayer.team;
       const shouldShow = !PlayerConfig.FogOfWarEnabled
-        || isActive
+        || isOnMyTeam
         || visibleNodeIds.has(player.node.id);
 
       this.lifecycle.setVisible(playerId, shouldShow);
       if (!shouldShow) continue;
 
+      // 経路アニメーション中は applyTransform の gsap.to / rotation 書き込みをスキップ
+      if (this.lifecycle.isPathAnimating(playerId)) continue;
+
+      const isActive = playerId === this.activePlayerId;
       const moving = this.lifecycle.applyTransform(
         playerId, player.node.x, player.node.y, player.angle, isActive,
       );
@@ -168,9 +175,12 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_SHOW_HIT_EFFECT, (data: { playerId: string }) => {
       this.effects.showHitEffect(data.playerId);
+      const player = this.model.getPlayer(data.playerId);
+      if (player) this.hpBarManager.updateBar(data.playerId, player.health, player.maxHealth);
     });
     eventBus.on(GameEventType.VIS_HIDE_PLAYER, (data: { playerId: string }) => {
       this.effects.hidePlayer(data.playerId);
+      this.hpBarManager.removeBar(data.playerId);
     });
 
     eventBus.on(GameEventType.VIS_SET_REACHABLE_NODES, (data: { nodeIds: number[] }) => {
@@ -182,7 +192,30 @@ export class VisualizationSync {
       this.doUpdateView();
     });
 
+    eventBus.on(GameEventType.VIS_ANIMATE_ALONG_PATH, (data: { playerId: string; path: number[]; finalAngle: number }) => {
+      this.lifecycle.animateAlongPath(data.playerId, data.path, data.finalAngle);
+    });
+
+    eventBus.on(GameEventType.VIS_SET_MOVE_PATH, (data: { nodeIds: number[] }) => {
+      this.nodeVis.setMovePath(data.nodeIds);
+      this.doUpdateView();
+    });
+    eventBus.on(GameEventType.VIS_CLEAR_MOVE_PATH, () => {
+      this.nodeVis.clearMovePath();
+      this.doUpdateView();
+    });
+
     eventBus.on(GameEventType.VIS_UPDATE_OBSTACLES, () => this.updateObstacles());
+
+    eventBus.on(GameEventType.PLAYER_ACTION_CONFIRMED, (data: { playerId: string; moveToNodeId: number; shotAtNodeId: number | undefined; angle: number; color: number }) => {
+      this.nodeVis.setConfirmedMove(data.playerId, data.moveToNodeId, data.angle, data.color);
+    });
+
+    eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
+      if (!data.locked) {
+        this.nodeVis.clearConfirmedMoves();
+      }
+    });
 
     eventBus.on(GameEventType.VIS_PLAY_DANCE, (data: { playerId: string }) => {
       this.animator.startDance(data.playerId);
@@ -191,5 +224,33 @@ export class VisualizationSync {
         this.textBurstEffect.playAtGameCoords(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
       }
     });
+
   }
+
+  private tickUpdateVisibility(): void {
+    if (!PlayerConfig.FogOfWarEnabled) return;
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (!activePlayer) return;
+
+    const origin = { x: activePlayer.node.x, y: activePlayer.node.y };
+    const halfAngle = PlayerConfig.ViewAngle / 2;
+    const dirX = Math.cos(activePlayer.angle * Math.PI / 180);
+    const dirY = Math.sin(activePlayer.angle * Math.PI / 180);
+
+    for (const [playerId, player] of this.model.players) {
+      if (playerId === this.activePlayerId) continue;
+      if (!player.isAlive) continue;
+      if (!this.lifecycle.isPathAnimating(playerId)) continue;
+
+      const mesh = this.lifecycle.playerMeshes.get(playerId);
+      if (!mesh) continue;
+
+      const gamePos = worldToGame(mesh.position.x, mesh.position.z);
+      const inCone = isPointInCone(gamePos, origin, dirX, dirY, halfAngle, PlayerConfig.MaxViewDistance)
+        && !this.model.Lines.some(seg => seg.intersects(origin, gamePos));
+      this.lifecycle.setVisible(playerId, inCone);
+    }
+  }
+
+  dispose(): void { }
 }

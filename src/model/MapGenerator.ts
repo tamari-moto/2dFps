@@ -6,6 +6,7 @@ import { MapConfig, BSPMapConfig, CalculatedConfig } from '../config/GameConfig'
 export interface ObstacleData {
   id: number;
   segments: LineSegment[];
+  rect?: { x: number; y: number; width: number; height: number };
 }
 
 /** BSP ツリーのノード */
@@ -345,11 +346,13 @@ export class MapGenerator {
     const topLeftW = (width - door) / 2;
     if (topLeftW > 0) {
       const s1 = createRectangleSegments(x, y, topLeftW, t);
-      obstacles.push({ id: idCounter.value++, segments: s1 });
+      obstacles.push({ id: idCounter.value++, segments: s1, rect: { x, y, width: topLeftW, height: t } });
       lines.push(...s1);
 
-      const s2 = createRectangleSegments(x + topLeftW + door, y, width - topLeftW - door, t);
-      obstacles.push({ id: idCounter.value++, segments: s2 });
+      const rw1 = width - topLeftW - door;
+      const rx1 = x + topLeftW + door;
+      const s2 = createRectangleSegments(rx1, y, rw1, t);
+      obstacles.push({ id: idCounter.value++, segments: s2, rect: { x: rx1, y, width: rw1, height: t } });
       lines.push(...s2);
     }
 
@@ -357,11 +360,13 @@ export class MapGenerator {
     const botY = y + height - t;
     if (topLeftW > 0) {
       const s1 = createRectangleSegments(x, botY, topLeftW, t);
-      obstacles.push({ id: idCounter.value++, segments: s1 });
+      obstacles.push({ id: idCounter.value++, segments: s1, rect: { x, y: botY, width: topLeftW, height: t } });
       lines.push(...s1);
 
-      const s2 = createRectangleSegments(x + topLeftW + door, botY, width - topLeftW - door, t);
-      obstacles.push({ id: idCounter.value++, segments: s2 });
+      const rw2 = width - topLeftW - door;
+      const rx2 = x + topLeftW + door;
+      const s2 = createRectangleSegments(rx2, botY, rw2, t);
+      obstacles.push({ id: idCounter.value++, segments: s2, rect: { x: rx2, y: botY, width: rw2, height: t } });
       lines.push(...s2);
     }
 
@@ -369,11 +374,13 @@ export class MapGenerator {
     const leftTopH = (height - door) / 2;
     if (leftTopH > 0) {
       const s1 = createRectangleSegments(x, y, t, leftTopH);
-      obstacles.push({ id: idCounter.value++, segments: s1 });
+      obstacles.push({ id: idCounter.value++, segments: s1, rect: { x, y, width: t, height: leftTopH } });
       lines.push(...s1);
 
-      const s2 = createRectangleSegments(x, y + leftTopH + door, t, height - leftTopH - door);
-      obstacles.push({ id: idCounter.value++, segments: s2 });
+      const rh1 = height - leftTopH - door;
+      const ry1 = y + leftTopH + door;
+      const s2 = createRectangleSegments(x, ry1, t, rh1);
+      obstacles.push({ id: idCounter.value++, segments: s2, rect: { x, y: ry1, width: t, height: rh1 } });
       lines.push(...s2);
     }
 
@@ -381,11 +388,13 @@ export class MapGenerator {
     const rightX = x + width - t;
     if (leftTopH > 0) {
       const s1 = createRectangleSegments(rightX, y, t, leftTopH);
-      obstacles.push({ id: idCounter.value++, segments: s1 });
+      obstacles.push({ id: idCounter.value++, segments: s1, rect: { x: rightX, y, width: t, height: leftTopH } });
       lines.push(...s1);
 
-      const s2 = createRectangleSegments(rightX, y + leftTopH + door, t, height - leftTopH - door);
-      obstacles.push({ id: idCounter.value++, segments: s2 });
+      const rh2 = height - leftTopH - door;
+      const ry2 = y + leftTopH + door;
+      const s2 = createRectangleSegments(rightX, ry2, t, rh2);
+      obstacles.push({ id: idCounter.value++, segments: s2, rect: { x: rightX, y: ry2, width: t, height: rh2 } });
       lines.push(...s2);
     }
   }
@@ -412,7 +421,7 @@ export class MapGenerator {
         const py = room.y + inset + rng() * (room.height - inset * 2 - pillarSize);
 
         const segs = createRectangleSegments(px, py, pillarSize, pillarSize);
-        obstacles.push({ id: idCounter.value++, segments: segs });
+        obstacles.push({ id: idCounter.value++, segments: segs, rect: { x: px, y: py, width: pillarSize, height: pillarSize } });
         lines.push(...segs);
       }
 
@@ -427,7 +436,7 @@ export class MapGenerator {
         const hy = room.y + BSPMapConfig.WallThickness + 10;
         if (hx + hw < room.x + room.width - BSPMapConfig.WallThickness) {
           const segs = createRectangleSegments(hx, hy, hw, ht);
-          obstacles.push({ id: idCounter.value++, segments: segs });
+          obstacles.push({ id: idCounter.value++, segments: segs, rect: { x: hx, y: hy, width: hw, height: ht } });
           lines.push(...segs);
         }
       }
@@ -444,10 +453,10 @@ export class MapGenerator {
     const originalCount = obstacles.length;
 
     for (let i = 0; i < originalCount; i++) {
-      const original = obstacles[i];
+      const orig = obstacles[i];
       const mirroredSegments: LineSegment[] = [];
 
-      for (const seg of original.segments) {
+      for (const seg of orig.segments) {
         // 各線分の X 座標をミラーリング（start と end を入れ替えて方向を維持）
         const mirroredSeg = new LineSegment(
           2 * centerX - seg.end.x, seg.end.y,
@@ -457,7 +466,32 @@ export class MapGenerator {
         lines.push(mirroredSeg);
       }
 
-      obstacles.push({ id: idCounter.value++, segments: mirroredSegments });
+      const mirroredRect = orig.rect ? {
+        x: 2 * centerX - orig.rect.x - orig.rect.width,
+        y: orig.rect.y,
+        width: orig.rect.width,
+        height: orig.rect.height,
+      } : undefined;
+      obstacles.push({ id: idCounter.value++, segments: mirroredSegments, rect: mirroredRect });
+    }
+  }
+
+  /** 矩形障害物（rect あり）の内部にあるノードをグラフから削除する */
+  public static removeNodesInsideObstacles(
+    edges: Graph,
+    nodeList: Node[],
+    obstacles: ObstacleData[]
+  ): void {
+    for (const obstacle of obstacles) {
+      const r = obstacle.rect;
+      if (!r) continue;
+      for (const node of nodeList) {
+        if (!edges.List[node.id]) continue;
+        if (node.x > r.x && node.x < r.x + r.width &&
+            node.y > r.y && node.y < r.y + r.height) {
+          edges.removeVertex(node.id);
+        }
+      }
     }
   }
 

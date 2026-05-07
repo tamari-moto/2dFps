@@ -1,18 +1,14 @@
 import { Model } from '../model/model';
 import type { ObstacleData } from '../model/MapGenerator';
-import { State, GameEvent, StateMachine } from './StateMachine';
+import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { AIConfig, PlayerConfig } from '../config/GameConfig';
-import { Player } from '../model/Player';
-import { Node } from '../model/node';
+import { PlayerConfig, HUMAN_PLAYER_IDS } from '../config/GameConfig';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
+import { InputCommandHandler } from './InputCommandHandler';
+import { resolveRoundPaths } from './PathResolver';
 
-/**
- * Controls game logic and state transitions
- * Handles player actions and combat resolution
- */
 export class GameController {
   private model: Model;
   private eventBus: GameEventBus;
@@ -21,10 +17,21 @@ export class GameController {
   private stateMachines: Map<string, StateMachine> = new Map();
   private turnManager: TurnManager;
   private inputLocked: boolean = false;
-  private reachableNodes: Set<number> = new Set();
+
+  private allHumanPlayerIds: string[] = [];
+  private pendingNextNodeId: Map<string, number | undefined> = new Map();
+  private pendingShotNodeId: Map<string, number | undefined> = new Map();
+  private reachableNodesPerPlayer: Map<string, Set<number>> = new Map();
+  private confirmedActions: Map<string, TurnAction> = new Map();
 
   /** True while sendRoundActions callbacks are being processed; suppresses per-result VIS_UPDATE_VIEW */
   private batchProcessing = false;
+
+  /** Number of path animations still in progress; input unlocks when this reaches 0 */
+  private pendingAnimCount = 0;
+
+  private inputCommandHandler: InputCommandHandler;
+  private pendingPaths: Map<string, number[]> = new Map();
 
   constructor(
     model: Model,
@@ -37,9 +44,15 @@ export class GameController {
     this.activePlayerId = activePlayerId;
     this.networkAdapter = networkAdapter;
 
-    // Create a StateMachine for each player
     for (const playerId of model.players.keys()) {
       this.stateMachines.set(playerId, new StateMachine());
+    }
+
+    this.allHumanPlayerIds = HUMAN_PLAYER_IDS.filter((id: string) => model.players.has(id));
+    for (const id of this.allHumanPlayerIds) {
+      this.pendingNextNodeId.set(id, undefined);
+      this.pendingShotNodeId.set(id, undefined);
+      this.reachableNodesPerPlayer.set(id, new Set());
     }
 
     this.turnManager = new TurnManager(model);
@@ -47,24 +60,46 @@ export class GameController {
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
     this.setupEventListeners();
+
+    this.inputCommandHandler = new InputCommandHandler({
+      model: this.model,
+      eventBus: this.eventBus,
+      getActivePlayerId: () => this.activePlayerId,
+      setActivePlayerId: (id) => { this.activePlayerId = id; },
+      getStateMachine: (id) => this.getStateMachine(id),
+      getReachableNodesForPlayer: (id) => this.reachableNodesPerPlayer.get(id) ?? new Set(),
+      setReachableNodesForPlayer: (id, s) => { this.reachableNodesPerPlayer.set(id, s); },
+      getPendingNextNodeIdForPlayer: (id) => this.pendingNextNodeId.get(id),
+      setPendingNextNodeIdForPlayer: (id, v) => { this.pendingNextNodeId.set(id, v); },
+      getPendingShotNodeIdForPlayer: (id) => this.pendingShotNodeId.get(id),
+      setPendingShotNodeIdForPlayer: (id, v) => { this.pendingShotNodeId.set(id, v); },
+      isInputLocked: () => this.inputLocked,
+      confirmPlayerAction: (sm) => this.confirmPlayerAction(sm),
+    });
+    this.inputCommandHandler.attach();
   }
 
-  /**
-   * Sets up event listeners for game events
-   */
   private setupEventListeners(): void {
-    this.eventBus.on(GameEventType.NODE_CLICKED, this.handleNodeClick.bind(this));
-    this.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.handleCanvasEmptyClick.bind(this));
-    this.eventBus.on(GameEventType.PLAYER_SWITCHED, this.handlePlayerSwitch.bind(this));
     this.eventBus.on(GameEventType.HIT_DETECTED, this.handleHitDetected.bind(this));
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
     });
+    this.eventBus.on(GameEventType.NPC_ONLY_TURN, () => {
+      if (this.inputLocked) return;
+      this.executeNPCOnlyTurn();
+    });
+    this.eventBus.on(GameEventType.VIS_PATH_ANIM_COMPLETE, () => {
+      this.pendingAnimCount--;
+      if (this.pendingAnimCount <= 0) {
+        this.pendingAnimCount = 0;
+        this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
+        this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+        this.resetAllStateMachines();
+        this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+      }
+    });
   }
 
-  /**
-   * Gets or creates a StateMachine for the given player
-   */
   private getStateMachine(playerId: string): StateMachine {
     if (!this.stateMachines.has(playerId)) {
       this.stateMachines.set(playerId, new StateMachine());
@@ -73,162 +108,169 @@ export class GameController {
   }
 
   /**
-   * Handles node click events
+   * Called when a human player confirms their action (move + optional shot).
+   * Records the action and either switches to the next unconfirmed player
+   * or executes the round if all players have confirmed.
    */
-  private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
-    if (this.inputLocked) return;
+  confirmPlayerAction(sm: StateMachine): void {
+    // Shot→Idle (Complete) or Move→Idle (Cancel)
+    sm.transition(GameEvent.Complete) || sm.transition(GameEvent.Cancel);
 
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
-    if (!activePlayer) return;
-
-    const sm = this.getStateMachine(this.activePlayerId);
-    const clickedNode = this.model.nodeList[data.nodeId];
-
-    if (!clickedNode) return;
-
-    const currentState = sm.getState();
-
-    if (currentState === State.Idle) {
-      this.handleIdleStateClick(activePlayer, clickedNode, sm);
-    } else if (currentState === State.Select) {
-      this.handleSelectStateClick(activePlayer, clickedNode, sm);
-    } else if (currentState === State.Move) {
-      this.handleMoveStateClick(activePlayer, clickedNode, sm);
-    } else if (currentState === State.Shot) {
-      this.handleShotStateClick(activePlayer, clickedNode, sm);
-    }
-
-    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
-  }
-
-  /**
-   * Handles clicks in Idle state
-   */
-  private handleIdleStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
-    if (activePlayer.node.id === clickedNode.id) {
-      sm.transition(GameEvent.SelectPlayer);
-      this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: clickedNode.id });
-
-      // Compute and emit reachable nodes
-      this.reachableNodes = this.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
-      this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
-        nodeIds: Array.from(this.reachableNodes),
-      });
-    }
-  }
-
-  /**
-   * Handles clicks in Select state
-   */
-  private handleSelectStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
-    const canMove = activePlayer.node.id === clickedNode.id ||
-                    this.reachableNodes.has(clickedNode.id);
-    if (canMove) {
-      sm.transition(GameEvent.MovePlayer);
-      this.currentNextNodeId = clickedNode.id;
-      this.eventBus.emit(GameEventType.VIS_SET_NEXT_MESH, { nodeId: clickedNode.id });
-    }
-  }
-
-  /**
-   * Handles clicks in Move state
-   */
-  private handleMoveStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
-    this.tryShotTarget(activePlayer, clickedNode, sm);
-  }
-
-  /**
-   * Handles clicks in Shot state
-   */
-  private handleShotStateClick(activePlayer: Player, clickedNode: Node, sm: StateMachine): void {
-    if (this.currentShotNodeId === clickedNode.id) {
-      this.executeTurn(sm);
-    } else {
-      this.tryShotTarget(activePlayer, clickedNode, sm);
-    }
-  }
-
-  // Tracks the currently selected next/shot node IDs (replaces VisualizationSync mesh queries)
-  private currentNextNodeId: number | undefined;
-  private currentShotNodeId: number | undefined;
-
-  /**
-   * Checks if a node is visible from the next move position and sets it as the shot target.
-   */
-  private tryShotTarget(activePlayer: Player, clickedNode: Node, sm: StateMachine): boolean {
-    if (this.currentNextNodeId === undefined) return false;
-
-    const nextNode = this.model.nodeList[this.currentNextNodeId];
-    const isVisible = this.model
-      .getVisibleNodesAtAngle(nextNode, activePlayer.angle, PlayerConfig.MaxViewDistance)
-      .some(n => n.id === clickedNode.id);
-
-    if (isVisible) {
-      sm.transition(GameEvent.ShotPlayer);
-      this.currentShotNodeId = clickedNode.id;
-      this.eventBus.emit(GameEventType.VIS_SET_SHOT_MESH, { nodeId: clickedNode.id });
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Executes a simultaneous round: collects all player actions, resolves them atomically,
-   * then fires a single VIS_UPDATE_VIEW so all animations play in parallel.
-   */
-  private executeTurn(sm: StateMachine): void {
-    sm.transition(GameEvent.Complete);
-
-    const nextNodeId = this.currentNextNodeId;
-    const shotNodeId = this.currentShotNodeId;
+    const playerId = this.activePlayerId;
+    const nextNodeId = this.pendingNextNodeId.get(playerId);
+    const shotNodeId = this.pendingShotNodeId.get(playerId);
 
     if (nextNodeId === undefined) return;
 
-    // Reset visual state immediately
     sm.transition(GameEvent.SelectPlayer);
     this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: nextNodeId });
-    this.currentNextNodeId = undefined;
-    this.currentShotNodeId = undefined;
+    this.pendingNextNodeId.set(playerId, undefined);
+    this.pendingShotNodeId.set(playerId, undefined);
     this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
+    this.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
 
-    // Recompute reachable nodes from the new position
-    this.reachableNodes = this.model.getReachableNodes(nextNodeId, PlayerConfig.MoveRange);
-    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
-      nodeIds: Array.from(this.reachableNodes),
+    this.confirmedActions.set(playerId, {
+      playerId,
+      moveToNodeId: nextNodeId,
+      shotAtNodeId: shotNodeId,
     });
 
-    // Collect human action + all NPC actions (NPCs decide from current model state)
-    const allActions: TurnAction[] = [
-      { playerId: this.activePlayerId, moveToNodeId: nextNodeId, shotAtNodeId: shotNodeId },
-    ];
+    const player = this.model.getPlayer(playerId);
+    this.eventBus.emit(GameEventType.PLAYER_ACTION_CONFIRMED, {
+      playerId,
+      moveToNodeId: nextNodeId,
+      shotAtNodeId: shotNodeId,
+      angle: player?.angle ?? 0,
+      color: player?.color ?? 0xffffff,
+    });
+
+    if (this.areAllPlayersConfirmed()) {
+      this.executeRound();
+    } else {
+      this.switchToNextUnconfirmed();
+    }
+  }
+
+  private areAllPlayersConfirmed(): boolean {
+    return this.allHumanPlayerIds.every(id => {
+      const p = this.model.getPlayer(id);
+      return !p || !p.isAlive || this.confirmedActions.has(id);
+    });
+  }
+
+  private switchToNextUnconfirmed(): void {
+    const next = this.allHumanPlayerIds.find(id => {
+      const p = this.model.getPlayer(id);
+      return p && p.isAlive && !this.confirmedActions.has(id);
+    });
+    if (next) {
+      this.enterSelectMode(next);
+    }
+  }
+
+  private enterSelectMode(playerId: string): void {
+    this.activePlayerId = playerId;
+    this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId });
+
+    const sm = this.getStateMachine(playerId);
+    const player = this.model.getPlayer(playerId);
+    if (!player) return;
+
+    const reachable = this.model.getReachableNodes(player.node.id, PlayerConfig.MoveRange);
+    this.reachableNodesPerPlayer.set(playerId, reachable);
+    this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, { nodeIds: Array.from(reachable) });
+    this.eventBus.emit(GameEventType.VIS_SET_SELECT_MESH, { nodeId: player.node.id });
+
+    sm.transition(GameEvent.Cancel);
+    sm.transition(GameEvent.SelectPlayer);
+  }
+
+  /**
+   * Executes all confirmed actions simultaneously once every human player has confirmed.
+   */
+  private executeRound(): void {
+    const allActions: TurnAction[] = Array.from(this.confirmedActions.values());
+
     if (this.networkAdapter.supportsNPC()) {
       allActions.push(...this.turnManager.collectNPCActions());
     }
 
-    // Resolve all actions atomically; applyTurnResult is called for each result
-    // but VIS_UPDATE_VIEW is suppressed until all results are applied
+    const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
+    this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
+
+    const rewrittenActions: TurnAction[] = resolved.map(r => ({
+      playerId: r.playerId,
+      moveToNodeId: r.finalNodeId,
+      shotAtNodeId: r.shotAtNodeId,
+    }));
+
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
     this.batchProcessing = true;
-    this.networkAdapter.sendRoundActions(allActions);
+    this.networkAdapter.sendRoundActions(rewrittenActions);
     this.batchProcessing = false;
 
-    // Single VIS_UPDATE_VIEW fires all animations simultaneously
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
 
-    // Re-enable input after animations complete
-    this.delay(AIConfig.RoundAnimationDelayMs).then(() => {
+    this.pendingAnimCount = resolved.filter(r => r.path.length > 1).length;
+    if (this.pendingAnimCount === 0) {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
-    });
+      this.resetAllStateMachines();
+      this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+    }
   }
 
-  /**
-   * Called when the game starts (≥2 players connected).
-   */
+  private resetAllStateMachines(): void {
+    this.confirmedActions.clear();
+    for (const id of this.allHumanPlayerIds) {
+      this.pendingNextNodeId.set(id, undefined);
+      this.pendingShotNodeId.set(id, undefined);
+      const sm = this.stateMachines.get(id);
+      if (sm) sm.transition(GameEvent.Cancel);
+    }
+  }
+
+  private executeNPCOnlyTurn(): void {
+    if (!this.networkAdapter.supportsNPC()) return;
+
+    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    if (!activePlayer) return;
+
+    const stayAction: TurnAction = {
+      playerId: this.activePlayerId,
+      moveToNodeId: activePlayer.node.id,
+      shotAtNodeId: undefined,
+    };
+    const allActions: TurnAction[] = [stayAction, ...this.turnManager.collectNPCActions()];
+
+    const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
+    this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
+
+    const rewrittenActions: TurnAction[] = resolved.map(r => ({
+      playerId: r.playerId,
+      moveToNodeId: r.finalNodeId,
+      shotAtNodeId: r.shotAtNodeId,
+    }));
+
+    this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
+    this.batchProcessing = true;
+    this.networkAdapter.sendRoundActions(rewrittenActions);
+    this.batchProcessing = false;
+
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+
+    this.pendingAnimCount = resolved.filter(r => r.path.length > 1).length;
+    if (this.pendingAnimCount === 0) {
+      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
+      this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+    }
+  }
+
   private handleGameStarted(): void {
     console.log(`▶ Game started! (${this.networkAdapter.getMyPlayerId()})`);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
   }
 
   /**
@@ -240,6 +282,15 @@ export class GameController {
     if (movingPlayer) {
       this.model.setPlayerRef(result.movingPlayerId, this.model.nodeList[result.newNodeId]);
       movingPlayer.setAngle(result.newAngle);
+    }
+
+    const path = this.pendingPaths.get(result.movingPlayerId);
+    if (path && path.length > 1) {
+      this.eventBus.emit(GameEventType.VIS_ANIMATE_ALONG_PATH, {
+        playerId: result.movingPlayerId,
+        path,
+        finalAngle: result.newAngle,
+      });
     }
 
     for (const hit of result.hits) {
@@ -255,60 +306,11 @@ export class GameController {
       });
     }
 
-    if (result.hits.length === 0) {
-      console.log(`❌ ${result.movingPlayerId} missed!`);
-    }
-
-    // During batch processing the caller emits one VIS_UPDATE_VIEW after all results
     if (!this.batchProcessing) {
       this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
     }
   }
 
-  /**
-   * Handles empty canvas clicks (cancel action)
-   */
-  private handleCanvasEmptyClick(): void {
-    if (this.inputLocked) return;
-
-    const sm = this.getStateMachine(this.activePlayerId);
-    sm.transition(GameEvent.Cancel);
-    this.currentShotNodeId = undefined;
-    this.currentNextNodeId = undefined;
-    this.eventBus.emit(GameEventType.VIS_CLEAR_SHOT_MESH);
-    this.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
-
-    // Recompute reachable nodes from current position
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
-    if (activePlayer) {
-      this.reachableNodes = this.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
-      this.eventBus.emit(GameEventType.VIS_SET_REACHABLE_NODES, {
-        nodeIds: Array.from(this.reachableNodes),
-      });
-    }
-
-    sm.transition(GameEvent.SelectPlayer);
-    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
-  }
-
-  /**
-   * Handles player switching
-   */
-  private handlePlayerSwitch(data: { currentPlayerId: string }): void {
-    if (this.inputLocked) return;
-
-    // Block switching to NPC-controlled players
-    const targetPlayer = this.model.getPlayer(data.currentPlayerId);
-    if (targetPlayer?.isNPC) return;
-
-    this.activePlayerId = data.currentPlayerId;
-    this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: data.currentPlayerId });
-    console.log(`Switched to ${data.currentPlayerId}`);
-  }
-
-  /**
-   * Handles hit detection events.
-   */
   private handleHitDetected(data: { attackerId: string; targetId: string; nodeId: number }): void {
     console.log(`💥 ${data.attackerId} hit ${data.targetId} at node ${data.nodeId}!`);
 
@@ -323,9 +325,6 @@ export class GameController {
     }
   }
 
-  /**
-   * Handles player elimination
-   */
   private handlePlayerElimination(playerId: string): void {
     console.log(`⚰️ ${playerId} has been eliminated!`);
     this.eventBus.emit(GameEventType.VIS_HIDE_PLAYER, { playerId });
@@ -336,22 +335,13 @@ export class GameController {
     }
   }
 
-  /**
-   * Gets the current model
-   */
   getModel(): Model {
     return this.model;
   }
 
-  /**
-   * Imports obstacles
-   */
   importObstacles(obstaclesData: ObstacleData[]): void {
     this.model.importObstacles(obstaclesData);
     this.eventBus.emit(GameEventType.VIS_UPDATE_OBSTACLES);
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 }

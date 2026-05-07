@@ -3,7 +3,7 @@
  */
 export const AnimationConfig = {
   /** Duration for player/enemy movement animations in seconds */
-  MovementDuration: 1,
+  MovementDuration: 0.5,
 
   /** Shot target pulse scale */
   ShotPulseScale: 1.3,
