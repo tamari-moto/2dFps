@@ -73,12 +73,12 @@ function findNodeNear(pos: Pt, nodes: CustomNodeData[], hitGameRadius: number): 
 }
 
 const TOOL_HELP: Record<Tool, string> = {
-  rect:        '矩形: ドラッグで長方形の壁',
-  line:        'ライン: ドラッグで任意角度の線分',
-  polygon:     'ポリゴン: クリックで頂点追加 / 始点付近or Enter で確定 / Esc でキャンセル',
-  select:      '選択: クリックで障害物選択 / Delete で削除',
-  'node-add':  'ノード追加: クリックでノードを配置',
-  'node-move': 'ノード移動: ノードをドラッグで移動',
+  rect:          '矩形: ドラッグで長方形の壁',
+  line:          'ライン: ドラッグで任意角度の線分',
+  polygon:       'ポリゴン: クリックで頂点追加 / 始点付近or Enter で確定 / Esc でキャンセル',
+  select:        '選択: クリックで障害物選択 / Delete で削除',
+  'node-add':    'ノード追加: クリックでノードを配置',
+  'node-move':   'ノード移動: ドラッグで移動 / 空白ドラッグで範囲選択 / Shift+クリックで追加選択',
   'node-delete': 'ノード削除: クリックでノードを削除',
 };
 
@@ -98,9 +98,15 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
 
   // --- Node state ---
   const [customNodes, setCustomNodes] = useState<CustomNodeData[] | null>(null); // null = default grid
-  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<number>>(new Set());
   const [connectionRadius, setConnectionRadius] = useState(DEFAULT_CONNECTION_RADIUS);
-  const nodeDragRef = useRef<{ nodeId: number } | null>(null);
+  // node drag/selection box ref: type 'move' or 'sel-box'
+  const nodeDragRef = useRef<{
+    type: 'move' | 'sel-box';
+    startPos: Pt;
+  } | null>(null);
+  const [nodeDragDelta, setNodeDragDelta] = useState<Pt | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const nextNodeIdRef = useRef(100000); // large to avoid collision before renumber
 
   // --- Image import ---
@@ -147,12 +153,26 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     if (nodeEditMode && activeNodes) {
       // Node edit mode: draw nodes as interactive circles
       for (const n of activeNodes) {
-        const { cx, cy } = g2c(n.x, n.y, scale);
-        const isSel = n.id === selectedNodeId;
+        const isSel = selectedNodeIds.has(n.id);
+        // ドラッグ中は選択ノードをオフセット表示
+        const dx = (isSel && nodeDragDelta) ? nodeDragDelta.x : 0;
+        const dy = (isSel && nodeDragDelta) ? nodeDragDelta.y : 0;
+        const { cx, cy } = g2c(n.x + dx, n.y + dy, scale);
         ctx.fillStyle = isSel ? '#ffdd00' : '#44aaff';
         ctx.beginPath();
         ctx.arc(cx, cy, isSel ? 6 : 4, 0, Math.PI * 2);
         ctx.fill();
+      }
+      // 範囲選択ボックス
+      if (selectionBox) {
+        const s = g2c(selectionBox.x1, selectionBox.y1, scale);
+        const e = g2c(selectionBox.x2, selectionBox.y2, scale);
+        ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(s.cx, s.cy, e.cx - s.cx, e.cy - s.cy);
+        ctx.fillStyle = 'rgba(0,170,255,0.08)';
+        ctx.fillRect(s.cx, s.cy, e.cx - s.cx, e.cy - s.cy);
+        ctx.setLineDash([]);
       }
     } else {
       // Default: draw grid dots (regardless of whether customNodes is set)
@@ -240,7 +260,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [obstacles, selectedId, tool, dragEnd, polyPoints, polyCursor, customNodes, selectedNodeId, imgEl, showImg, mapSize, nodesInGrid, nodeSpacing]);
+  }, [obstacles, selectedId, tool, dragEnd, polyPoints, polyCursor, customNodes, selectedNodeIds, nodeDragDelta, selectionBox, imgEl, showImg, mapSize, nodesInGrid, nodeSpacing]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getGamePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Pt => {
@@ -255,6 +275,8 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     nextNodeIdRef.current = grid.length;
     return grid;
   }, [customNodes]);
+
+  const clearNodeSelection = useCallback(() => setSelectedNodeIds(new Set()), []);
 
   const commitPolygon = useCallback((pts: Pt[]) => {
     if (pts.length < 2) return;
@@ -278,27 +300,46 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       const nodes = ensureCustomNodes();
       const newNode: CustomNodeData = { id: nextNodeIdRef.current++, x: pos.x, y: pos.y };
       setCustomNodes([...nodes, newNode]);
-      setSelectedNodeId(newNode.id);
+      setSelectedNodeIds(new Set([newNode.id]));
       return;
     }
 
-    if (tool === 'node-move' || tool === 'node-delete') {
+    if (tool === 'node-delete') {
       const nodes = ensureCustomNodes();
       const hitRadius = NODE_HIT_RADIUS / getScale();
       const hit = findNodeNear(pos, nodes, hitRadius);
       if (!hit) return;
+      // 選択中なら選択全体を削除、そうでなければヒットしたノードのみ
+      const toDelete = selectedNodeIds.has(hit.id) ? selectedNodeIds : new Set([hit.id]);
+      setCustomNodes(nodes.filter(n => !toDelete.has(n.id)));
+      setSelectedNodeIds(prev => { const s = new Set(prev); toDelete.forEach(id => s.delete(id)); return s; });
+      return;
+    }
 
-      if (tool === 'node-delete') {
-        setCustomNodes(nodes.filter(n => n.id !== hit.id));
-        if (selectedNodeId === hit.id) setSelectedNodeId(null);
-        return;
+    if (tool === 'node-move') {
+      const nodes = ensureCustomNodes();
+      const hitRadius = NODE_HIT_RADIUS / getScale();
+      const hit = findNodeNear(pos, nodes, hitRadius);
+
+      if (hit) {
+        // Shift+クリックで追加/解除選択
+        if (e.shiftKey) {
+          setSelectedNodeIds(prev => {
+            const next = new Set(prev);
+            if (next.has(hit.id)) next.delete(hit.id); else next.add(hit.id);
+            return next;
+          });
+          return;
+        }
+        // ヒットしたノードが未選択なら選択を切り替え
+        if (!selectedNodeIds.has(hit.id)) setSelectedNodeIds(new Set([hit.id]));
+        nodeDragRef.current = { type: 'move', startPos: pos };
+      } else {
+        // 空白クリック → 範囲選択開始
+        if (!e.shiftKey) clearNodeSelection();
+        nodeDragRef.current = { type: 'sel-box', startPos: pos };
+        setSelectionBox({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y });
       }
-
-      // node-move: start drag
-      setSelectedNodeId(hit.id);
-      nodeDragRef.current = { nodeId: hit.id };
-      dragStart.current = pos;
-      setDragEnd(pos);
       return;
     }
 
@@ -322,11 +363,19 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       }
       return [...prev, pos];
     });
-  }, [tool, obstacles, ensureCustomNodes, selectedNodeId, getGamePos, commitPolygon]);
+  }, [tool, obstacles, ensureCustomNodes, selectedNodeIds, getGamePos, commitPolygon, clearNodeSelection]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const pos = getGamePos(e);
-    if (tool === 'node-move' && nodeDragRef.current) { setDragEnd(pos); return; }
+    if (tool === 'node-move' && nodeDragRef.current) {
+      const { type, startPos } = nodeDragRef.current;
+      if (type === 'move') {
+        setNodeDragDelta({ x: pos.x - startPos.x, y: pos.y - startPos.y });
+      } else {
+        setSelectionBox({ x1: startPos.x, y1: startPos.y, x2: pos.x, y2: pos.y });
+      }
+      return;
+    }
     if ((tool === 'rect' || tool === 'line') && dragStart.current) { setDragEnd(pos); return; }
     if (tool === 'polygon') setPolyCursor(pos);
   }, [tool, getGamePos]);
@@ -335,13 +384,33 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     const pos = getGamePos(e);
 
     if (tool === 'node-move' && nodeDragRef.current) {
-      const nodeId = nodeDragRef.current.nodeId;
-      setCustomNodes(prev => prev
-        ? prev.map(n => n.id === nodeId ? { ...n, x: pos.x, y: pos.y } : n)
-        : null
-      );
+      const { type, startPos } = nodeDragRef.current;
       nodeDragRef.current = null;
-      dragStart.current = null; setDragEnd(null);
+
+      if (type === 'move' && nodeDragDelta) {
+        const dx = nodeDragDelta.x, dy = nodeDragDelta.y;
+        setCustomNodes(prev => prev
+          ? prev.map(n => selectedNodeIds.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)
+          : null
+        );
+        setNodeDragDelta(null);
+      } else if (type === 'sel-box' && selectionBox) {
+        const minX = Math.min(selectionBox.x1, selectionBox.x2);
+        const maxX = Math.max(selectionBox.x1, selectionBox.x2);
+        const minY = Math.min(selectionBox.y1, selectionBox.y2);
+        const maxY = Math.max(selectionBox.y1, selectionBox.y2);
+        const inside = (customNodes ?? []).filter(n => n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY);
+        setSelectedNodeIds(prev => {
+          const next = e.shiftKey ? new Set(prev) : new Set<number>();
+          inside.forEach(n => next.add(n.id));
+          return next;
+        });
+        setSelectionBox(null);
+        // 単クリック（ドラッグなし）で空白を押した場合は始点==終点 → クリアのみ
+        if (Math.abs(pos.x - startPos.x) < 3 && Math.abs(pos.y - startPos.y) < 3 && !e.shiftKey) {
+          setSelectedNodeIds(new Set());
+        }
+      }
       return;
     }
 
@@ -366,31 +435,43 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   const handleMouseLeave = useCallback(() => {
     if (tool !== 'node-move') { dragStart.current = null; setDragEnd(null); }
     setPolyCursor(null);
+    // ドラッグ中にカーソルが外れた場合はキャンセル
+    if (nodeDragRef.current) {
+      nodeDragRef.current = null;
+      setNodeDragDelta(null);
+      setSelectionBox(null);
+    }
   }, [tool]);
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (isNodeTool(tool) && selectedNodeId !== null) {
-          setCustomNodes(prev => prev ? prev.filter(n => n.id !== selectedNodeId) : null);
-          setSelectedNodeId(null);
+        if (isNodeTool(tool) && selectedNodeIds.size > 0) {
+          const toDelete = new Set(selectedNodeIds);
+          setCustomNodes(prev => prev ? prev.filter(n => !toDelete.has(n.id)) : null);
+          setSelectedNodeIds(new Set());
         } else if (selectedId !== null) {
           setObstacles(p => p.filter(o => o.id !== selectedId)); setSelectedId(null);
         }
       }
       if (e.key === 'Enter' && polyPoints.length >= 2) commitPolygon(polyPoints);
-      if (e.key === 'Escape') {
-        cancelPolygon(); nodeDragRef.current = null; dragStart.current = null; setDragEnd(null);
+        if (e.key === 'Escape') {
+        cancelPolygon();
+        nodeDragRef.current = null; setNodeDragDelta(null); setSelectionBox(null);
+        dragStart.current = null; setDragEnd(null);
+        clearNodeSelection();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tool, selectedId, selectedNodeId, polyPoints, commitPolygon, cancelPolygon]);
+  }, [tool, selectedId, selectedNodeIds, polyPoints, commitPolygon, cancelPolygon, clearNodeSelection]);
 
   // ── Tool switch ───────────────────────────────────────────────────────────
   const selectTool = useCallback((t: Tool) => {
-    setTool(t); cancelPolygon(); nodeDragRef.current = null; dragStart.current = null; setDragEnd(null);
+    setTool(t); cancelPolygon();
+    nodeDragRef.current = null; setNodeDragDelta(null); setSelectionBox(null);
+    dragStart.current = null; setDragEnd(null);
     setStatus(TOOL_HELP[t]);
     // node ツールに入ったらグリッドを実体化
     if (t.startsWith('node-') && !customNodes) {
@@ -554,11 +635,12 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
           <button style={btn(tool === 'node-move')} onClick={() => selectTool('node-move')}>↔ ノード移動</button>
           <button style={btn(tool === 'node-delete')} onClick={() => selectTool('node-delete')}>✕ ノード削除</button>
 
-          {isNodeTool(tool) && selectedNodeId !== null && (
+          {isNodeTool(tool) && selectedNodeIds.size > 0 && (
             <button style={btn(false, true)} onClick={() => {
-              setCustomNodes(prev => prev ? prev.filter(n => n.id !== selectedNodeId) : null);
-              setSelectedNodeId(null);
-            }}>✕ 選択ノードを削除 (Del)</button>
+              const toDelete = new Set(selectedNodeIds);
+              setCustomNodes(prev => prev ? prev.filter(n => !toDelete.has(n.id)) : null);
+              setSelectedNodeIds(new Set());
+            }}>✕ 選択ノード {selectedNodeIds.size}個を削除 (Del)</button>
           )}
 
           <div style={{ marginTop: '6px' }}>
@@ -567,6 +649,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
 
           <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
             ノード数: {customNodes ? customNodes.length : `${nodesInGrid ** 2} (デフォルト)`}
+            {selectedNodeIds.size > 0 && <span style={{ color: '#ffdd00' }}> / 選択: {selectedNodeIds.size}</span>}
           </div>
 
           <button style={{ ...btn(), marginTop: '4px', fontSize: '11px' }}
