@@ -6,6 +6,14 @@ import { PlayerConfig } from '../config/GameConfig';
 import { ENTITY_IDS } from '../config/GameConfig';
 import type { ObstacleData } from '../model/MapGenerator';
 
+export interface CustomNodeData { id: number; x: number; y: number }
+
+export interface CustomMapData {
+  obstacles?: ObstacleData[];
+  nodes?: CustomNodeData[];
+  connectionRadius?: number;
+}
+
 /**
  * Local-play implementation of INetworkAdapter.
  * Executes all game logic in-process (no network), preserving the original behavior.
@@ -16,14 +24,20 @@ export class LocalAdapter implements INetworkAdapter {
   private readonly myPlayerId: string = ENTITY_IDS.PLAYER_1;
   private turnResultCallback?: (result: TurnResult) => void;
 
-  constructor(private readonly customObstacles?: ObstacleData[]) {}
+  constructor(private readonly customMap?: CustomMapData) {}
 
   // ---- INetworkAdapter -------------------------------------------------------
 
   initializeModel(): Model {
-    if (this.customObstacles && this.customObstacles.length > 0) {
+    const map = this.customMap;
+    if (map?.nodes && map.nodes.length > 0) {
+      // カスタムノード+障害物レイアウト
       this.model = new Model(false);
-      this.model.importObstacles(this.customObstacles);
+      this.model.initCustomLayout(map.nodes, map.obstacles ?? [], map.connectionRadius ?? 33);
+    } else if (map?.obstacles && map.obstacles.length > 0) {
+      // 障害物のみカスタム、ノードはデフォルトグリッド
+      this.model = new Model(false);
+      this.model.importObstacles(map.obstacles);
     } else {
       this.model = new Model();
     }

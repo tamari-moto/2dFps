@@ -16,6 +16,7 @@ class Model {
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
   private lastSeed: string = '';
+  private customConnectionRadius: number = 0; // 0 = grid mode, >0 = proximity mode
 
   public getLastSeed(): string {
     return this.lastSeed;
@@ -251,13 +252,55 @@ class Model {
    * Clears all existing edges and rebuilds the grid connectivity.
    */
   private resetGraphEdges(): void {
-    // Reset edges to original state
     this.Edges = new Graph();
     for (let i = 0; i < this.nodeList.length; i++) {
       this.Edges.addVertex(i);
     }
+    if (this.customConnectionRadius > 0) {
+      this.addProximityEdges(this.customConnectionRadius);
+    } else {
+      this.addDirectionalEdges();
+    }
+  }
 
-    this.addDirectionalEdges();
+  /** 距離が radius 以内のノードペアをすべて双方向接続する（カスタムレイアウト用）。*/
+  private addProximityEdges(radius: number): void {
+    const r2 = radius * radius;
+    for (let i = 0; i < this.nodeList.length; i++) {
+      for (let j = i + 1; j < this.nodeList.length; j++) {
+        const dx = this.nodeList[i].x - this.nodeList[j].x;
+        const dy = this.nodeList[i].y - this.nodeList[j].y;
+        if (dx * dx + dy * dy <= r2) {
+          this.Edges.addEdgeDirected(this.nodeList[i].id, this.nodeList[j].id);
+          this.Edges.addEdgeDirected(this.nodeList[j].id, this.nodeList[i].id);
+        }
+      }
+    }
+  }
+
+  /**
+   * マップエディタのカスタムノード配置でゲームを初期化する。
+   * ノード ID は 0..n-1 の連番であること（nodeList[id] でのO(1)アクセスが必要）。
+   */
+  public initCustomLayout(
+    customNodes: { id: number; x: number; y: number }[],
+    obstaclesData: ObstacleData[],
+    connectionRadius: number
+  ): void {
+    this.customConnectionRadius = connectionRadius;
+    this.nodeList = customNodes.map(n => new Node(n.id, n.x, n.y));
+
+    this.Edges = new Graph();
+    for (const node of this.nodeList) this.Edges.addVertex(node.id);
+    this.addProximityEdges(connectionRadius);
+
+    const result = MapGenerator.importObstacles(obstaclesData);
+    this.obstacles = result.obstacles;
+    this.Lines = result.lines;
+    MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+
+    this.players = new Map();
+    this.initLocalPlayers();
   }
 
   /**

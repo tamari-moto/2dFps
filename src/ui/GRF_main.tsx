@@ -10,7 +10,7 @@ import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
 import { gameEventBus, GameEventType } from '../core/GameEventBus';
-import type { ObstacleData } from '../model/MapGenerator';
+import type { CustomNodeData } from '../network/LocalAdapter';
 
 type AppState = 'lobby' | 'connecting' | 'playing' | 'map-editor';
 
@@ -60,8 +60,12 @@ const GRF_main = () => {
     startGame(new LocalAdapter());
   }, [startGame]);
 
-  const handlePlayWithMap = React.useCallback((obstacles: ObstacleData[]) => {
-    startGame(new LocalAdapter(obstacles));
+  const handlePlayWithMap = React.useCallback((
+    obstacles: import('../model/MapGenerator').ObstacleData[],
+    nodes: CustomNodeData[] | null,
+    connectionRadius: number,
+  ) => {
+    startGame(new LocalAdapter({ obstacles, nodes: nodes ?? undefined, connectionRadius }));
   }, [startGame]);
 
   const handleOnline = React.useCallback(async (serverUrl: string) => {
