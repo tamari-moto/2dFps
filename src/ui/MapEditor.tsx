@@ -1043,8 +1043,8 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       </div>
 
       {/* ── Canvas ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minWidth: 0 }}>
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
           <canvas
             ref={canvasRef}
             style={{
@@ -1065,7 +1065,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
             onContextMenu={e => e.preventDefault()}
           />
         </div>
-        <div style={{ fontSize: '11px', color: '#888', padding: '5px 10px', background: '#161616', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ flexShrink: 0, fontSize: '11px', color: '#888', padding: '5px 10px', background: '#161616', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => setSidebarOpen(o => !o)}
             style={{ flexShrink: 0, padding: '3px 8px', fontSize: '14px', background: '#333', border: 'none', borderRadius: '4px', color: '#eee', cursor: 'pointer', lineHeight: 1 }}
