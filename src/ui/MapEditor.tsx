@@ -1045,6 +1045,12 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       {/* ── Canvas ── */}
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minWidth: 0 }}>
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
+          {/* サイドバー開閉ボタン（左上固定） */}
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, padding: '4px 10px', fontSize: '16px', background: '#333', border: 'none', borderRadius: '4px', color: '#eee', cursor: 'pointer', lineHeight: 1, opacity: 0.85 }}
+            title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'}
+          >☰</button>
           <canvas
             ref={canvasRef}
             style={{
@@ -1065,14 +1071,9 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
             onContextMenu={e => e.preventDefault()}
           />
         </div>
-        <div style={{ flexShrink: 0, fontSize: '11px', color: '#888', padding: '5px 10px', background: '#161616', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setSidebarOpen(o => !o)}
-            style={{ flexShrink: 0, padding: '3px 8px', fontSize: '14px', background: '#333', border: 'none', borderRadius: '4px', color: '#eee', cursor: 'pointer', lineHeight: 1 }}
-            title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'}
-          >☰</button>
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{status}</span>
-          <span style={{ flexShrink: 0, color: '#444' }}>2本指: ズーム/移動</span>
+        <div style={{ flexShrink: 0, fontSize: '11px', color: '#888', padding: '5px 10px', background: '#161616', borderTop: '1px solid #2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {status}
+          <span style={{ float: 'right', color: '#444' }}>2本指: ズーム/移動</span>
         </div>
       </div>
     </div>
