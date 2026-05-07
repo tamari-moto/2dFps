@@ -5,9 +5,10 @@ interface LobbyUIProps {
   errorMsg: string;
   onOffline: () => void;
   onOnline: (serverUrl: string) => void;
+  onOpenEditor: () => void;
 }
 
-const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOnline }) => {
+const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOnline, onOpenEditor }) => {
   const [serverUrl, setServerUrl] = React.useState(
     import.meta.env.VITE_SERVER_URL ?? 'ws://localhost:2567'
   );
@@ -120,6 +121,16 @@ const LobbyUI: React.FC<LobbyUIProps> = ({ connecting, errorMsg, onOffline, onOn
       </div>
 
       {errorMsg && <p style={errorStyle}>{errorMsg}</p>}
+
+      <p style={dividerStyle}>── TOOLS ──</p>
+
+      <button
+        style={{ ...buttonBase, backgroundColor: '#555', color: '#eee' }}
+        onClick={onOpenEditor}
+        disabled={connecting}
+      >
+        🗺 マップエディタ
+      </button>
     </div>
   );
 };

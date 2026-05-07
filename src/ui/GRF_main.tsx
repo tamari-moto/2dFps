@@ -5,12 +5,13 @@ import GameHUD from './GameHUD';
 import LobbyUI from './LobbyUI';
 import ConsoleLogger from './ConsoleLogger';
 import FPSOverlay from './FPSOverlay';
+import MapEditor from './MapEditor';
 import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
 import { gameEventBus, GameEventType } from '../core/GameEventBus';
 
-type AppState = 'lobby' | 'connecting' | 'playing';
+type AppState = 'lobby' | 'connecting' | 'playing' | 'map-editor';
 
 const GRF_main = () => {
   const [appState, setAppState] = React.useState<AppState>('lobby');
@@ -73,20 +74,28 @@ const GRF_main = () => {
 
   return (
     <div>
-      <canvas
-        ref={canvasRef}
-        style={{ display: appState === 'playing' ? 'block' : 'none' }}
-      />
-      {appState === 'playing' && !fpsMode && <GameHUD threeSetup={threeSetup} />}
-      {appState === 'playing' && !fpsMode && <ConsoleLogger />}
-      {appState === 'playing' && fpsMode && <FPSOverlay />}
-      {appState !== 'playing' && (
-        <LobbyUI
-          connecting={appState === 'connecting'}
-          errorMsg={errorMsg}
-          onOffline={handleOffline}
-          onOnline={handleOnline}
-        />
+      {appState === 'map-editor' && (
+        <MapEditor onClose={() => setAppState('lobby')} />
+      )}
+      {appState !== 'map-editor' && (
+        <>
+          <canvas
+            ref={canvasRef}
+            style={{ display: appState === 'playing' ? 'block' : 'none' }}
+          />
+          {appState === 'playing' && !fpsMode && <GameHUD threeSetup={threeSetup} />}
+          {appState === 'playing' && !fpsMode && <ConsoleLogger />}
+          {appState === 'playing' && fpsMode && <FPSOverlay />}
+          {appState !== 'playing' && (
+            <LobbyUI
+              connecting={appState === 'connecting'}
+              errorMsg={errorMsg}
+              onOffline={handleOffline}
+              onOnline={handleOnline}
+              onOpenEditor={() => setAppState('map-editor')}
+            />
+          )}
+        </>
       )}
     </div>
   );
