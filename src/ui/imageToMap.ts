@@ -15,7 +15,7 @@ export const DEFAULT_IMAGE_OPTIONS: ImageMapOptions = {
   maxSize: 600,
 };
 
-type Pt = { x: number; y: number };
+export type Pt = { x: number; y: number };
 
 // 8-direction offsets
 const DX8 = [-1, 0, 1, -1, 1, -1, 0, 1];
@@ -69,7 +69,7 @@ function nbrs8(idx: number, arr: Uint8Array, w: number, h: number): number[] {
 }
 
 /** Ramer-Douglas-Peucker polyline simplification. */
-function rdp(pts: Pt[], eps: number): Pt[] {
+export function rdp(pts: Pt[], eps: number): Pt[] {
   if (pts.length <= 2) return pts;
   const a = pts[0], b = pts[pts.length - 1];
   const dx = b.x - a.x, dy = b.y - a.y;
