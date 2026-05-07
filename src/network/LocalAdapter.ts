@@ -4,6 +4,7 @@ import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
 import { ENTITY_IDS } from '../config/GameConfig';
+import type { ObstacleData } from '../model/MapGenerator';
 
 /**
  * Local-play implementation of INetworkAdapter.
@@ -15,10 +16,17 @@ export class LocalAdapter implements INetworkAdapter {
   private readonly myPlayerId: string = ENTITY_IDS.PLAYER_1;
   private turnResultCallback?: (result: TurnResult) => void;
 
+  constructor(private readonly customObstacles?: ObstacleData[]) {}
+
   // ---- INetworkAdapter -------------------------------------------------------
 
   initializeModel(): Model {
-    this.model = new Model();
+    if (this.customObstacles && this.customObstacles.length > 0) {
+      this.model = new Model(false);
+      this.model.importObstacles(this.customObstacles);
+    } else {
+      this.model = new Model();
+    }
     return this.model;
   }
 

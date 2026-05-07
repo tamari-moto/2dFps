@@ -6,6 +6,7 @@ import { imageToObstacles, DEFAULT_IMAGE_OPTIONS, type ImageMapOptions } from '.
 
 interface MapEditorProps {
   onClose: () => void;
+  onPlayWithMap: (obstacles: ObstacleData[]) => void;
 }
 
 type Tool = 'rect' | 'line' | 'polygon' | 'select';
@@ -47,7 +48,7 @@ const TOOL_HELP: Record<Tool, string> = {
   select:  '選択: クリックで選択 / Delete で削除',
 };
 
-const MapEditor: React.FC<MapEditorProps> = ({ onClose }) => {
+const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [obstacles, setObstacles] = useState<ObstacleData[]>([]);
   const [tool, setTool] = useState<Tool>('rect');
@@ -471,7 +472,13 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose }) => {
 
         <div style={{ fontSize: '11px', color: '#555' }}>障害物数: {obstacles.length}</div>
 
-        <div style={{ marginTop: 'auto' }}>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <button
+            style={{ ...btn(), marginTop: 0, background: '#1a7a3a', fontSize: '13px', padding: '10px' }}
+            onClick={() => onPlayWithMap(obstacles)}
+          >
+            ▶ このマップで遊ぶ
+          </button>
           <button style={{ ...btn(), marginTop: 0 }} onClick={onClose}>← ロビーに戻る</button>
         </div>
       </div>

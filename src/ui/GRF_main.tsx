@@ -10,6 +10,7 @@ import { LocalAdapter } from '../network/LocalAdapter';
 import { ColyseusAdapter } from '../network/ColyseusAdapter';
 import type { INetworkAdapter } from '../network/INetworkAdapter';
 import { gameEventBus, GameEventType } from '../core/GameEventBus';
+import type { ObstacleData } from '../model/MapGenerator';
 
 type AppState = 'lobby' | 'connecting' | 'playing' | 'map-editor';
 
@@ -59,6 +60,10 @@ const GRF_main = () => {
     startGame(new LocalAdapter());
   }, [startGame]);
 
+  const handlePlayWithMap = React.useCallback((obstacles: ObstacleData[]) => {
+    startGame(new LocalAdapter(obstacles));
+  }, [startGame]);
+
   const handleOnline = React.useCallback(async (serverUrl: string) => {
     setAppState('connecting');
     setErrorMsg('');
@@ -75,7 +80,13 @@ const GRF_main = () => {
   return (
     <div>
       {appState === 'map-editor' && (
-        <MapEditor onClose={() => setAppState('lobby')} />
+        <MapEditor
+          onClose={() => setAppState('lobby')}
+          onPlayWithMap={(obstacles) => {
+            setAppState('lobby');
+            handlePlayWithMap(obstacles);
+          }}
+        />
       )}
       {appState !== 'map-editor' && (
         <>
