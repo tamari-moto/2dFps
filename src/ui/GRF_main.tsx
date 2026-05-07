@@ -79,34 +79,28 @@ const GRF_main = () => {
 
   return (
     <div>
+      {/* canvas は常に DOM に残す。appState に関わらず ref が有効であることが必要 */}
+      <canvas
+        ref={canvasRef}
+        style={{ display: appState === 'playing' ? 'block' : 'none' }}
+      />
+      {appState === 'playing' && !fpsMode && <GameHUD threeSetup={threeSetup} />}
+      {appState === 'playing' && !fpsMode && <ConsoleLogger />}
+      {appState === 'playing' && fpsMode && <FPSOverlay />}
       {appState === 'map-editor' && (
         <MapEditor
           onClose={() => setAppState('lobby')}
-          onPlayWithMap={(obstacles) => {
-            setAppState('lobby');
-            handlePlayWithMap(obstacles);
-          }}
+          onPlayWithMap={handlePlayWithMap}
         />
       )}
-      {appState !== 'map-editor' && (
-        <>
-          <canvas
-            ref={canvasRef}
-            style={{ display: appState === 'playing' ? 'block' : 'none' }}
-          />
-          {appState === 'playing' && !fpsMode && <GameHUD threeSetup={threeSetup} />}
-          {appState === 'playing' && !fpsMode && <ConsoleLogger />}
-          {appState === 'playing' && fpsMode && <FPSOverlay />}
-          {appState !== 'playing' && (
-            <LobbyUI
-              connecting={appState === 'connecting'}
-              errorMsg={errorMsg}
-              onOffline={handleOffline}
-              onOnline={handleOnline}
-              onOpenEditor={() => setAppState('map-editor')}
-            />
-          )}
-        </>
+      {(appState === 'lobby' || appState === 'connecting') && (
+        <LobbyUI
+          connecting={appState === 'connecting'}
+          errorMsg={errorMsg}
+          onOffline={handleOffline}
+          onOnline={handleOnline}
+          onOpenEditor={() => setAppState('map-editor')}
+        />
       )}
     </div>
   );
