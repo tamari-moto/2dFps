@@ -138,6 +138,22 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   const [viewOffset, setViewOffset] = useState<Pt>(() => ({ x: PADDING, y: PADDING }));
   /** 右クリックドラッグのパン開始位置記録用 */
   const panDragRef = useRef<{ startCanvas: Pt; startOffset: Pt } | null>(null);
+  /** ピンチズーム状態 */
+  const pinchRef = useRef<{ mid: Pt; dist: number; startOx: number; startOy: number; startScale: number } | null>(null);
+  /** タッチハンドラがステール値を読まないようにする ref 群 */
+  const viewScaleRef = useRef(viewScale);
+  const viewOffsetRef = useRef(viewOffset);
+  const toolRef = useRef<Tool>(tool);
+  /** タッチハンドラ用コールバック ref（毎レンダーで更新） — 初期値はダミー、effect で上書き */
+  const cbRef = useRef({
+    onNodeAddDown: (_p: Pt) => {}, onNodeDeleteDown: (_p: Pt) => {},
+    onNodeMoveDown: (_p: Pt, _s: boolean) => {}, onDrawDragDown: (_p: Pt) => {},
+    onSelectDown: (_p: Pt) => {}, onPolygonDown: (_p: Pt) => {},
+    onNodeMoveUp: (_p: Pt, _s: boolean) => {}, onRectUp: (_p: Pt) => {}, onLineUp: (_p: Pt) => {},
+  });
+
+  // --- UI state ---
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 600);
 
   const mapSize = CalculatedConfig.MapSize;
   const nodeSpacing = MapConfig.NodeSpacing;
@@ -145,6 +161,10 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
 
   // liveStateRef を常に最新 state に同期
   useEffect(() => { liveStateRef.current = { obstacles, customNodes }; }, [obstacles, customNodes]);
+  // タッチハンドラ用 ref を毎レンダーで最新値に更新（deps なし = 毎回）
+  useEffect(() => { viewScaleRef.current = viewScale; }, [viewScale]);
+  useEffect(() => { viewOffsetRef.current = viewOffset; }, [viewOffset]);
+  useEffect(() => { toolRef.current = tool; }, [tool]);
 
   const pushHistory = useCallback(() => {
     const snap = { ...liveStateRef.current };
@@ -631,6 +651,127 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       commitPolygon, cancelPolygon, clearNodeSelection,
       deleteSelectedObstacle, deleteSelectedNodes, resetTransientDragState]);
 
+  // cbRef を毎レンダーで最新のコールバック群に更新（deps なし = 毎回）
+  useEffect(() => {
+    cbRef.current = { onNodeAddDown, onNodeDeleteDown, onNodeMoveDown, onDrawDragDown,
+      onSelectDown, onPolygonDown, onNodeMoveUp, onRectUp, onLineUp };
+  });
+
+  // ── Touch events (1本指=描画/編集、2本指=ピンチズーム+パン) ───────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const getGamePt = (touch: Touch): Pt => {
+      const r = canvas.getBoundingClientRect();
+      const s = viewScaleRef.current, o = viewOffsetRef.current;
+      return { x: (touch.clientX - r.left - o.x) / s, y: (touch.clientY - r.top - o.y) / s };
+    };
+    const getCanvasPt = (touch: Touch): Pt => {
+      const r = canvas.getBoundingClientRect();
+      return { x: touch.clientX - r.left, y: touch.clientY - r.top };
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length >= 2) {
+        // 2本指: ピンチ開始（進行中の1本指ドラッグをキャンセル）
+        dragStart.current = null;
+        nodeDragRef.current = null;
+        const t1 = getCanvasPt(e.touches[0]);
+        const t2 = getCanvasPt(e.touches[1]);
+        const mid = { x: (t1.x + t2.x) / 2, y: (t1.y + t2.y) / 2 };
+        pinchRef.current = {
+          mid, dist: Math.hypot(t2.x - t1.x, t2.y - t1.y),
+          startOx: viewOffsetRef.current.x, startOy: viewOffsetRef.current.y,
+          startScale: viewScaleRef.current,
+        };
+      } else if (e.touches.length === 1 && !pinchRef.current) {
+        // 1本指: ツールに応じたdown
+        const pos = getGamePt(e.touches[0]);
+        const t = toolRef.current;
+        const cb = cbRef.current;
+        switch (t) {
+          case 'node-add':    cb.onNodeAddDown(pos); break;
+          case 'node-delete': cb.onNodeDeleteDown(pos); break;
+          case 'node-move':   cb.onNodeMoveDown(pos, false); break;
+          case 'rect':
+          case 'line':        cb.onDrawDragDown(pos); break;
+          case 'select':      cb.onSelectDown(pos); break;
+          case 'polygon':     cb.onPolygonDown(pos); break;
+        }
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length >= 2 && pinchRef.current) {
+        // 2本指: ピンチズーム + パン
+        const t1 = getCanvasPt(e.touches[0]);
+        const t2 = getCanvasPt(e.touches[1]);
+        const newMid = { x: (t1.x + t2.x) / 2, y: (t1.y + t2.y) / 2 };
+        const newDist = Math.hypot(t2.x - t1.x, t2.y - t1.y);
+        const { mid, dist, startOx, startOy, startScale } = pinchRef.current;
+        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startScale * (newDist / dist)));
+        // 開始時の mid 下のゲーム座標を newMid の下に維持しつつパン差分も反映
+        const gameX = (mid.x - startOx) / startScale;
+        const gameY = (mid.y - startOy) / startScale;
+        setViewOffset({ x: newMid.x - gameX * newScale, y: newMid.y - gameY * newScale });
+        setViewScale(newScale);
+      } else if (e.touches.length === 1 && !pinchRef.current) {
+        // 1本指: ツールに応じた move
+        const pos = getGamePt(e.touches[0]);
+        const t = toolRef.current;
+        if (t === 'node-move' && nodeDragRef.current) {
+          const { type, startPos } = nodeDragRef.current;
+          if (type === 'move') setNodeDragDelta({ x: pos.x - startPos.x, y: pos.y - startPos.y });
+          else setSelectionBox({ x1: startPos.x, y1: startPos.y, x2: pos.x, y2: pos.y });
+        } else if ((t === 'rect' || t === 'line') && dragStart.current) {
+          setDragEnd(pos);
+        } else if (t === 'polygon') {
+          setPolyCursor(pos);
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 0) {
+        const wasPinching = !!pinchRef.current;
+        pinchRef.current = null;
+        if (!wasPinching && e.changedTouches.length > 0) {
+          // 1本指ドラッグ終了 → up処理
+          const pos = getGamePt(e.changedTouches[0]);
+          const t = toolRef.current;
+          const cb = cbRef.current;
+          if (t === 'node-move') { cb.onNodeMoveUp(pos, false); }
+          else if (t === 'rect') { cb.onRectUp(pos); dragStart.current = null; setDragEnd(null); }
+          else if (t === 'line') { cb.onLineUp(pos); dragStart.current = null; setDragEnd(null); }
+        } else {
+          pinchRef.current = null;
+          dragStart.current = null;
+          nodeDragRef.current = null;
+          setDragEnd(null);
+          setNodeDragDelta(null);
+          setSelectionBox(null);
+        }
+        setPolyCursor(null);
+      } else if (e.touches.length < 2) {
+        // 2本指 → 1本指: ピンチは継続フラグとして残し、1本指 move で描画しない
+        // (pinchRef.current は touches === 0 まで非null のまま)
+      }
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []); // refs 経由でアクセスするため deps なし
+
   // ── Tool switch ───────────────────────────────────────────────────────────
   const selectTool = useCallback((t: Tool) => {
     setTool(t);
@@ -766,7 +907,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#111', color: '#eee', fontFamily: 'monospace', overflow: 'hidden' }}>
 
       {/* ── Sidebar ── */}
-      <div style={{ width: SIDEBAR_W, flexShrink: 0, background: '#161616', borderRight: '1px solid #2a2a2a', display: 'flex', flexDirection: 'column', padding: '10px', gap: '6px', overflowY: 'auto' }}>
+      <div style={{ width: SIDEBAR_W, flexShrink: 0, background: '#161616', borderRight: '1px solid #2a2a2a', display: sidebarOpen ? 'flex' : 'none', flexDirection: 'column', padding: '10px', gap: '6px', overflowY: 'auto' }}>
 
         {/* Draw tools */}
         <div>
@@ -914,6 +1055,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
                 : 'crosshair',
               display: 'block',
               userSelect: 'none',
+              touchAction: 'none',
             }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -923,9 +1065,14 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
             onContextMenu={e => e.preventDefault()}
           />
         </div>
-        <div style={{ fontSize: '11px', color: '#888', padding: '5px 10px', background: '#161616', borderTop: '1px solid #2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {status}
-          <span style={{ float: 'right', color: '#444' }}>右ドラッグ: 移動 | ホイール: ズーム</span>
+        <div style={{ fontSize: '11px', color: '#888', padding: '5px 10px', background: '#161616', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            style={{ flexShrink: 0, padding: '3px 8px', fontSize: '14px', background: '#333', border: 'none', borderRadius: '4px', color: '#eee', cursor: 'pointer', lineHeight: 1 }}
+            title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'}
+          >☰</button>
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{status}</span>
+          <span style={{ flexShrink: 0, color: '#444' }}>2本指: ズーム/移動</span>
         </div>
       </div>
     </div>
