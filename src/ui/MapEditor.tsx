@@ -118,6 +118,12 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   const [selectionBox, setSelectionBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const nextNodeIdRef = useRef(NODE_ID_BASE);
 
+  // --- Undo history (スナップショット方式) ---
+  type Snapshot = { obstacles: ObstacleData[]; customNodes: CustomNodeData[] | null };
+  const undoStack = useRef<Snapshot[]>([]);
+  // obstacles/customNodes の最新値を ref 経由で読めるようにする（pushHistory の deps を安定化）
+  const liveStateRef = useRef<Snapshot>({ obstacles: [], customNodes: null });
+
   // --- Image import ---
   const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null);
   const [showImg, setShowImg] = useState(true);
@@ -136,6 +142,23 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   const mapSize = CalculatedConfig.MapSize;
   const nodeSpacing = MapConfig.NodeSpacing;
   const nodesInGrid = MapConfig.NodesInGridSize;
+
+  // liveStateRef を常に最新 state に同期
+  useEffect(() => { liveStateRef.current = { obstacles, customNodes }; }, [obstacles, customNodes]);
+
+  const pushHistory = useCallback(() => {
+    const snap = { ...liveStateRef.current };
+    undoStack.current.push(snap);
+    if (undoStack.current.length > 50) undoStack.current.shift();
+  }, []);
+
+  const undo = useCallback(() => {
+    const snap = undoStack.current.pop();
+    if (!snap) return;
+    setObstacles(snap.obstacles);
+    setCustomNodes(snap.customNodes);
+    setStatus('元に戻しました');
+  }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -325,6 +348,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
 
   const commitPolygon = useCallback((pts: Pt[]) => {
     if (pts.length < 2) return;
+    pushHistory();
     const segs: LineSegment[] = [];
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 1) % pts.length];
@@ -338,12 +362,14 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
 
   const deleteSelectedObstacle = useCallback(() => {
     if (selectedId === null) return;
+    pushHistory();
     setObstacles(p => p.filter(o => o.id !== selectedId));
     setSelectedId(null);
   }, [selectedId]);
 
   const deleteSelectedNodes = useCallback(() => {
     if (selectedNodeIds.size === 0) return;
+    pushHistory();
     const toDelete = new Set(selectedNodeIds);
     setCustomNodes(prev => prev ? prev.filter(n => !toDelete.has(n.id)) : null);
     setSelectedNodeIds(new Set());
@@ -364,6 +390,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   // ── Mouse Down: per-tool handlers ─────────────────────────────────────────
   const onNodeAddDown = useCallback((pos: Pt) => {
     const nodes = ensureCustomNodes();
+    pushHistory();
     const newNode: CustomNodeData = { id: nextNodeIdRef.current++, x: pos.x, y: pos.y };
     setCustomNodes([...nodes, newNode]);
     setSelectedNodeIds(new Set([newNode.id]));
@@ -373,6 +400,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     const nodes = ensureCustomNodes();
     const hit = findNodeNear(pos, nodes, NODE_HIT_RADIUS / viewScale);
     if (!hit) return;
+    pushHistory();
     const toDelete = selectedNodeIds.has(hit.id) ? selectedNodeIds : new Set([hit.id]);
     setCustomNodes(nodes.filter(n => !toDelete.has(n.id)));
     setSelectedNodeIds(prev => { const s = new Set(prev); toDelete.forEach(id => s.delete(id)); return s; });
@@ -480,6 +508,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     nodeDragRef.current = null;
 
     if (type === 'move' && nodeDragDelta) {
+      pushHistory();
       const dx = nodeDragDelta.x, dy = nodeDragDelta.y;
       setCustomNodes(prev => prev
         ? prev.map(n => selectedNodeIds.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)
@@ -514,6 +543,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     const x1 = Math.min(dragStart.current.x, pos.x), y1 = Math.min(dragStart.current.y, pos.y);
     const x2 = Math.max(dragStart.current.x, pos.x), y2 = Math.max(dragStart.current.y, pos.y);
     if (x2 - x1 > RECT_MIN_SIZE && y2 - y1 > RECT_MIN_SIZE) {
+      pushHistory();
       const segs = createRectangleSegments(x1, y1, x2 - x1, y2 - y1);
       setObstacles(prev => [...prev, { id: nextObsIdRef.current++, segments: segs }]);
     }
@@ -522,6 +552,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   const onLineUp = useCallback((pos: Pt) => {
     if (!dragStart.current) return;
     if (dist2(dragStart.current, pos) > LINE_MIN_DIST_SQ) {
+      pushHistory();
       const seg = new LineSegment(dragStart.current.x, dragStart.current.y, pos.x, pos.y);
       setObstacles(prev => [...prev, { id: nextObsIdRef.current++, segments: [seg] }]);
     }
@@ -582,6 +613,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   // ── Keyboard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (isNodeTool(tool) && selectedNodeIds.size > 0) deleteSelectedNodes();
         else if (selectedId !== null) deleteSelectedObstacle();
@@ -595,7 +627,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tool, selectedId, selectedNodeIds, polyPoints,
+  }, [tool, selectedId, selectedNodeIds, polyPoints, undo,
       commitPolygon, cancelPolygon, clearNodeSelection,
       deleteSelectedObstacle, deleteSelectedNodes, resetTransientDragState]);
 
@@ -614,6 +646,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
 
   // ── BSP ───────────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(() => {
+    pushHistory();
     const result = MapGenerator.generateComplexMap(seed || undefined);
     setObstacles(result.obstacles);
     setSelectedId(null); cancelPolygon();
@@ -643,6 +676,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png'));
       const file = new File([blob], 'img.png', { type: 'image/png' });
       const result = await imageToObstacles(file, mapSize, imgOpts, nextObsIdRef.current);
+      pushHistory();
       setObstacles(prev => [...prev, ...result.obstacles]);
       nextObsIdRef.current = result.nextId;
       setStatus(`変換完了: ${result.chainCount} チェーン → ${result.segmentCount} 線分`);
@@ -683,6 +717,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
         const json = JSON.parse(ev.target?.result as string);
         const rawObs = Array.isArray(json) ? json : (json.obstacles ?? []);
         const { obstacles: imp } = MapGenerator.importObstacles(rawObs);
+        pushHistory();
         setObstacles(imp);
         setSelectedId(null);
         nextObsIdRef.current = Math.max(OBSTACLE_ID_BASE, ...imp.map((o: ObstacleData) => o.id)) + 1;
@@ -703,6 +738,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
   }, []);
 
   const handleClear = useCallback(() => {
+    pushHistory();
     setObstacles([]); setSelectedId(null); cancelPolygon();
     nextObsIdRef.current = OBSTACLE_ID_BASE;
     setStatus('障害物をクリア');
