@@ -179,6 +179,20 @@ class Model {
   public getVisibleNodesAtAngle(centerNode: Node, angle: number, distance: number): Node[] {
     const dirX = Math.cos(angle * Math.PI / 180);
     const dirY = Math.sin(angle * Math.PI / 180);
+
+    if (this.customConnectionRadius > 0) {
+      // カスタムレイアウト: グリッド前提の ID 計算が使えないため全ノードを走査
+      const result: Node[] = [];
+      for (const node of this.nodeList) {
+        if (node.id === centerNode.id) continue;
+        if (this.getNodeDistance(centerNode, node) > distance) continue;
+        if (this.getAngleFromDirection(centerNode, node, dirX, dirY) >= this.viewAngle) continue;
+        if (this.hasLineOfSight(centerNode, node)) result.push(node);
+      }
+      return result;
+    }
+
+    // 標準グリッド: バウンディングボックスで走査範囲を絞る高速パス
     const gridSize = this.NodesInGridSize;
     const spacing = MapConfig.NodeSpacing;
 
