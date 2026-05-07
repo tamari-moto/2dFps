@@ -7,6 +7,16 @@ import { LOCAL_PLAYER_COUNT, LOCAL_NPC_COUNT, createPlayerId } from '../config/G
 import type { TeamId } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
+import type { RoundWinner } from '../schema/types';
+
+export type BombStatus = 'idle' | 'planted' | 'defused' | 'exploded';
+
+export interface BombState {
+  status: BombStatus;
+  plantedAtNodeId: number | undefined;
+  planterPlayerId: string | undefined;
+  plantedOnTurn: number;
+}
 
 class Model {
   public nodeList: Node[] = [];
@@ -17,6 +27,15 @@ class Model {
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
   private lastSeed: string = '';
+
+  // Bomb defusal mode state
+  public bombSiteNodeIds: [number, number] = [0, 0];
+  public bombState: BombState = { status: 'idle', plantedAtNodeId: undefined, planterPlayerId: undefined, plantedOnTurn: 0 };
+  public roundNumber: number = 0;
+  public globalTurnIndex: number = 0;
+  public teamScores: [number, number] = [0, 0];
+  public matchOver: boolean = false;
+  public spawnNodes: Map<string, number> = new Map();
 
   public getLastSeed(): string {
     return this.lastSeed;
@@ -56,6 +75,27 @@ class Model {
       MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
       MapGenerator.removeNodesInsideObstacles(this.Edges, this.nodeList, this.obstacles);
     }
+
+    this.initBombSites();
+  }
+
+  private initBombSites(): void {
+    const gridSize = this.NodesInGridSize * MapConfig.NodeSpacing;
+    const midY = gridSize * 0.5;
+    this.bombSiteNodeIds = [
+      this.findNearestAccessibleNode(gridSize * 0.25, midY),
+      this.findNearestAccessibleNode(gridSize * 0.75, midY),
+    ];
+  }
+
+  private findNearestAccessibleNode(tx: number, ty: number): number {
+    const accessible = this.nodeList.filter(
+      n => this.Edges.List[n.id] !== undefined && this.Edges.List[n.id].length > 0
+    );
+    accessible.sort((a, b) =>
+      ((a.x - tx) ** 2 + (a.y - ty) ** 2) - ((b.x - tx) ** 2 + (b.y - ty) ** 2)
+    );
+    return accessible[0]?.id ?? 0;
   }
 
   /**
@@ -90,8 +130,14 @@ class Model {
       } while (usedNodeIds.has(nodeIndex));
 
       usedNodeIds.add(nodeIndex);
-      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team, 100, isNPC));
+      const player = new Player(playerId, this.nodeList[nodeIndex], team, 100, isNPC);
+      this.players.set(playerId, player);
+      this.spawnNodes.set(playerId, nodeIndex);
     }
+
+    // First Team 0 player carries the bomb
+    const firstAttacker = Array.from(this.players.values()).find(p => p.team === 0);
+    if (firstAttacker) firstAttacker.hasBomb = true;
   }
 
   /**
@@ -313,6 +359,63 @@ class Model {
     const result = MapGenerator.generateComplexMap(seed);
     this.lastSeed = result.seed;
     this.applyObstacleLayout(result);
+  }
+
+  /**
+   * Resets all players to their spawn positions and restores health for a new round.
+   * Assigns the bomb to a random alive Team 0 player.
+   */
+  public initRound(): void {
+    this.roundNumber++;
+    this.bombState = { status: 'idle', plantedAtNodeId: undefined, planterPlayerId: undefined, plantedOnTurn: 0 };
+
+    for (const [id, player] of this.players) {
+      player.health = player.maxHealth;
+      player.isAlive = true;
+      player.hasBomb = false;
+      player.defuseProgress = 0;
+      const spawnNodeId = this.spawnNodes.get(id);
+      if (spawnNodeId !== undefined && this.nodeList[spawnNodeId]) {
+        this.setPlayerRef(id, this.nodeList[spawnNodeId]);
+      }
+    }
+
+    const attackers = Array.from(this.players.values()).filter(p => p.team === 0);
+    if (attackers.length > 0) {
+      attackers[Math.floor(Math.random() * attackers.length)].hasBomb = true;
+    }
+  }
+
+  /**
+   * Checks if a round-ending condition has been met.
+   * Returns the winner and reason, or null if the round is still in progress.
+   */
+  public checkRoundEndCondition(): { winner: RoundWinner; reason: string } | null {
+    if (this.bombState.status === 'exploded') {
+      return { winner: 'attackers', reason: 'bomb_exploded' };
+    }
+    if (this.bombState.status === 'defused') {
+      return { winner: 'defenders', reason: 'bomb_defused' };
+    }
+
+    const aliveT0 = Array.from(this.players.values()).filter(p => p.team === 0 && p.isAlive);
+    const aliveT1 = Array.from(this.players.values()).filter(p => p.team === 1 && p.isAlive);
+
+    if (aliveT0.length === 0 && this.bombState.status !== 'planted') {
+      return { winner: 'defenders', reason: 'attackers_eliminated' };
+    }
+    if (aliveT1.length === 0) {
+      return { winner: 'attackers', reason: 'defenders_eliminated' };
+    }
+    return null;
+  }
+
+  public isBombSite(nodeId: number): boolean {
+    return this.bombSiteNodeIds[0] === nodeId || this.bombSiteNodeIds[1] === nodeId;
+  }
+
+  public isAtPlantedBomb(nodeId: number): boolean {
+    return this.bombState.status === 'planted' && this.bombState.plantedAtNodeId === nodeId;
   }
 
   public getEnemyPlayers(playerId: string): Player[] {

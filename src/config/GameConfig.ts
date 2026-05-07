@@ -23,3 +23,4 @@ export { LightingConfig, FogConfig, ShadowConfig, PostProcessConfig } from './sc
 export { applyServerConfig } from './server-sync';
 export type { TeamId } from './team';
 export { TeamConfig } from './team';
+export { BombConfig } from './bomb';

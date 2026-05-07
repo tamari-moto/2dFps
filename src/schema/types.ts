@@ -3,11 +3,15 @@
  * Used by both LocalAdapter and ColyseusAdapter (Phase 2+).
  */
 
+/** Bomb-related action type within a turn */
+export type BombActionType = 'plant' | 'defuse' | 'none';
+
 /** Action sent from client to server (or processed locally) */
 export interface TurnAction {
   playerId: string;
   moveToNodeId: number;
   shotAtNodeId: number | undefined;
+  bombAction: BombActionType;
 }
 
 /** Result returned after a turn is executed */
@@ -16,6 +20,17 @@ export interface TurnResult {
   newNodeId: number;
   newAngle: number;
   hits: Array<{ targetId: string; damage: number; isEliminated: boolean }>;
+  bombPlanted?: boolean;
+  bombDefused?: boolean;
+}
+
+/** Round outcome for bomb defusal mode */
+export type RoundWinner = 'attackers' | 'defenders';
+
+export interface RoundResult {
+  winner: RoundWinner;
+  reason: 'bomb_exploded' | 'bomb_defused' | 'attackers_eliminated' | 'defenders_eliminated';
+  roundNumber: number;
 }
 
 /** Obstacle segment data transferred over the network */

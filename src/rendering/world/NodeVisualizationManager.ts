@@ -33,6 +33,9 @@ export class NodeVisualizationManager {
   private undefinedMesh:    THREE.Mesh;
   private ghostMarkers:     Map<string, THREE.Group> = new Map();
 
+  private bombSiteNodeIds:  Set<number> = new Set();
+  private plantedBombNodeId: number | undefined = undefined;
+
   constructor(private sceneManager: SceneManager, private model: Model) {
     this.playerSelectMesh = createUndefinedMesh();
     this.playerNextMesh   = createUndefinedMesh();
@@ -114,6 +117,25 @@ export class NodeVisualizationManager {
 
   clearMovePath(): void {
     this.movePathNodeIds.clear();
+  }
+
+  setBombSites(nodeIds: [number, number]): void {
+    this.bombSiteNodeIds = new Set(nodeIds);
+    this.plantedBombNodeId = undefined;
+    for (const id of nodeIds) this.dirtyNodeIds.add(id);
+  }
+
+  markBombPlanted(nodeId: number): void {
+    this.plantedBombNodeId = nodeId;
+    this.dirtyNodeIds.add(nodeId);
+  }
+
+  clearBombState(): void {
+    if (this.plantedBombNodeId !== undefined) {
+      this.dirtyNodeIds.add(this.plantedBombNodeId);
+    }
+    this.plantedBombNodeId = undefined;
+    for (const id of this.bombSiteNodeIds) this.dirtyNodeIds.add(id);
   }
 
   // ── Ghost markers (confirmed move destinations) ────────────────────────────
@@ -299,6 +321,28 @@ export class NodeVisualizationManager {
       setNodeColor(this.playerNextMesh, NodeConfig.NextMoveColor, NodeVisualConfig.EmissiveNextIntensity);
       const nodeId = this.meshToNodeMap.get(this.playerNextMesh.id);
       if (nodeId !== undefined) this.markDirty(nodeId);
+    }
+
+    // Bomb site markers (drawn last so they override other colors)
+    for (const nodeId of this.bombSiteNodeIds) {
+      const mesh = this.findMeshByNodeId(nodeId);
+      if (!mesh) continue;
+      const isPlanted = nodeId === this.plantedBombNodeId;
+      const color = isPlanted ? NodeConfig.BombPlantedColor : NodeConfig.BombSiteColor;
+      setNodeColor(mesh, color, NodeVisualConfig.EmissiveBombSiteIntensity);
+      this.markDirty(nodeId);
+
+      if (isPlanted) {
+        gsap.to(mesh.scale, {
+          x: 1.4,
+          y: 1.4,
+          duration: 0.6,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut',
+          overwrite: 'auto',
+        });
+      }
     }
   }
 }

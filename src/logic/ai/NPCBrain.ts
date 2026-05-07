@@ -30,7 +30,31 @@ export function decideTurn(model: Model, npc: Player): TurnAction {
     }
   }
 
-  // 2. Calculate facing angle toward nearest visible enemy from chosen node
+  // 2. Bomb objective: attacker NPC at a bomb site should plant
+  if (npc.hasBomb && model.isBombSite(bestNodeId) && model.bombState.status === 'idle') {
+    return {
+      playerId: npc.id,
+      moveToNodeId: bestNodeId,
+      shotAtNodeId: undefined,
+      bombAction: 'plant',
+    };
+  }
+
+  // 3. Bomb objective: defender NPC at planted bomb should defuse
+  if (
+    npc.team === 1 &&
+    model.bombState.status === 'planted' &&
+    model.isAtPlantedBomb(bestNodeId)
+  ) {
+    return {
+      playerId: npc.id,
+      moveToNodeId: bestNodeId,
+      shotAtNodeId: undefined,
+      bombAction: 'defuse',
+    };
+  }
+
+  // 4. Calculate facing angle toward nearest visible enemy from chosen node
   const moveToNode = model.nodeList[bestNodeId];
   let facingAngle = npc.angle;
 
@@ -49,13 +73,14 @@ export function decideTurn(model: Model, npc: Player): TurnAction {
     }
   }
 
-  // 3. Select shot target
+  // 5. Select shot target
   const shotAtNodeId = selectShotTarget(model, npc, moveToNode, facingAngle, enemies);
 
   return {
     playerId: npc.id,
     moveToNodeId: bestNodeId,
     shotAtNodeId,
+    bombAction: 'none',
   };
 }
 

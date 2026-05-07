@@ -1,10 +1,10 @@
 import { Model } from '../model/model';
 import type { ObstacleData } from '../model/MapGenerator';
-import { GameEvent, StateMachine } from './StateMachine';
+import { GameEvent, State, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig, HUMAN_PLAYER_IDS } from '../config/GameConfig';
+import { PlayerConfig, BombConfig, HUMAN_PLAYER_IDS } from '../config/GameConfig';
 import { INetworkAdapter } from '../network/INetworkAdapter';
-import type { TurnAction, TurnResult } from '../schema/types';
+import type { TurnAction, TurnResult, RoundResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
 import { InputCommandHandler } from './InputCommandHandler';
 import { resolveRoundPaths } from './PathResolver';
@@ -59,6 +59,7 @@ export class GameController {
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
+    this.networkAdapter.onRoundResult(this.handleRoundEnded.bind(this));
     this.setupEventListeners();
 
     this.inputCommandHandler = new InputCommandHandler({
@@ -77,6 +78,11 @@ export class GameController {
       confirmPlayerAction: (sm) => this.confirmPlayerAction(sm),
     });
     this.inputCommandHandler.attach();
+
+    // Start in bomb defusal mode immediately
+    this.model.initRound();
+    this.eventBus.emit(GameEventType.ROUND_STARTED, { roundNumber: this.model.roundNumber });
+    this.eventBus.emit(GameEventType.VIS_HIGHLIGHT_BOMB_SITES, { nodeIds: this.model.bombSiteNodeIds });
   }
 
   private setupEventListeners(): void {
@@ -108,12 +114,15 @@ export class GameController {
   }
 
   /**
-   * Called when a human player confirms their action (move + optional shot).
-   * Records the action and either switches to the next unconfirmed player
-   * or executes the round if all players have confirmed.
+   * Called when a human player confirms their action (move + optional shot/plant/defuse).
    */
   confirmPlayerAction(sm: StateMachine): void {
-    // Shot→Idle (Complete) or Move→Idle (Cancel)
+    const currentState = sm.getState();
+    // Determine bomb action from SM state before transitioning
+    const bombAction = currentState === State.Plant ? 'plant' as const
+                     : currentState === State.Defuse ? 'defuse' as const
+                     : 'none' as const;
+
     sm.transition(GameEvent.Complete) || sm.transition(GameEvent.Cancel);
 
     const playerId = this.activePlayerId;
@@ -133,14 +142,15 @@ export class GameController {
     this.confirmedActions.set(playerId, {
       playerId,
       moveToNodeId: nextNodeId,
-      shotAtNodeId: shotNodeId,
+      shotAtNodeId: bombAction !== 'none' ? undefined : shotNodeId,
+      bombAction,
     });
 
     const player = this.model.getPlayer(playerId);
     this.eventBus.emit(GameEventType.PLAYER_ACTION_CONFIRMED, {
       playerId,
       moveToNodeId: nextNodeId,
-      shotAtNodeId: shotNodeId,
+      shotAtNodeId: bombAction !== 'none' ? undefined : shotNodeId,
       angle: player?.angle ?? 0,
       color: player?.color ?? 0xffffff,
     });
@@ -203,12 +213,16 @@ export class GameController {
       playerId: r.playerId,
       moveToNodeId: r.finalNodeId,
       shotAtNodeId: r.shotAtNodeId,
+      bombAction: allActions.find(a => a.playerId === r.playerId)?.bombAction ?? 'none',
     }));
 
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
     this.batchProcessing = true;
     this.networkAdapter.sendRoundActions(rewrittenActions);
     this.batchProcessing = false;
+
+    // Emit bomb events based on model state after resolution
+    this.emitPostRoundBombEvents();
 
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
 
@@ -218,6 +232,26 @@ export class GameController {
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
       this.resetAllStateMachines();
       this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+    }
+  }
+
+  private emitPostRoundBombEvents(): void {
+    const bomb = this.model.bombState;
+    if (bomb.status === 'planted' && bomb.plantedAtNodeId !== undefined) {
+      const turnsRemaining = BombConfig.ExplodeAfterTurns - (this.model.globalTurnIndex - bomb.plantedOnTurn);
+      this.eventBus.emit(GameEventType.BOMB_PLANTED, {
+        planterId: bomb.planterPlayerId ?? '',
+        nodeId: bomb.plantedAtNodeId,
+        turnsUntilExplosion: turnsRemaining,
+      });
+      this.eventBus.emit(GameEventType.VIS_BOMB_SITE_PLANTED, { nodeId: bomb.plantedAtNodeId });
+    } else if (bomb.status === 'defused') {
+      this.eventBus.emit(GameEventType.BOMB_DEFUSED, {
+        defuserId: '',
+        nodeId: bomb.plantedAtNodeId ?? 0,
+      });
+    } else if (bomb.status === 'exploded') {
+      this.eventBus.emit(GameEventType.BOMB_EXPLODED, { nodeId: bomb.plantedAtNodeId ?? 0 });
     }
   }
 
@@ -241,6 +275,7 @@ export class GameController {
       playerId: this.activePlayerId,
       moveToNodeId: activePlayer.node.id,
       shotAtNodeId: undefined,
+      bombAction: 'none',
     };
     const allActions: TurnAction[] = [stayAction, ...this.turnManager.collectNPCActions()];
 
@@ -251,6 +286,7 @@ export class GameController {
       playerId: r.playerId,
       moveToNodeId: r.finalNodeId,
       shotAtNodeId: r.shotAtNodeId,
+      bombAction: allActions.find(a => a.playerId === r.playerId)?.bombAction ?? 'none',
     }));
 
     this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: true });
@@ -258,6 +294,7 @@ export class GameController {
     this.networkAdapter.sendRoundActions(rewrittenActions);
     this.batchProcessing = false;
 
+    this.emitPostRoundBombEvents();
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
 
     this.pendingAnimCount = resolved.filter(r => r.path.length > 1).length;
@@ -275,7 +312,6 @@ export class GameController {
 
   /**
    * Applies a turn result received from the network adapter.
-   * During batch (simultaneous) processing, VIS_UPDATE_VIEW is deferred to the caller.
    */
   private applyTurnResult(result: TurnResult): void {
     const movingPlayer = this.model.getPlayer(result.movingPlayerId);
@@ -328,11 +364,59 @@ export class GameController {
   private handlePlayerElimination(playerId: string): void {
     console.log(`⚰️ ${playerId} has been eliminated!`);
     this.eventBus.emit(GameEventType.VIS_HIDE_PLAYER, { playerId });
+  }
 
-    const alivePlayers = Array.from(this.model.players.values()).filter(p => p.isAlive);
-    if (alivePlayers.length === 1) {
-      console.log(`🏆 ${alivePlayers[0].id} wins!`);
+  /**
+   * Called when a round ends (from LocalAdapter via onRoundResult callback).
+   */
+  private handleRoundEnded(result: RoundResult): void {
+    console.log(`🏁 Round ${result.roundNumber} ended: ${result.winner} win (${result.reason})`);
+
+    if (result.winner === 'attackers') {
+      this.model.teamScores[0]++;
+    } else {
+      this.model.teamScores[1]++;
     }
+
+    this.eventBus.emit(GameEventType.ROUND_ENDED, {
+      winner: result.winner,
+      reason: result.reason,
+      scores: [...this.model.teamScores] as [number, number],
+    });
+
+    // Check match win condition
+    if (
+      this.model.teamScores[0] >= BombConfig.WinsPerMatch ||
+      this.model.teamScores[1] >= BombConfig.WinsPerMatch
+    ) {
+      const winnerTeam: 0 | 1 = this.model.teamScores[0] >= BombConfig.WinsPerMatch ? 0 : 1;
+      this.model.matchOver = true;
+      this.eventBus.emit(GameEventType.MATCH_OVER, {
+        winnerTeam,
+        scores: [...this.model.teamScores] as [number, number],
+      });
+      console.log(`🏆 Match over! Team ${winnerTeam} wins!`);
+      return;
+    }
+
+    // Start next round after delay
+    setTimeout(() => this.startNextRound(), BombConfig.RespawnDelayMs);
+  }
+
+  private startNextRound(): void {
+    this.model.initRound();
+    this.eventBus.emit(GameEventType.ROUND_STARTED, { roundNumber: this.model.roundNumber });
+    this.eventBus.emit(GameEventType.VIS_RESPAWN_ALL_PLAYERS);
+    this.eventBus.emit(GameEventType.VIS_HIGHLIGHT_BOMB_SITES, { nodeIds: this.model.bombSiteNodeIds });
+    this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
+    this.resetAllStateMachines();
+
+    // Re-initialize player HUD states
+    for (const id of this.allHumanPlayerIds) {
+      this.reachableNodesPerPlayer.set(id, new Set());
+    }
+
+    this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
   }
 
   getModel(): Model {

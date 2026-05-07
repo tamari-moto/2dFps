@@ -225,6 +225,28 @@ export class VisualizationSync {
       }
     });
 
+    eventBus.on(GameEventType.VIS_HIGHLIGHT_BOMB_SITES, (data: { nodeIds: [number, number] }) => {
+      this.nodeVis.setBombSites(data.nodeIds);
+      this.doUpdateView();
+    });
+
+    eventBus.on(GameEventType.VIS_BOMB_SITE_PLANTED, (data: { nodeId: number }) => {
+      this.nodeVis.markBombPlanted(data.nodeId);
+      this.doUpdateView();
+    });
+
+    eventBus.on(GameEventType.VIS_RESPAWN_ALL_PLAYERS, () => {
+      // Re-show all players at their new spawn positions
+      for (const [playerId, player] of this.model.players) {
+        if (player.isAlive) {
+          this.lifecycle.setVisible(playerId, true);
+          this.hpBarManager.updateBar(playerId, player.health, player.maxHealth);
+        }
+      }
+      this.nodeVis.clearBombState();
+      this.doUpdateView();
+    });
+
   }
 
   private tickUpdateVisibility(): void {

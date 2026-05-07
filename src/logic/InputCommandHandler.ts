@@ -25,22 +25,27 @@ export class InputCommandHandler {
   private boundHandleNodeClick: (data: { nodeId: number; position: { x: number; y: number } }) => void;
   private boundHandleCanvasEmptyClick: () => void;
   private boundHandlePlayerSwitch: (data: { currentPlayerId: string }) => void;
+  private boundHandleKeyPressed: (data: { key: string }) => void;
+
   constructor(private ctx: InputCommandContext) {
     this.boundHandleNodeClick = this.handleNodeClick.bind(this);
     this.boundHandleCanvasEmptyClick = this.handleCanvasEmptyClick.bind(this);
     this.boundHandlePlayerSwitch = this.handlePlayerSwitch.bind(this);
+    this.boundHandleKeyPressed = this.handleKeyPressed.bind(this);
   }
 
   attach(): void {
     this.ctx.eventBus.on(GameEventType.NODE_CLICKED, this.boundHandleNodeClick);
     this.ctx.eventBus.on(GameEventType.CANVAS_CLICKED_EMPTY, this.boundHandleCanvasEmptyClick);
     this.ctx.eventBus.on(GameEventType.PLAYER_SWITCHED, this.boundHandlePlayerSwitch);
+    this.ctx.eventBus.on(GameEventType.KEY_PRESSED, this.boundHandleKeyPressed);
   }
 
   detach(): void {
     this.ctx.eventBus.off(GameEventType.NODE_CLICKED, this.boundHandleNodeClick);
     this.ctx.eventBus.off(GameEventType.CANVAS_CLICKED_EMPTY, this.boundHandleCanvasEmptyClick);
     this.ctx.eventBus.off(GameEventType.PLAYER_SWITCHED, this.boundHandlePlayerSwitch);
+    this.ctx.eventBus.off(GameEventType.KEY_PRESSED, this.boundHandleKeyPressed);
   }
 
   private handleNodeClick(data: { nodeId: number; position: { x: number; y: number } }): void {
@@ -101,6 +106,8 @@ export class InputCommandHandler {
       } else {
         this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
       }
+
+      this.notifyBombActionAvailable(activePlayer, clickedNode.id);
     }
   }
 
@@ -130,6 +137,80 @@ export class InputCommandHandler {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Emits BOMB_ACTION_SELECTED if the active player can plant or defuse at the destination node.
+   */
+  private notifyBombActionAvailable(player: Player, destNodeId: number): void {
+    const model = this.ctx.model;
+
+    if (player.hasBomb && model.isBombSite(destNodeId) && model.bombState.status === 'idle') {
+      this.ctx.eventBus.emit(GameEventType.BOMB_ACTION_SELECTED, {
+        action: 'plant',
+        nodeId: destNodeId,
+        playerId: player.id,
+      });
+      return;
+    }
+
+    if (
+      player.team === 1 &&
+      model.isAtPlantedBomb(destNodeId) &&
+      model.bombState.status === 'planted'
+    ) {
+      this.ctx.eventBus.emit(GameEventType.BOMB_ACTION_SELECTED, {
+        action: 'defuse',
+        nodeId: destNodeId,
+        playerId: player.id,
+      });
+    }
+  }
+
+  /**
+   * Triggered by 'f' key: executes a bomb plant or defuse action for the active player.
+   */
+  private tryBombAction(): void {
+    if (this.ctx.isInputLocked()) return;
+
+    const activePlayerId = this.ctx.getActivePlayerId();
+    const activePlayer = this.ctx.model.getPlayer(activePlayerId);
+    if (!activePlayer) return;
+
+    const sm = this.ctx.getStateMachine(activePlayerId);
+    const currentState = sm.getState();
+    if (currentState !== State.Move) return;
+
+    const nextNodeId = this.ctx.getPendingNextNodeIdForPlayer(activePlayerId);
+    if (nextNodeId === undefined) return;
+
+    const model = this.ctx.model;
+
+    if (
+      activePlayer.hasBomb &&
+      model.isBombSite(nextNodeId) &&
+      model.bombState.status === 'idle'
+    ) {
+      sm.transition(GameEvent.PlantBomb);
+      this.ctx.confirmPlayerAction(sm);
+      return;
+    }
+
+    if (
+      activePlayer.team === 1 &&
+      model.isAtPlantedBomb(nextNodeId) &&
+      model.bombState.status === 'planted'
+    ) {
+      sm.transition(GameEvent.DefuseBomb);
+      this.ctx.confirmPlayerAction(sm);
+    }
+  }
+
+  private handleKeyPressed(data: { key: string }): void {
+    if (this.ctx.isInputLocked()) return;
+    if (data.key === 'f' || data.key === 'F') {
+      this.tryBombAction();
+    }
   }
 
   private handleCanvasEmptyClick(): void {

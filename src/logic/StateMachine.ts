@@ -7,15 +7,19 @@ export enum State {
   Idle = "Idle",
   Select = "Select",
   Move = "Move",
-  Shot = "Shot"
+  Shot = "Shot",
+  Plant = "Plant",
+  Defuse = "Defuse",
 }
 
 export enum GameEvent {
   SelectPlayer = "Select player",
   MovePlayer = "Move player",
   ShotPlayer = "Shot player",
+  PlantBomb = "Plant bomb",
+  DefuseBomb = "Defuse bomb",
   Complete = "Complete",
-  Cancel = "Cancel"
+  Cancel = "Cancel",
 }
 
 /**
@@ -48,6 +52,8 @@ class MoveState implements IState {
   readonly name = State.Move;
   transition(event: GameEvent): IState | null {
     if (event === GameEvent.ShotPlayer) return new ShotState();
+    if (event === GameEvent.PlantBomb)  return new PlantState();
+    if (event === GameEvent.DefuseBomb) return new DefuseState();
     if (event === GameEvent.Cancel)     return new IdleState();
     return null;
   }
@@ -59,6 +65,24 @@ class ShotState implements IState {
     if (event === GameEvent.Complete)   return new IdleState();
     if (event === GameEvent.ShotPlayer) return new ShotState(); // Can change shot target
     if (event === GameEvent.Cancel)     return new IdleState();
+    return null;
+  }
+}
+
+class PlantState implements IState {
+  readonly name = State.Plant;
+  transition(event: GameEvent): IState | null {
+    if (event === GameEvent.Complete) return new IdleState();
+    if (event === GameEvent.Cancel)   return new IdleState();
+    return null;
+  }
+}
+
+class DefuseState implements IState {
+  readonly name = State.Defuse;
+  transition(event: GameEvent): IState | null {
+    if (event === GameEvent.Complete) return new IdleState();
+    if (event === GameEvent.Cancel)   return new IdleState();
     return null;
   }
 }
@@ -97,6 +121,8 @@ export class StateMachine {
       case State.Select: return new SelectState();
       case State.Move:   return new MoveState();
       case State.Shot:   return new ShotState();
+      case State.Plant:  return new PlantState();
+      case State.Defuse: return new DefuseState();
     }
   }
 }

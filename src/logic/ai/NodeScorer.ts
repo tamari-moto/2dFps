@@ -63,5 +63,25 @@ export function scoreNode(
     }
   }
 
+  // 5. Bomb objective scoring
+  if (npc.hasBomb && model.bombState.status === 'idle') {
+    // Attacker with bomb: pull toward nearest bomb site
+    for (const siteId of model.bombSiteNodeIds) {
+      const siteNode = model.nodeList[siteId];
+      if (!siteNode) continue;
+      const dist = model.getNodeDistance(candidateNode, siteNode);
+      score += AIConfig.BombSiteGravity / (dist + 1);
+    }
+  }
+
+  if (npc.team === 1 && model.bombState.status === 'planted' && model.bombState.plantedAtNodeId !== undefined) {
+    // Defender: pull toward planted bomb site
+    const siteNode = model.nodeList[model.bombState.plantedAtNodeId];
+    if (siteNode) {
+      const dist = model.getNodeDistance(candidateNode, siteNode);
+      score += AIConfig.DefuseSiteGravity / (dist + 1);
+    }
+  }
+
   return score;
 }

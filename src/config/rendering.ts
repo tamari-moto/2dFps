@@ -75,6 +75,12 @@ export const NodeConfig = {
 
   /** Move path node color (saddle brown) */
   MovePathColor: 0x8b4513,
+
+  /** Bomb site node color (yellow) */
+  BombSiteColor: 0xddcc00,
+
+  /** Planted bomb node color (bright red) */
+  BombPlantedColor: 0xff2200,
 } as const;
 
 /**
@@ -99,6 +105,9 @@ export const NodeVisualConfig = {
   EmissiveReachableIntensity: 0.15,
   /** Emissive intensity for move-path nodes */
   EmissiveMovePathIntensity: 0.35,
+
+  /** Emissive intensity for bomb site nodes */
+  EmissiveBombSiteIntensity: 0.55,
 } as const;
 
 /**

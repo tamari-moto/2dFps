@@ -25,4 +25,10 @@ export const AIConfig = {
 
   /** Waiting time after a simultaneous round resolves before re-enabling input (ms) */
   RoundAnimationDelayMs: 1500,
+
+  /** Score bonus pulling attacker NPC toward bomb sites (higher = stronger pull) */
+  BombSiteGravity: 500,
+
+  /** Score bonus pulling defender NPC toward planted bomb (higher = stronger pull) */
+  DefuseSiteGravity: 800,
 } as const;

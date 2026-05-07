@@ -1,5 +1,5 @@
 import { Model } from '../model/model';
-import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload, RoundResult } from '../schema/types';
 
 /**
  * Abstraction layer between game logic and transport (local / online).
@@ -51,6 +51,9 @@ export interface INetworkAdapter {
    * LocalAdapter: no-op (client defaults remain in effect).
    */
   onServerConfig(callback: (config: ServerConfigPayload) => void): void;
+
+  /** Register a callback invoked when a round ends (bomb defusal mode) */
+  onRoundResult(callback: (result: RoundResult) => void): void;
 
   /**
    * Returns true if NPC turn processing should run on the client side.

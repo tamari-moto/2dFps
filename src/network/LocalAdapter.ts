@@ -1,19 +1,19 @@
 import { Model } from '../model/model';
 import { Node } from '../model/node';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
-import { PlayerConfig } from '../config/GameConfig';
+import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload, RoundResult } from '../schema/types';
+import { PlayerConfig, BombConfig } from '../config/GameConfig';
 import { ENTITY_IDS } from '../config/GameConfig';
 
 /**
  * Local-play implementation of INetworkAdapter.
- * Executes all game logic in-process (no network), preserving the original behavior.
- * Phase 2+: replace this with ColyseusAdapter to enable online play.
+ * Executes all game logic in-process (no network).
  */
 export class LocalAdapter implements INetworkAdapter {
   private model!: Model;
   private readonly myPlayerId: string = ENTITY_IDS.PLAYER_1;
   private turnResultCallback?: (result: TurnResult) => void;
+  private roundResultCallback?: (result: RoundResult) => void;
 
   // ---- INetworkAdapter -------------------------------------------------------
 
@@ -28,6 +28,10 @@ export class LocalAdapter implements INetworkAdapter {
 
   onTurnResult(callback: (result: TurnResult) => void): void {
     this.turnResultCallback = callback;
+  }
+
+  onRoundResult(callback: (result: RoundResult) => void): void {
+    this.roundResultCallback = callback;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -46,22 +50,18 @@ export class LocalAdapter implements INetworkAdapter {
   onServerConfig(_callback: (config: ServerConfigPayload) => void): void { /* no-op in local mode */ }
 
   /**
-   * Executes a turn synchronously (ported from GameController.executeTurn /
-   * checkPlayerShot) and immediately fires the turnResult callback.
+   * Executes a turn synchronously and immediately fires the turnResult callback.
    */
   sendTurnAction(action: TurnAction): void {
     const player = this.model.getPlayer(action.playerId);
     if (!player) return;
 
-    // 1. Record position before move
     const fromNode = player.node;
 
-    // 2. Move
     const newNode = this.model.nodeList[action.moveToNodeId];
     if (!newNode) return;
     this.model.setPlayerRef(action.playerId, newNode);
 
-    // 3. Update facing angle: toward shot target if provided, else toward move destination
     let newAngle = player.angle;
     if (action.shotAtNodeId !== undefined) {
       const shotNode = this.model.nodeList[action.shotAtNodeId];
@@ -74,7 +74,6 @@ export class LocalAdapter implements INetworkAdapter {
       player.setAngle(newAngle);
     }
 
-    // 4. Shot resolution
     const hits: TurnResult['hits'] = [];
     if (action.shotAtNodeId !== undefined) {
       this.resolveShot(action.playerId, action.shotAtNodeId, hits, newAngle);
@@ -136,14 +135,81 @@ export class LocalAdapter implements INetworkAdapter {
     }
   }
 
+  /**
+   * Resolves bomb plant and defuse actions after all players have moved.
+   */
+  private resolveBombActions(actions: TurnAction[], results: TurnResult[]): void {
+    const bomb = this.model.bombState;
+
+    // Track which team1 players declared defuse this round
+    const defusingPlayerIds = new Set<string>();
+
+    for (let i = 0; i < actions.length; i++) {
+      const action = actions[i];
+      const player = this.model.getPlayer(action.playerId);
+      if (!player || !player.isAlive) continue;
+
+      if (action.bombAction === 'plant') {
+        if (
+          player.hasBomb &&
+          bomb.status === 'idle' &&
+          this.model.isBombSite(action.moveToNodeId)
+        ) {
+          bomb.status = 'planted';
+          bomb.plantedAtNodeId = action.moveToNodeId;
+          bomb.planterPlayerId = action.playerId;
+          bomb.plantedOnTurn = this.model.globalTurnIndex;
+          player.hasBomb = false;
+          results[i].bombPlanted = true;
+        }
+      } else if (action.bombAction === 'defuse') {
+        if (
+          player.team === 1 &&
+          bomb.status === 'planted' &&
+          player.node.id === bomb.plantedAtNodeId
+        ) {
+          defusingPlayerIds.add(action.playerId);
+          player.defuseProgress++;
+          if (player.defuseProgress >= BombConfig.DefuseTurns) {
+            bomb.status = 'defused';
+            results[i].bombDefused = true;
+            player.defuseProgress = 0;
+          }
+        }
+      }
+    }
+
+    // Reset defuse progress for team1 players who didn't defuse this round
+    for (const [, player] of this.model.players) {
+      if (player.team === 1 && !defusingPlayerIds.has(player.id)) {
+        player.defuseProgress = 0;
+      }
+    }
+  }
+
+  /**
+   * Checks if the planted bomb should explode based on elapsed turns.
+   */
+  private checkBombExplosion(): void {
+    const bomb = this.model.bombState;
+    if (bomb.status !== 'planted') return;
+    const turnsElapsed = this.model.globalTurnIndex - bomb.plantedOnTurn;
+    if (turnsElapsed >= BombConfig.ExplodeAfterTurns) {
+      bomb.status = 'exploded';
+    }
+  }
+
   supportsNPC(): boolean { return true; }
 
   /**
    * Resolves all players' actions simultaneously:
    * 1. Snapshot from-nodes before any movement
    * 2. Apply all moves atomically
-   * 3. Resolve all shots after movement but before damage is applied
-   * 4. Fire turnResultCallback for each result
+   * 3. Resolve bomb actions (plant/defuse)
+   * 4. Check bomb explosion
+   * 5. Resolve all shots after movement but before damage is applied
+   * 6. Fire turnResultCallback for each result
+   * 7. Check round-end conditions
    */
   sendRoundActions(actions: TurnAction[]): void {
     // 1. Snapshot positions before any moves
@@ -184,16 +250,40 @@ export class LocalAdapter implements INetworkAdapter {
       });
     }
 
-    // 3. Resolve all shots after all moves, before any damage is applied
+    // 3. Resolve bomb actions after all moves
+    this.resolveBombActions(actions, pendingResults);
+
+    // 4. Check bomb explosion
+    this.checkBombExplosion();
+
+    // 5. Resolve all shots after all moves, before any damage is applied
     for (let i = 0; i < actions.length; i++) {
-      if (actions[i].shotAtNodeId !== undefined) {
+      if (actions[i].shotAtNodeId !== undefined && actions[i].bombAction === 'none') {
         this.resolveShot(actions[i].playerId, actions[i].shotAtNodeId!, pendingResults[i].hits, pendingResults[i].newAngle);
       }
     }
 
-    // 4. Fire callbacks; GameController applies damage from each result
+    // 6. Fire callbacks; GameController applies damage from each result
     for (const result of pendingResults) {
       this.turnResultCallback?.(result);
+    }
+
+    // 7. Increment global turn index
+    this.model.globalTurnIndex++;
+
+    // 8. Check round-end conditions
+    const roundEnd = this.model.checkRoundEndCondition();
+    if (roundEnd) {
+      const turnsUntilExplosion = this.model.bombState.status === 'planted'
+        ? BombConfig.ExplodeAfterTurns - (this.model.globalTurnIndex - this.model.bombState.plantedOnTurn)
+        : 0;
+      void turnsUntilExplosion; // used in HUD events emitted by GameController
+
+      this.roundResultCallback?.({
+        winner: roundEnd.winner as 'attackers' | 'defenders',
+        reason: roundEnd.reason as RoundResult['reason'],
+        roundNumber: this.model.roundNumber,
+      });
     }
   }
 }

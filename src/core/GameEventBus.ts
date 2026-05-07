@@ -83,6 +83,22 @@ export enum GameEventType {
   PLAYER_JOINED = 'network:player_joined',
   PLAYER_LEFT = 'network:player_left',
   ROOM_STATE_CHANGED = 'network:room_state',
+
+  // Bomb events
+  BOMB_PLANTED = 'bomb:planted',
+  BOMB_DEFUSED = 'bomb:defused',
+  BOMB_EXPLODED = 'bomb:exploded',
+  BOMB_ACTION_SELECTED = 'bomb:action_selected',
+
+  // Round / match events
+  ROUND_STARTED = 'round:started',
+  ROUND_ENDED = 'round:ended',
+  MATCH_OVER = 'match:over',
+
+  // Visualization — bomb
+  VIS_HIGHLIGHT_BOMB_SITES = 'vis:highlight_bomb_sites',
+  VIS_BOMB_SITE_PLANTED = 'vis:bomb_site_planted',
+  VIS_RESPAWN_ALL_PLAYERS = 'vis:respawn_all_players',
 }
 
 /**
@@ -227,6 +243,22 @@ export interface GameEventData {
   [GameEventType.PLAYER_JOINED]: void;
   [GameEventType.PLAYER_LEFT]: void;
   [GameEventType.ROOM_STATE_CHANGED]: void;
+
+  // Bomb events
+  [GameEventType.BOMB_PLANTED]: { planterId: string; nodeId: number; turnsUntilExplosion: number };
+  [GameEventType.BOMB_DEFUSED]: { defuserId: string; nodeId: number };
+  [GameEventType.BOMB_EXPLODED]: { nodeId: number };
+  [GameEventType.BOMB_ACTION_SELECTED]: { action: 'plant' | 'defuse'; nodeId: number; playerId: string };
+
+  // Round / match events
+  [GameEventType.ROUND_STARTED]: { roundNumber: number };
+  [GameEventType.ROUND_ENDED]: { winner: string; reason: string; scores: [number, number] };
+  [GameEventType.MATCH_OVER]: { winnerTeam: 0 | 1; scores: [number, number] };
+
+  // Visualization — bomb
+  [GameEventType.VIS_HIGHLIGHT_BOMB_SITES]: { nodeIds: [number, number] };
+  [GameEventType.VIS_BOMB_SITE_PLANTED]: { nodeId: number };
+  [GameEventType.VIS_RESPAWN_ALL_PLAYERS]: void;
 }
 
 type EventListener<T> = (data: T) => void;

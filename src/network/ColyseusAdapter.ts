@@ -2,7 +2,7 @@ import * as Colyseus from 'colyseus.js';
 import { Model } from '../model/model';
 import { Player } from '../model/Player';
 import { INetworkAdapter } from './INetworkAdapter';
-import { TurnAction, TurnResult, ObstaclePayload, ObstaclesReadyPayload, ServerConfigPayload } from '../schema/types';
+import { TurnAction, TurnResult, ObstaclePayload, ObstaclesReadyPayload, ServerConfigPayload, RoundResult } from '../schema/types';
 
 /**
  * Online-play implementation of INetworkAdapter.
@@ -231,6 +231,9 @@ export class ColyseusAdapter implements INetworkAdapter {
   }
 
   supportsNPC(): boolean { return false; }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onRoundResult(_callback: (result: RoundResult) => void): void { /* no-op: server-side round management */ }
 
   /**
    * Simultaneous round resolution is server-authoritative in online mode.

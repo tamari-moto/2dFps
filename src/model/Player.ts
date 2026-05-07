@@ -12,6 +12,8 @@ export class Player extends Entity {
   isAlive: boolean;
   isNPC: boolean;
   team: TeamId;
+  hasBomb: boolean;
+  defuseProgress: number;
 
   constructor(id: string, initialNode: Node, team: TeamId, maxHealth: number = 100, isNPC: boolean = false) {
     const color = team === 0 ? TeamConfig.Team0Color : TeamConfig.Team1Color;
@@ -21,6 +23,8 @@ export class Player extends Entity {
     this.isAlive = true;
     this.isNPC = isNPC;
     this.team = team;
+    this.hasBomb = false;
+    this.defuseProgress = 0;
   }
 
   /**
