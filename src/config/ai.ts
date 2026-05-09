@@ -38,17 +38,20 @@ export const AIConfig = {
   /** Enable ThreatMap-based facing angle when no visible enemies */
   ThreatMapAngleEnabled: true,
 
-  /** Time constant for threat score decay (rounds) */
-  ThreatTau: 8,
+  /** Per-round multiplier applied to accumulated threat scores before diffusion. Controls fade speed. */
+  ThreatAccumulationDecay: 0.85,
+
+  /** Fraction of a node's score that spreads outward during BFS diffusion. */
+  ThreatSpreadFactor: 1.2,
 
   /** BFS diffusion distance scale */
-  ThreatSigma: 2,
+  ThreatSigma: 4,
 
   /** Maximum BFS steps for threat diffusion */
-  ThreatMaxDiffusionSteps: 6,
+  ThreatMaxDiffusionSteps: 1,
 
   /** Upper bound for ambient threat score on long-unobserved nodes */
-  ThreatAmbientCap: 0.3,
+  ThreatAmbientCap: 0,
 
   /** BFS range when searching for highest-threat node to face */
   ThreatMapMaxLookDistance: 8,

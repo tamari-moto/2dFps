@@ -6,10 +6,10 @@ import type { TeamId } from '../../config/GameConfig';
  * Tracks enemy presence probability for a single team.
  * Updated once per round before NPC decisions; read-only during decideTurn.
  *
- * Score model:
- *   - Nodes observed this round: score = 1 if enemy present, 0 if clear
- *   - Previously observed nodes: exponential decay in time + BFS diffusion from sighting sources
- *   - Long-unobserved nodes: ambient score rises up to ThreatAmbientCap
+ * Score model (cumulative diffusion):
+ *   - Each round: scores are multiplied by ThreatAccumulationDecay, then BFS-diffused outward
+ *   - Nodes observed this round: overwritten with 1.0 (enemy present) or 0.0 (clear)
+ *   - Effect: threat "ripples" outward from sightings and fades over time
  */
 export class ThreatMap {
   readonly team: TeamId;
@@ -30,7 +30,7 @@ export class ThreatMap {
     this.team = team;
     this.lastSeenRound = new Float64Array(nodeCount).fill(-Infinity);
     this.lastSeenHadEnemy = new Uint8Array(nodeCount);
-    this.score = new Float32Array(nodeCount);
+    this.score = new Float32Array(nodeCount).fill(1);
     this.confirmedDeadAt = new Set();
   }
 
@@ -118,36 +118,36 @@ export class ThreatMap {
 
   private _rescore(model: Model, roundNumber: number): void {
     const nodeCount = model.nodeList.length;
-    const tau = AIConfig.ThreatTau;
+    const decay = AIConfig.ThreatAccumulationDecay;
+    const spreadFactor = AIConfig.ThreatSpreadFactor;
     const sigma = AIConfig.ThreatSigma;
     const maxSteps = AIConfig.ThreatMaxDiffusionSteps;
-    const ambientCap = AIConfig.ThreatAmbientCap;
 
-    // --- Pass 1: compute source scores ---
-    // sourceScore[id] = how confident we are that a living enemy was last seen here
-    const sourceScore = new Float32Array(nodeCount);
+    // --- Pass 0: decay accumulated scores from previous round ---
     for (let id = 0; id < nodeCount; id++) {
-      if (this.confirmedDeadAt.has(id)) continue;
-      if (!this.lastSeenHadEnemy[id]) continue;
-      const dt = roundNumber - this.lastSeenRound[id];
-      sourceScore[id] = Math.exp(-dt / tau);
+      this.score[id] *= decay;
     }
 
-    // --- Pass 2: BFS diffusion from each source ---
-    // diffused[id] = max over all sources j of: sourceScore[j] * exp(-bfsDist(id,j) / sigma)
+    // --- Pass 1: overwrite observed nodes with ground-truth values ---
+    for (let id = 0; id < nodeCount; id++) {
+      if (this.lastSeenRound[id] !== roundNumber) continue;
+      this.score[id] = this.lastSeenHadEnemy[id] ? 1.0 : 0.0;
+    }
+
+    // --- Pass 2: BFS diffusion — score[] is the wave source ---
     const diffused = new Float32Array(nodeCount);
 
     for (let srcId = 0; srcId < nodeCount; srcId++) {
-      const src = sourceScore[srcId];
+      const src = this.score[srcId];
       if (src <= 0) continue;
+      if (this.confirmedDeadAt.has(srcId)) continue;
 
-      // BFS outward from srcId up to maxSteps
       const visited = new Set<number>([srcId]);
       let frontier = [srcId];
       let dist = 0;
 
       while (frontier.length > 0 && dist <= maxSteps) {
-        const contribution = src * Math.exp(-dist / sigma);
+        const contribution = src * spreadFactor * Math.exp(-dist / sigma);
         for (const nid of frontier) {
           if (contribution > diffused[nid]) {
             diffused[nid] = contribution;
@@ -169,23 +169,13 @@ export class ThreatMap {
       }
     }
 
-    // --- Pass 3: combine with ambient + apply current-round overrides ---
+    // --- Pass 3: merge diffusion, clamp, re-apply observed overrides ---
     for (let id = 0; id < nodeCount; id++) {
-      const dt = roundNumber - this.lastSeenRound[id];
-      const isCurrentlyObserved = this.lastSeenRound[id] === roundNumber;
-
-      if (isCurrentlyObserved) {
-        // Known state this round: enemy present → 1, clear → 0
+      if (this.lastSeenRound[id] === roundNumber) {
         this.score[id] = this.lastSeenHadEnemy[id] ? 1.0 : 0.0;
-        continue;
+      } else {
+        this.score[id] = Math.min(1.0, Math.max(this.score[id], diffused[id]));
       }
-
-      // Ambient: rises the longer a node goes unobserved
-      const ambientScore = dt === Infinity
-        ? ambientCap
-        : Math.min(ambientCap, 1 - Math.exp(-dt / tau));
-
-      this.score[id] = Math.max(diffused[id], ambientScore);
     }
   }
 }
