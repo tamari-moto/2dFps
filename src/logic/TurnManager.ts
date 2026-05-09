@@ -17,6 +17,7 @@ export class TurnManager {
   private model: Model;
   private npcGoals: Map<string, NPCGoalState> = new Map();
   private threatMaps: Map<TeamId, ThreatMap> = new Map();
+  private cachedTeamScores: Map<TeamId, Float32Array> = new Map();
   private getRoundNumber: () => number;
   private eventBus: GameEventBus;
 
@@ -55,23 +56,26 @@ export class TurnManager {
     });
 
     // Emit threat scores for heatmap visualization
+    const nodeCount = this.model.nodeList.length;
     for (const teamId of AIConfig.ThreatMapTeams as TeamId[]) {
       const map = this.threatMaps.get(teamId);
-      if (map) {
-        const scores = new Float32Array(this.model.nodeList.length);
-        for (let i = 0; i < scores.length; i++) scores[i] = map.getScore(i);
-        this.eventBus.emit(GameEventType.VIS_THREAT_MAP_UPDATED, {
-          scores,
-          teamColor: TEAM_COLORS[teamId],
-        });
+      if (!map) continue;
+      let scores = this.cachedTeamScores.get(teamId);
+      if (!scores || scores.length !== nodeCount) {
+        scores = new Float32Array(nodeCount);
+        this.cachedTeamScores.set(teamId, scores);
       }
+      for (let i = 0; i < nodeCount; i++) scores[i] = map.getScore(i);
+      this.eventBus.emit(GameEventType.VIS_THREAT_MAP_UPDATED, {
+        scores,
+        teamColor: TEAM_COLORS[teamId],
+      });
     }
 
     return actions;
   }
 
   private _updateThreatMaps(aliveNPCs: Player[], roundNumber: number): void {
-    // Only update ThreatMap for team 0
     const activeTeams = new Set<TeamId>(
       aliveNPCs.filter(n => (AIConfig.ThreatMapTeams as number[]).includes(n.team)).map(n => n.team)
     );

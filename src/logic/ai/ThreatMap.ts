@@ -26,12 +26,22 @@ export class ThreatMap {
   /** Nodes where an enemy death was confirmed (suppressed as diffusion sources). */
   private confirmedDeadAt: Set<number>;
 
+  /** Reusable BFS buffers — cleared and reused each _rescore call to avoid per-iteration allocations. */
+  private bfsDiffused: Float32Array;
+  private bfsVisited: Uint8Array;
+  private bfsFrontier: number[];
+  private bfsNext: number[];
+
   constructor(team: TeamId, nodeCount: number) {
     this.team = team;
     this.lastSeenRound = new Float64Array(nodeCount).fill(-Infinity);
     this.lastSeenHadEnemy = new Uint8Array(nodeCount);
     this.score = new Float32Array(nodeCount).fill(1);
     this.confirmedDeadAt = new Set();
+    this.bfsDiffused = new Float32Array(nodeCount);
+    this.bfsVisited = new Uint8Array(nodeCount);
+    this.bfsFrontier = [];
+    this.bfsNext = [];
   }
 
   /**
@@ -135,37 +145,41 @@ export class ThreatMap {
     }
 
     // --- Pass 2: BFS diffusion — score[] is the wave source ---
-    const diffused = new Float32Array(nodeCount);
+    const diffused = this.bfsDiffused;
+    diffused.fill(0);
 
     for (let srcId = 0; srcId < nodeCount; srcId++) {
       const src = this.score[srcId];
       if (src <= 0) continue;
       if (this.confirmedDeadAt.has(srcId)) continue;
 
-      const visited = new Set<number>([srcId]);
-      let frontier = [srcId];
+      // Reuse frontier/visited buffers — clear before use
+      this.bfsVisited.fill(0);
+      this.bfsFrontier.length = 0;
+      this.bfsVisited[srcId] = 1;
+      this.bfsFrontier.push(srcId);
       let dist = 0;
 
-      while (frontier.length > 0 && dist <= maxSteps) {
+      while (this.bfsFrontier.length > 0 && dist <= maxSteps) {
         const contribution = src * spreadFactor * Math.exp(-dist / sigma);
-        for (const nid of frontier) {
-          if (contribution > diffused[nid]) {
-            diffused[nid] = contribution;
-          }
+        for (const nid of this.bfsFrontier) {
+          if (contribution > diffused[nid]) diffused[nid] = contribution;
         }
         dist++;
-        const next: number[] = [];
-        for (const nid of frontier) {
+        this.bfsNext.length = 0;
+        for (const nid of this.bfsFrontier) {
           const neighbors = model.Edges.List[nid];
           if (!neighbors) continue;
           for (const nb of neighbors) {
-            if (!visited.has(nb)) {
-              visited.add(nb);
-              next.push(nb);
+            if (!this.bfsVisited[nb]) {
+              this.bfsVisited[nb] = 1;
+              this.bfsNext.push(nb);
             }
           }
         }
-        frontier = next;
+        const tmp = this.bfsFrontier;
+        this.bfsFrontier = this.bfsNext;
+        this.bfsNext = tmp;
       }
     }
 

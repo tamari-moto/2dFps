@@ -20,6 +20,7 @@ export class ThreatHeatmapManager {
   private nodeList: Node[] = [];
   private edgeList: { [nodeId: number]: number[] } = {};
   private visible = true;
+  private sharedGeo: THREE.PlaneGeometry | null = null;
 
   constructor(private sceneManager: SceneManager) {}
 
@@ -73,10 +74,13 @@ export class ThreatHeatmapManager {
   private _createLayer(teamColor: number): void {
     const layerIndex = this.layers.size;
     const height = HEATMAP_HEIGHT + layerIndex * LAYER_HEIGHT_STEP;
-    const geo = new THREE.PlaneGeometry(
-      NodeConfig.CircleSize * PLANE_SIZE_FACTOR,
-      NodeConfig.CircleSize * PLANE_SIZE_FACTOR,
-    );
+    if (!this.sharedGeo) {
+      this.sharedGeo = new THREE.PlaneGeometry(
+        NodeConfig.CircleSize * PLANE_SIZE_FACTOR,
+        NodeConfig.CircleSize * PLANE_SIZE_FACTOR,
+      );
+    }
+    const geo = this.sharedGeo;
 
     const planes = new Map<number, THREE.Mesh>();
 
