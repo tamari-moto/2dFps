@@ -240,23 +240,46 @@ const MapEditor: React.FC<MapEditorProps> = ({ onClose, onPlayWithMap }) => {
       }
 
       if (customNodes) {
+        // カスタムノード: connectionRadius 以内のペアを線で結ぶ
+        const r2 = connectionRadius ** 2;
+        const maxN = 600; // それ以上は O(n²) が重いのでドット描画にフォールバック
+        if (customNodes.length <= maxN) {
+          ctx.strokeStyle = '#1e3a4a'; ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let i = 0; i < customNodes.length; i++) {
+            for (let j = i + 1; j < customNodes.length; j++) {
+              const a = customNodes[i], b = customNodes[j];
+              if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= r2) {
+                const s = gc(a.x, a.y), e = gc(b.x, b.y);
+                ctx.moveTo(s.cx, s.cy); ctx.lineTo(e.cx, e.cy);
+              }
+            }
+          }
+          ctx.stroke();
+        }
         ctx.fillStyle = '#3a5a7a';
         for (const n of customNodes) {
           const { cx, cy } = gc(n.x, n.y);
-          ctx.beginPath();
-          ctx.arc(cx, cy, 2, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
         }
       } else {
-        ctx.fillStyle = '#2a2a2a';
+        // デフォルトグリッド: 縦横の隣接ノード間をエッジで描画
+        ctx.strokeStyle = '#1e2e1e'; ctx.lineWidth = 1;
+        ctx.beginPath();
         for (let i = 0; i < nodesInGrid; i++) {
           for (let j = 0; j < nodesInGrid; j++) {
             const { cx, cy } = gc(i * nodeSpacing, j * nodeSpacing);
-            ctx.beginPath();
-            ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
-            ctx.fill();
+            if (i + 1 < nodesInGrid) {
+              const { cx: nx, cy: ny } = gc((i + 1) * nodeSpacing, j * nodeSpacing);
+              ctx.moveTo(cx, cy); ctx.lineTo(nx, ny);
+            }
+            if (j + 1 < nodesInGrid) {
+              const { cx: nx, cy: ny } = gc(i * nodeSpacing, (j + 1) * nodeSpacing);
+              ctx.moveTo(cx, cy); ctx.lineTo(nx, ny);
+            }
           }
         }
+        ctx.stroke();
       }
     };
 
