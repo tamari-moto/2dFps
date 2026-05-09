@@ -19,6 +19,7 @@ export class ThreatHeatmapManager {
   private layers: Map<number, Map<number, THREE.Mesh>> = new Map();
   private nodeList: Node[] = [];
   private edgeList: { [nodeId: number]: number[] } = {};
+  private visible = true;
 
   constructor(private sceneManager: SceneManager) {}
 
@@ -27,7 +28,18 @@ export class ThreatHeatmapManager {
     this.edgeList = edgeList;
   }
 
+  toggle(): boolean {
+    this.visible = !this.visible;
+    if (!this.visible) this.clear();
+    return this.visible;
+  }
+
+  isVisible(): boolean {
+    return this.visible;
+  }
+
   update(scores: Float32Array, teamColor: number): void {
+    if (!this.visible) return;
     if (!this.layers.has(teamColor)) {
       this._createLayer(teamColor);
     }
@@ -49,10 +61,11 @@ export class ThreatHeatmapManager {
 
   /** Show only the layer for the given teamColor; hide all others. */
   showOnly(teamColor: number): void {
+    if (!this.visible) return;
     for (const [color, layer] of this.layers) {
-      const visible = color === teamColor;
+      const isActive = color === teamColor;
       for (const mesh of layer.values()) {
-        if (!visible) (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        if (!isActive) (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
       }
     }
   }

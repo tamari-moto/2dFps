@@ -91,6 +91,10 @@ export class VisualizationSync {
     return this.losLines.isVisible();
   }
 
+  toggleHeatmap(): boolean {
+    return this.heatmap.toggle();
+  }
+
   getMeshList(): THREE.Mesh[] {
     return this.nodeVis.getMeshList();
   }

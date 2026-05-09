@@ -164,6 +164,10 @@ export class ThreeSetup {
     return this.visualizationSync.toggleLOS();
   }
 
+  toggleHeatmap(): boolean {
+    return this.visualizationSync.toggleHeatmap();
+  }
+
   /**
    * Returns all player IDs in the current game
    */

@@ -75,6 +75,7 @@ const PlayerCard: React.FC<{ state: PlayerHUDState; onSelect?: () => void }> = (
 const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
   const [losVisible, setLosVisible] = React.useState(true);
+  const [heatmapVisible, setHeatmapVisible] = React.useState(true);
   const [fogEnabled, setFogEnabled] = React.useState(PlayerConfig.FogOfWarEnabled);
   const [playerStates, setPlayerStates] = React.useState<PlayerHUDState[]>([]);
   const [confirmedCount, setConfirmedCount] = React.useState(0);
@@ -162,6 +163,12 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     setLosVisible(next);
   };
 
+  const handleToggleHeatmap = () => {
+    if (!threeSetup) return;
+    const next = threeSetup.toggleHeatmap();
+    setHeatmapVisible(next);
+  };
+
   const handleToggleFog = () => {
     PlayerConfig.FogOfWarEnabled = !PlayerConfig.FogOfWarEnabled;
     setFogEnabled(PlayerConfig.FogOfWarEnabled);
@@ -227,6 +234,13 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
         aria-label={`霧: ${fogEnabled ? 'ON' : 'OFF'}`}
       >
         霧: {fogEnabled ? 'ON' : 'OFF'}
+      </button>
+      <button
+        onClick={handleToggleHeatmap}
+        style={{ ...baseButtonStyle, backgroundColor: heatmapVisible ? '#8e44ad' : '#444444' }}
+        aria-label={`脅威図: ${heatmapVisible ? 'ON' : 'OFF'}`}
+      >
+        脅威図: {heatmapVisible ? 'ON' : 'OFF'}
       </button>
       {isSpectatorMode && (
         <>
