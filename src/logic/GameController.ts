@@ -223,7 +223,8 @@ export class GameController {
     const allActions: TurnAction[] = Array.from(this.confirmedActions.values());
 
     if (this.networkAdapter.supportsNPC()) {
-      allActions.push(...this.turnManager.collectNPCActions());
+      const activeTeam = this.model.getPlayer(this.activePlayerId)?.team ?? null;
+      allActions.push(...this.turnManager.collectNPCActions(activeTeam));
     }
 
     const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
@@ -275,7 +276,8 @@ export class GameController {
       moveToNodeId: activePlayer.node.id,
       shotAtNodeId: undefined,
     }] : [];
-    const allActions: TurnAction[] = [...stayActions, ...this.turnManager.collectNPCActions()];
+    const activeTeam = this.model.getPlayer(this.activePlayerId)?.team ?? null;
+    const allActions: TurnAction[] = [...stayActions, ...this.turnManager.collectNPCActions(activeTeam)];
 
     const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
     this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));

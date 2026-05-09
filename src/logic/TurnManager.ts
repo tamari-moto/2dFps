@@ -30,8 +30,9 @@ export class TurnManager {
   /**
    * Returns the intended TurnAction for every alive NPC.
    * Does NOT execute or apply any actions — the caller submits them as a round.
+   * visibleTeam: only emit VIS_THREAT_MAP_UPDATED for this team (avoids 6x emit per round).
    */
-  collectNPCActions(): TurnAction[] {
+  collectNPCActions(visibleTeam: TeamId | null = null): TurnAction[] {
     const aliveNPCs = this.getAliveNPCs();
 
     // Remove goals for NPCs that are no longer alive
@@ -55,21 +56,22 @@ export class TurnManager {
       return decideTurn(this.model, npc, updated, threatMap);
     });
 
-    // Emit threat scores for heatmap visualization
-    const nodeCount = this.model.nodeList.length;
-    for (const teamId of AIConfig.ThreatMapTeams as TeamId[]) {
-      const map = this.threatMaps.get(teamId);
-      if (!map) continue;
-      let scores = this.cachedTeamScores.get(teamId);
-      if (!scores || scores.length !== nodeCount) {
-        scores = new Float32Array(nodeCount);
-        this.cachedTeamScores.set(teamId, scores);
+    // Emit threat scores for heatmap visualization — active team only to avoid N×nodeCount updates
+    if (visibleTeam !== null && (AIConfig.ThreatMapTeams as number[]).includes(visibleTeam)) {
+      const map = this.threatMaps.get(visibleTeam);
+      if (map) {
+        const nodeCount = this.model.nodeList.length;
+        let scores = this.cachedTeamScores.get(visibleTeam);
+        if (!scores || scores.length !== nodeCount) {
+          scores = new Float32Array(nodeCount);
+          this.cachedTeamScores.set(visibleTeam, scores);
+        }
+        for (let i = 0; i < nodeCount; i++) scores[i] = map.getScore(i);
+        this.eventBus.emit(GameEventType.VIS_THREAT_MAP_UPDATED, {
+          scores,
+          teamColor: TEAM_COLORS[visibleTeam],
+        });
       }
-      for (let i = 0; i < nodeCount; i++) scores[i] = map.getScore(i);
-      this.eventBus.emit(GameEventType.VIS_THREAT_MAP_UPDATED, {
-        scores,
-        teamColor: TEAM_COLORS[teamId],
-      });
     }
 
     return actions;
