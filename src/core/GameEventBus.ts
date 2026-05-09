@@ -84,6 +84,9 @@ export enum GameEventType {
   // ThreatMap heatmap visualization
   VIS_THREAT_MAP_UPDATED = 'vis:threat_map_updated',
 
+  // ScoreNode label visualization
+  VIS_SCORENODE_LABELS = 'vis:scorenode_labels',
+
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
   NETWORK_DISCONNECTED = 'network:disconnected',
@@ -239,6 +242,11 @@ export interface GameEventData {
   [GameEventType.VIS_THREAT_MAP_UPDATED]: {
     scores: Float32Array;
     teamColor: number;
+  };
+
+  // ScoreNode label visualization
+  [GameEventType.VIS_SCORENODE_LABELS]: {
+    scores: Map<number, number> | null;
   };
 
   // Network events

@@ -10,6 +10,7 @@ import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
 import { LOSLineManager } from './world/LOSLineManager';
 import { ThreatHeatmapManager } from './world/ThreatHeatmapManager';
+import { ScoreNodeLabelManager } from './world/ScoreNodeLabelManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
 import { HPBarManager } from './players/HPBarManager';
 import { isPointInCone } from '../logic/ConeIntersection';
@@ -29,6 +30,7 @@ export class VisualizationSync {
   private textBurstEffect: TextBurstEffect;
   private hpBarManager:  HPBarManager;
   private heatmap:       ThreatHeatmapManager;
+  private scoreLabels:   ScoreNodeLabelManager;
   private model:         Model;
 
   private activePlayerId: string;
@@ -55,6 +57,8 @@ export class VisualizationSync {
     this.textBurstEffect = new TextBurstEffect(sceneManager);
     this.heatmap       = new ThreatHeatmapManager(sceneManager);
     this.heatmap.init(model.nodeList, model.Edges.List);
+    this.scoreLabels   = new ScoreNodeLabelManager(sceneManager);
+    this.scoreLabels.init(model.nodeList);
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -252,6 +256,14 @@ export class VisualizationSync {
 
     eventBus.on(GameEventType.VIS_THREAT_MAP_UPDATED, (data: { scores: Float32Array; teamColor: number }) => {
       this.heatmap.update(data.scores, data.teamColor);
+    });
+
+    eventBus.on(GameEventType.VIS_SCORENODE_LABELS, (data) => {
+      if (data.scores === null) {
+        this.scoreLabels.clear();
+      } else {
+        this.scoreLabels.update(data.scores);
+      }
     });
 
   }

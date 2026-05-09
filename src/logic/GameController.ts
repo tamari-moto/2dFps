@@ -1,8 +1,10 @@
 import { Model } from '../model/model';
+import { Player } from '../model/Player';
 import type { ObstacleData } from '../model/MapGenerator';
 import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig, HUMAN_PLAYER_IDS } from '../config/GameConfig';
+import { PlayerConfig, HUMAN_PLAYER_IDS, AIConfig } from '../config/GameConfig';
+import { scoreNode } from './ai/NodeScorer';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
@@ -99,6 +101,13 @@ export class GameController {
       if (!player || !player.isAlive) return;
       this.activePlayerId = playerId;
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId });
+
+      if (player.isNPC) {
+        const scores = this.computeScoreNodeLabels(player);
+        this.eventBus.emit(GameEventType.VIS_SCORENODE_LABELS, { scores });
+      } else {
+        this.eventBus.emit(GameEventType.VIS_SCORENODE_LABELS, { scores: null });
+      }
     });
     this.eventBus.on(GameEventType.NPC_ONLY_TURN, () => {
       if (this.inputLocked) return;
@@ -372,6 +381,16 @@ export class GameController {
 
   getModel(): Model {
     return this.model;
+  }
+
+  private computeScoreNodeLabels(npc: Player): Map<number, number> {
+    const enemies = this.model.getEnemyPlayers(npc.id);
+    const reachable = this.model.getReachableNodes(npc.node.id, AIConfig.GoalSearchRadius);
+    const result = new Map<number, number>();
+    for (const nodeId of reachable) {
+      result.set(nodeId, scoreNode(this.model, npc, nodeId, enemies));
+    }
+    return result;
   }
 
   importObstacles(obstaclesData: ObstacleData[]): void {
