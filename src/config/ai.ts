@@ -57,8 +57,11 @@ export const AIConfig = {
   ThreatMapMaxLookDistance: 8,
 
   /** Teams that use ThreatMap for goal selection, facing, and heatmap visualization. */
-  ThreatMapTeams: [2, 5] as number[],
+  ThreatMapTeams: [0, 1, 2, 3, 4, 5] as number[],
 
   /** Weight for ThreatMap score bonus when selecting a patrol goal node */
   ThreatMapGoalBonus: 50,
+
+  /** Threshold below which NodeScorer ignores a node's threat score for exposure/distance calc */
+  ScorerThreatExposureMin: 0.1,
 } as const;

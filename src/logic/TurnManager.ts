@@ -90,6 +90,10 @@ export class TurnManager {
     }
   }
 
+  getThreatMapForTeam(team: TeamId): ThreatMap | null {
+    return this.threatMaps.get(team) ?? null;
+  }
+
   private _getThreatMap(team: TeamId): ThreatMap {
     let map = this.threatMaps.get(team);
     if (!map) {

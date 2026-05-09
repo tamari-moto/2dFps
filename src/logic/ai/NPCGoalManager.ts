@@ -20,12 +20,14 @@ export function selectGoalNode(model: Model, npc: Player, threatMap: ThreatMap |
 
   if (candidates.length === 0) return npc.node.id;
 
+  const teamVisibleNodeIds = model.getTeamVisibleNodes(npc.id);
+
   let bestNodeId = npc.node.id;
   let bestScore = -Infinity;
 
   for (const nodeId of candidates) {
     if (isNodeOccupied(model, nodeId, npc.id)) continue;
-    const score = scoreNode(model, npc, nodeId, enemies)
+    const score = scoreNode(model, npc, nodeId, enemies, threatMap, teamVisibleNodeIds)
       + (threatMap ? threatMap.getScore(nodeId) * AIConfig.ThreatMapGoalBonus : 0);
     if (score > bestScore) {
       bestScore = score;

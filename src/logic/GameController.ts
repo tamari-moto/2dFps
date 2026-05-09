@@ -386,9 +386,11 @@ export class GameController {
   private computeScoreNodeLabels(npc: Player): Map<number, number> {
     const enemies = this.model.getEnemyPlayers(npc.id);
     const reachable = this.model.getReachableNodes(npc.node.id, AIConfig.GoalSearchRadius);
+    const teamVisibleNodeIds = this.model.getTeamVisibleNodes(npc.id);
+    const threatMap = this.turnManager.getThreatMapForTeam(npc.team);
     const result = new Map<number, number>();
     for (const nodeId of reachable) {
-      result.set(nodeId, scoreNode(this.model, npc, nodeId, enemies));
+      result.set(nodeId, scoreNode(this.model, npc, nodeId, enemies, threatMap, teamVisibleNodeIds));
     }
     return result;
   }
