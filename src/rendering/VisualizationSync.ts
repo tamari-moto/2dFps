@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Model } from '../model/model';
 import { SceneManager } from './core/SceneManager';
-import { CameraConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
+import { CameraConfig, PlayerConfig, RenderConfig, AIConfig, TEAM_COLORS } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerAnimator } from './players/PlayerAnimator';
 import { PlayerLifecycleManager } from './players/PlayerLifecycleManager';
@@ -120,8 +120,9 @@ export class VisualizationSync {
     this.nodeVis.updateNodeColors(activePlayer);
     this.losLines.update(this.model);
 
-    // Clear heatmap when not observing team 5
-    if (activePlayer.team !== 5) {
+    if ((AIConfig.ThreatMapTeams as number[]).includes(activePlayer.team)) {
+      this.heatmap.showOnly(TEAM_COLORS[activePlayer.team]);
+    } else {
       this.heatmap.clear();
     }
   }

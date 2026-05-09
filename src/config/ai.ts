@@ -55,4 +55,10 @@ export const AIConfig = {
 
   /** BFS range when searching for highest-threat node to face */
   ThreatMapMaxLookDistance: 8,
+
+  /** Teams that use ThreatMap for goal selection, facing, and heatmap visualization. */
+  ThreatMapTeams: [2, 5] as number[],
+
+  /** Weight for ThreatMap score bonus when selecting a patrol goal node */
+  ThreatMapGoalBonus: 50,
 } as const;

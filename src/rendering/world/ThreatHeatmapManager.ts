@@ -7,29 +7,71 @@ import { NodeConfig } from '../../config/GameConfig';
 const HEATMAP_HEIGHT = 1.5;
 const HEATMAP_MAX_OPACITY = 0.6;
 const PLANE_SIZE_FACTOR = 2.0;
+const LAYER_HEIGHT_STEP = 0.05;
 
 /**
- * Renders a ThreatMap as a per-node semi-transparent overlay in the 3D scene.
- * Each node gets a horizontal PlaneGeometry positioned above it.
+ * Renders ThreatMaps as per-node semi-transparent overlays in the 3D scene.
+ * Each team gets its own layer of PlaneGeometry meshes, created lazily on first update.
  * opacity = score * HEATMAP_MAX_OPACITY; color = team color.
  */
 export class ThreatHeatmapManager {
-  /** Indexed by node.id; undefined for nodes excluded from the graph (inside obstacles). */
-  private planes: Map<number, THREE.Mesh> = new Map();
+  /** teamColor → (nodeId → Mesh) */
+  private layers: Map<number, Map<number, THREE.Mesh>> = new Map();
+  private nodeList: Node[] = [];
+  private edgeList: { [nodeId: number]: number[] } = {};
 
   constructor(private sceneManager: SceneManager) {}
 
   init(nodeList: Node[], edgeList: { [nodeId: number]: number[] }): void {
+    this.nodeList = nodeList;
+    this.edgeList = edgeList;
+  }
+
+  update(scores: Float32Array, teamColor: number): void {
+    if (!this.layers.has(teamColor)) {
+      this._createLayer(teamColor);
+    }
+    const layer = this.layers.get(teamColor)!;
+    for (const [nodeId, mesh] of layer) {
+      const score = scores[nodeId] ?? 0;
+      (mesh.material as THREE.MeshBasicMaterial).opacity = score * HEATMAP_MAX_OPACITY;
+    }
+  }
+
+  /** Hide all layers. */
+  clear(): void {
+    for (const layer of this.layers.values()) {
+      for (const mesh of layer.values()) {
+        (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+      }
+    }
+  }
+
+  /** Show only the layer for the given teamColor; hide all others. */
+  showOnly(teamColor: number): void {
+    for (const [color, layer] of this.layers) {
+      const visible = color === teamColor;
+      for (const mesh of layer.values()) {
+        if (!visible) (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+      }
+    }
+  }
+
+  private _createLayer(teamColor: number): void {
+    const layerIndex = this.layers.size;
+    const height = HEATMAP_HEIGHT + layerIndex * LAYER_HEIGHT_STEP;
     const geo = new THREE.PlaneGeometry(
       NodeConfig.CircleSize * PLANE_SIZE_FACTOR,
       NodeConfig.CircleSize * PLANE_SIZE_FACTOR,
     );
 
-    for (const node of nodeList) {
-      if (!edgeList[node.id]) continue;
+    const planes = new Map<number, THREE.Mesh>();
+
+    for (const node of this.nodeList) {
+      if (!this.edgeList[node.id]) continue;
 
       const mat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: teamColor,
         transparent: true,
         depthTest: false,
         opacity: 0,
@@ -38,25 +80,12 @@ export class ThreatHeatmapManager {
 
       const mesh = new THREE.Mesh(geo, mat);
       mesh.rotation.x = -Math.PI / 2;
-      mesh.position.copy(gameToWorld(node.x, node.y, HEATMAP_HEIGHT));
+      mesh.position.copy(gameToWorld(node.x, node.y, height));
 
       this.sceneManager.addToScene(mesh);
-      this.planes.set(node.id, mesh);
+      planes.set(node.id, mesh);
     }
-  }
 
-  update(scores: Float32Array, teamColor: number): void {
-    for (const [nodeId, mesh] of this.planes) {
-      const score = scores[nodeId] ?? 0;
-      const mat = mesh.material as THREE.MeshBasicMaterial;
-      mat.color.setHex(teamColor);
-      mat.opacity = score * HEATMAP_MAX_OPACITY;
-    }
-  }
-
-  clear(): void {
-    for (const mesh of this.planes.values()) {
-      (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
-    }
+    this.layers.set(teamColor, planes);
   }
 }

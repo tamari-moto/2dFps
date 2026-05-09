@@ -6,7 +6,7 @@ import { NPCGoalState } from './ai/NPCGoalState';
 import { selectGoalNode, updateGoal } from './ai/NPCGoalManager';
 import { ThreatMap } from './ai/ThreatMap';
 import type { TeamId } from '../config/GameConfig';
-import { TEAM_COLORS } from '../config/GameConfig';
+import { TEAM_COLORS, AIConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 
 /**
@@ -47,21 +47,24 @@ export class TurnManager {
 
     const actions = aliveNPCs.map(npc => {
       const goal = this.getOrInitGoal(npc);
-      const updated = updateGoal(this.model, npc, goal);
+      const threatMap = (AIConfig.ThreatMapTeams as number[]).includes(npc.team)
+        ? this._getThreatMap(npc.team as TeamId) : null;
+      const updated = updateGoal(this.model, npc, goal, threatMap);
       this.npcGoals.set(npc.id, updated);
-      const threatMap = npc.team === 5 ? this._getThreatMap(npc.team) : null;
       return decideTurn(this.model, npc, updated, threatMap);
     });
 
-    // Emit team 5 threat scores for heatmap visualization
-    const map5 = this.threatMaps.get(5 as TeamId);
-    if (map5) {
-      const scores = new Float32Array(this.model.nodeList.length);
-      for (let i = 0; i < scores.length; i++) scores[i] = map5.getScore(i);
-      this.eventBus.emit(GameEventType.VIS_THREAT_MAP_UPDATED, {
-        scores,
-        teamColor: TEAM_COLORS[5],
-      });
+    // Emit threat scores for heatmap visualization
+    for (const teamId of AIConfig.ThreatMapTeams as TeamId[]) {
+      const map = this.threatMaps.get(teamId);
+      if (map) {
+        const scores = new Float32Array(this.model.nodeList.length);
+        for (let i = 0; i < scores.length; i++) scores[i] = map.getScore(i);
+        this.eventBus.emit(GameEventType.VIS_THREAT_MAP_UPDATED, {
+          scores,
+          teamColor: TEAM_COLORS[teamId],
+        });
+      }
     }
 
     return actions;
@@ -70,7 +73,7 @@ export class TurnManager {
   private _updateThreatMaps(aliveNPCs: Player[], roundNumber: number): void {
     // Only update ThreatMap for team 0
     const activeTeams = new Set<TeamId>(
-      aliveNPCs.filter(n => n.team === 5).map(n => n.team)
+      aliveNPCs.filter(n => (AIConfig.ThreatMapTeams as number[]).includes(n.team)).map(n => n.team)
     );
 
     for (const team of activeTeams) {
@@ -95,7 +98,7 @@ export class TurnManager {
   private getOrInitGoal(npc: Player): NPCGoalState {
     if (!this.npcGoals.has(npc.id)) {
       return {
-        goalNodeId: selectGoalNode(this.model, npc),
+        goalNodeId: selectGoalNode(this.model, npc, null),
         goalSetAtHP: npc.health,
         turnsElapsed: 0,
       };
