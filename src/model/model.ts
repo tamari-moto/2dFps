@@ -17,6 +17,7 @@ class Model {
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
   private lastSeed: string = '';
+  private losCache: Map<string, boolean> = new Map();
 
   public getLastSeed(): string {
     return this.lastSeed;
@@ -55,6 +56,7 @@ class Model {
       this.Lines = bspResult.lines;
       MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
       MapGenerator.removeNodesInsideObstacles(this.Edges, this.nodeList, this.obstacles);
+      this.buildLOSCache();
     }
   }
 
@@ -147,17 +149,35 @@ class Model {
    * @returns True if there is a clear line of sight, false if blocked by obstacles.
    */
   public hasLineOfSight(node1: Node, node2: Node): boolean {
+    const [a, b] = node1.id < node2.id
+      ? [node1.id, node2.id]
+      : [node2.id, node1.id];
+    const cached = this.losCache.get(`${a},${b}`);
+    if (cached !== undefined) return cached;
     const p1 = { x: node1.x, y: node1.y };
     const p2 = { x: node2.x, y: node2.y };
-
-    // Check if the line between nodes intersects with any obstacle segments
     for (const segment of this.Lines) {
-      if (segment.intersects(p1, p2)) {
-        return false; // Line of sight is blocked
+      if (segment.intersects(p1, p2)) return false;
+    }
+    return true;
+  }
+
+  private buildLOSCache(): void {
+    this.losCache = new Map();
+    const activeNodes = this.nodeList.filter(n => this.Edges.List[n.id] !== undefined);
+    for (let i = 0; i < activeNodes.length; i++) {
+      for (let j = i + 1; j < activeNodes.length; j++) {
+        const n1 = activeNodes[i];
+        const n2 = activeNodes[j];
+        const p1 = { x: n1.x, y: n1.y };
+        const p2 = { x: n2.x, y: n2.y };
+        let los = true;
+        for (const seg of this.Lines) {
+          if (seg.intersects(p1, p2)) { los = false; break; }
+        }
+        this.losCache.set(`${n1.id},${n2.id}`, los);
       }
     }
-
-    return true; // Clear line of sight
   }
 
   /**
@@ -295,6 +315,7 @@ class Model {
     this.obstacles = result.obstacles;
     this.Lines = result.lines;
     MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    this.buildLOSCache();
   }
 
   /**
