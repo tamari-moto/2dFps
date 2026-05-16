@@ -315,6 +315,7 @@ class Model {
     this.obstacles = result.obstacles;
     this.Lines = result.lines;
     MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    MapGenerator.removeNodesInsideObstacles(this.Edges, this.nodeList, this.obstacles);
     this.buildLOSCache();
   }
 
