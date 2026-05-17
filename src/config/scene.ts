@@ -37,7 +37,7 @@ export const FogConfig = {
  */
 export const ShadowConfig = {
   /** Enable shadow maps */
-  Enabled: true,
+  Enabled: false,
   /** Shadow map size (higher = sharper, more expensive) */
   MapSize: 2048,
   /** Shadow camera near clip */
@@ -53,7 +53,7 @@ export const ShadowConfig = {
  */
 export const PostProcessConfig = {
   /** Enable bloom post-processing */
-  EnableBloom: true,
+  EnableBloom: false,
   /** Bloom effect strength */
   BloomStrength: 0.8,
   /** Bloom effect radius */

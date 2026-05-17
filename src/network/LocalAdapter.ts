@@ -3,8 +3,6 @@ import { Node } from '../model/node';
 import { INetworkAdapter } from './INetworkAdapter';
 import { TurnAction, TurnResult, ObstaclePayload, ServerConfigPayload } from '../schema/types';
 import { PlayerConfig } from '../config/GameConfig';
-import { ENTITY_IDS } from '../config/GameConfig';
-
 /**
  * Local-play implementation of INetworkAdapter.
  * Executes all game logic in-process (no network), preserving the original behavior.
@@ -12,7 +10,7 @@ import { ENTITY_IDS } from '../config/GameConfig';
  */
 export class LocalAdapter implements INetworkAdapter {
   private model!: Model;
-  private readonly myPlayerId: string = ENTITY_IDS.PLAYER_1;
+  private readonly myPlayerId: string = '';
   private turnResultCallback?: (result: TurnResult) => void;
 
   // ---- INetworkAdapter -------------------------------------------------------
@@ -165,16 +163,17 @@ export class LocalAdapter implements INetworkAdapter {
       this.model.setPlayerRef(action.playerId, newNode);
 
       let newAngle = player.angle;
-      if (action.shotAtNodeId !== undefined) {
+      if (action.angle !== undefined) {
+        newAngle = action.angle;
+      } else if (action.shotAtNodeId !== undefined) {
         const shotNode = this.model.nodeList[action.shotAtNodeId];
         if (shotNode) {
           newAngle = this.model.getAngleBetweenNodes(newNode, shotNode);
-          player.setAngle(newAngle);
         }
       } else if (action.moveToNodeId !== fromNode.id) {
         newAngle = this.model.getAngleBetweenNodes(fromNode, newNode);
-        player.setAngle(newAngle);
       }
+      player.setAngle(newAngle);
 
       pendingResults.push({
         movingPlayerId: action.playerId,

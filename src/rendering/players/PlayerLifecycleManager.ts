@@ -37,7 +37,7 @@ export class PlayerLifecycleManager {
       const obj = createVariantPlayer(player.color);
       this.sceneManager.addToScene(obj);
       this.playerMeshes.set(playerId, obj);
-      this.hpBarManager.attachBar(playerId, obj, player.isNPC);
+      this.hpBarManager.attachBar(playerId, obj, player.isNPC, player.team);
       this.animator.startIdle(playerId);
     }
   }
@@ -49,7 +49,7 @@ export class PlayerLifecycleManager {
     this.sceneManager.addToScene(obj);
     this.playerMeshes.set(playerId, obj);
     const player = this.model.getPlayer(playerId);
-    this.hpBarManager.attachBar(playerId, obj, player?.isNPC ?? false);
+    this.hpBarManager.attachBar(playerId, obj, player?.isNPC ?? false, player?.team);
     this.animator.startIdle(playerId);
   }
 

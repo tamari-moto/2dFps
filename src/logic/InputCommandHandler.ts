@@ -48,7 +48,7 @@ export class InputCommandHandler {
 
     const activePlayerId = this.ctx.getActivePlayerId();
     const activePlayer = this.ctx.model.getPlayer(activePlayerId);
-    if (!activePlayer) return;
+    if (!activePlayer || activePlayer.isNPC) return;
 
     const sm = this.ctx.getStateMachine(activePlayerId);
     const clickedNode = this.ctx.model.nodeList[data.nodeId];
@@ -136,6 +136,9 @@ export class InputCommandHandler {
     if (this.ctx.isInputLocked()) return;
 
     const activePlayerId = this.ctx.getActivePlayerId();
+    const activePlayer = this.ctx.model.getPlayer(activePlayerId);
+    if (!activePlayer || activePlayer.isNPC) return;
+
     const sm = this.ctx.getStateMachine(activePlayerId);
     sm.transition(GameEvent.Cancel);
     this.ctx.setPendingShotNodeIdForPlayer(activePlayerId, undefined);
@@ -144,7 +147,6 @@ export class InputCommandHandler {
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_NEXT_MESH);
     this.ctx.eventBus.emit(GameEventType.VIS_CLEAR_MOVE_PATH);
 
-    const activePlayer = this.ctx.model.getPlayer(activePlayerId);
     if (activePlayer) {
       const reachableNodes = this.ctx.model.getReachableNodes(activePlayer.node.id, PlayerConfig.MoveRange);
       this.ctx.setReachableNodesForPlayer(activePlayerId, reachableNodes);

@@ -4,6 +4,7 @@ import { CameraConfig, MapConfig, RenderConfig } from '../../config/GameConfig';
 import { LightingRig } from './LightingRig';
 import { applyFogToScene, applyShadowToRenderer, setupPostProcessing } from './PostProcessing';
 import { BackgroundGrid } from './BackgroundGrid';
+import type { Model } from '../../model/model';
 
 /**
  * Owns the Three.js renderer / scene / camera and the per-frame render loop.
@@ -47,6 +48,7 @@ export class SceneManager {
     this.camera.updateProjectionMatrix();
 
     this.backgroundGrid = new BackgroundGrid(this.scene);
+    // Edge grid is built later via buildEdgeGrid(model) once the model is ready.
 
     // Origin axes helper (red=+X, green=+Y, blue=+Z) for debugging
     this.scene.add(new THREE.AxesHelper(MapConfig.NodeSpacing * 3));
@@ -122,6 +124,11 @@ export class SceneManager {
 
   getRenderer(): THREE.WebGLRenderer {
     return this.renderer;
+  }
+
+  /** Builds (or rebuilds) the edge graph lines from the model. Call after map generation. */
+  buildEdgeGrid(model: Model): void {
+    this.backgroundGrid.build(model);
   }
 
   /** Toggles the background grid visibility. */

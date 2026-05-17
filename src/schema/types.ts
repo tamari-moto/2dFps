@@ -8,6 +8,7 @@ export interface TurnAction {
   playerId: string;
   moveToNodeId: number;
   shotAtNodeId: number | undefined;
+  angle?: number;
 }
 
 /** Result returned after a turn is executed */

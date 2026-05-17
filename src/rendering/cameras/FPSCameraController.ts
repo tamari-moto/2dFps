@@ -85,9 +85,10 @@ export class FPSCameraController {
     if (this.enabled) return;
 
     const activeId = this.getActivePlayerId();
-    const player = this.model.getPlayer(activeId);
+    const player = this.model.getPlayer(activeId)
+      ?? Array.from(this.model.players.values()).find(p => p.isAlive);
     if (!player) {
-      console.warn('[FPSCameraController] enable() called but no active player available');
+      console.warn('[FPSCameraController] enable() called but no alive player available');
       return;
     }
 
@@ -155,7 +156,8 @@ export class FPSCameraController {
 
     // アクティブプレイヤーへスナップ（パン中で取り残されたカメラを定位置に戻す）
     const activeId = this.getActivePlayerId();
-    const player = this.model.getPlayer(activeId);
+    const player = this.model.getPlayer(activeId)
+      ?? Array.from(this.model.players.values()).find(p => p.isAlive);
     if (player) {
       this.follow.snapTo(player.node.x, player.node.y, player.angle);
     }
@@ -218,7 +220,6 @@ export class FPSCameraController {
       case 'Space': this.keys.space = true; e.preventDefault(); break;
       case 'ControlLeft': case 'ControlRight': this.keys.ctrl = true; break;
       case 'ShiftLeft': case 'ShiftRight': this.keys.shift = true; break;
-      case 'KeyR': this.eventBus.emit(GameEventType.NPC_ONLY_TURN); break;
     }
   }
 

@@ -25,4 +25,43 @@ export const AIConfig = {
 
   /** Waiting time after a simultaneous round resolves before re-enabling input (ms) */
   RoundAnimationDelayMs: 1500,
+
+  /** BFS radius used when searching for a goal node */
+  GoalSearchRadius: 8,
+
+  /** Force goal re-evaluation after this many turns without reaching the goal */
+  GoalTimeoutTurns: 10,
+
+  /** Re-evaluate goal if HP drops by this amount since goal was set */
+  GoalHPChangeThreshold: 30,
+
+  /** Enable ThreatMap-based facing angle when no visible enemies */
+  ThreatMapAngleEnabled: true,
+
+  /** Per-round multiplier applied to accumulated threat scores before diffusion. Controls fade speed. */
+  ThreatAccumulationDecay: 0.85,
+
+  /** Fraction of a node's score that spreads outward during BFS diffusion. */
+  ThreatSpreadFactor: 1.2,
+
+  /** BFS diffusion distance scale */
+  ThreatSigma: 4,
+
+  /** Maximum BFS steps for threat diffusion */
+  ThreatMaxDiffusionSteps: 1,
+
+  /** Upper bound for ambient threat score on long-unobserved nodes */
+  ThreatAmbientCap: 0,
+
+  /** BFS range when searching for highest-threat node to face */
+  ThreatMapMaxLookDistance: 8,
+
+  /** Teams that use ThreatMap for goal selection, facing, and heatmap visualization. */
+  ThreatMapTeams: [0, 1, 2, 3, 4, 5] as number[],
+
+  /** Weight for ThreatMap score bonus when selecting a patrol goal node */
+  ThreatMapGoalBonus: 50,
+
+  /** Threshold below which NodeScorer ignores a node's threat score for exposure/distance calc */
+  ScorerThreatExposureMin: 0.1,
 } as const;

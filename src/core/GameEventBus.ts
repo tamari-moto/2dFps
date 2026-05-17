@@ -70,9 +70,22 @@ export enum GameEventType {
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
   FPS_MODE_CHANGED = 'fps:mode_changed',
 
+  // Spectator auto-loop control
+  SPECTATOR_SET_AUTO_LOOP = 'spectator:set_auto_loop',
+  SPECTATOR_AUTO_LOOP_CHANGED = 'spectator:auto_loop_changed',
+
+  // Spectator player selection
+  SPECTATOR_SELECT_PLAYER = 'spectator:select_player',
+
   // Ortho MAP overview mode events
   ORTHO_MODE_TOGGLE_REQUESTED = 'ortho:toggle_requested',
   ORTHO_MODE_CHANGED = 'ortho:mode_changed',
+
+  // ThreatMap heatmap visualization
+  VIS_THREAT_MAP_UPDATED = 'vis:threat_map_updated',
+
+  // ScoreNode label visualization
+  VIS_SCORENODE_LABELS = 'vis:scorenode_labels',
 
   // Network events (Phase 2+: used by ColyseusAdapter)
   NETWORK_CONNECTED = 'network:connected',
@@ -212,10 +225,28 @@ export interface GameEventData {
     enabled: boolean;
   };
 
+  // Spectator auto-loop control
+  [GameEventType.SPECTATOR_SET_AUTO_LOOP]: { enabled: boolean };
+  [GameEventType.SPECTATOR_AUTO_LOOP_CHANGED]: { enabled: boolean };
+
+  // Spectator player selection
+  [GameEventType.SPECTATOR_SELECT_PLAYER]: { playerId: string };
+
   // Ortho MAP overview mode events
   [GameEventType.ORTHO_MODE_TOGGLE_REQUESTED]: void;
   [GameEventType.ORTHO_MODE_CHANGED]: {
     enabled: boolean;
+  };
+
+  // ThreatMap heatmap visualization
+  [GameEventType.VIS_THREAT_MAP_UPDATED]: {
+    scores: Float32Array;
+    teamColor: number;
+  };
+
+  // ScoreNode label visualization
+  [GameEventType.VIS_SCORENODE_LABELS]: {
+    scores: Map<number, number> | null;
   };
 
   // Network events

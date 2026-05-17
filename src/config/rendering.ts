@@ -11,6 +11,12 @@ export const RenderConfig = {
   /** Grid line opacity */
   GridLineOpacity: 0.6,
 
+  /** LOS (line-of-sight) ray color */
+  LOSLineColor: 0x334455,
+
+  /** LOS ray opacity */
+  LOSLineOpacity: 0.35,
+
   /** Player diamond marker size */
   PlayerMarkerSize: 20,
 
@@ -130,6 +136,18 @@ export const WallConfig = {
  * All sizes are in Three.js world units (PlayerMarkerSize = 20 scale).
  * Head top Y ≈ 13.26 (HS*1.3 + headR*s = 4.06 + 9.2), bar at YOffset=16 gives 2.74 units clearance.
  */
+export const ScoreLabelConfig = {
+  Height: 3.0,
+  SpriteWorldSize: 7,
+  CanvasSize: 128,
+  FontSizeRatio: 0.55,
+  ColorHigh: '#44ff88',
+  ColorLow:  '#ff4444',
+  ColorMid:  '#ffcc00',
+  BgColor: 'rgba(0, 0, 0, 0.6)',
+  BgPaddingRatio: 0.08,
+} as const;
+
 export const HPBarConfig = {
   Width:        14,
   Height:       1.5,

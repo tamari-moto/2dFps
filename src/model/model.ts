@@ -3,7 +3,7 @@ import { Graph } from './Graph';
 import { LineSegment } from './LineSegment';
 import type { ObstacleData } from './MapGenerator';
 import { MapConfig, PlayerConfig } from '../config/GameConfig';
-import { LOCAL_PLAYER_COUNT, LOCAL_NPC_COUNT, createPlayerId } from '../config/GameConfig';
+import { LOCAL_TEAM_COUNT, LOCAL_NPC_PER_TEAM, createPlayerId } from '../config/GameConfig';
 import type { TeamId } from '../config/GameConfig';
 import { MapGenerator } from './MapGenerator';
 import { Player } from './Player';
@@ -17,6 +17,7 @@ class Model {
   public Lines: LineSegment[] = [];
   private obstacles: ObstacleData[] = [];
   private lastSeed: string = '';
+  private losCache: Map<string, boolean> = new Map();
 
   public getLastSeed(): string {
     return this.lastSeed;
@@ -55,6 +56,7 @@ class Model {
       this.Lines = bspResult.lines;
       MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
       MapGenerator.removeNodesInsideObstacles(this.Edges, this.nodeList, this.obstacles);
+      this.buildLOSCache();
     }
   }
 
@@ -65,32 +67,34 @@ class Model {
   public initLocalPlayers(): void {
     const usedNodeIds = new Set<number>();
     const size = this.NodesInGridSize;
-    const totalCount = LOCAL_PLAYER_COUNT + LOCAL_NPC_COUNT;
+    const h = size * MapConfig.NodeSpacing;
 
-    // Players spawn at bottom (low y), NPCs spawn at top (high y)
-    const bottomNodes = this.nodeList.filter(n => n.y < (size * MapConfig.NodeSpacing) * 0.25 && this.Edges.List[n.id] !== undefined);
-    const topNodes    = this.nodeList.filter(n => n.y >= (size * MapConfig.NodeSpacing) * 0.75 && this.Edges.List[n.id] !== undefined);
+    // チーム数に応じてマップをY軸方向に均等分割してスポーンプールを生成
+    const spawnPools = Array.from({ length: LOCAL_TEAM_COUNT }, (_, team) => {
+      const yMin = (team / LOCAL_TEAM_COUNT) * h;
+      const yMax = ((team + 1) / LOCAL_TEAM_COUNT) * h;
+      return this.nodeList.filter(
+        n => n.y >= yMin && n.y < yMax && this.Edges.List[n.id] !== undefined
+      );
+    });
 
-    for (let i = 0; i < totalCount && i < this.nodeList.length; i++) {
-      const isNPC = i >= LOCAL_PLAYER_COUNT;
-      const playerId = createPlayerId(i);
-      const team: TeamId = isNPC ? 1 : 0;
-      const pool = isNPC ? topNodes : bottomNodes;
-
-      let nodeIndex: number;
-      let attempts = 0;
-      do {
-        const candidate = pool[Math.floor(Math.random() * pool.length)];
-        nodeIndex = candidate?.id ?? Math.floor(Math.random() * this.nodeList.length);
-        attempts++;
-        // fallback to full list if pool is exhausted
-        if (attempts > pool.length * 2) {
-          nodeIndex = Math.floor(Math.random() * this.nodeList.length);
-        }
-      } while (usedNodeIds.has(nodeIndex));
-
-      usedNodeIds.add(nodeIndex);
-      this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team, 100, isNPC));
+    let playerIndex = 0;
+    for (let team = 0; team < LOCAL_TEAM_COUNT; team++) {
+      const pool = spawnPools[team];
+      for (let i = 0; i < LOCAL_NPC_PER_TEAM; i++) {
+        const playerId = createPlayerId(playerIndex++);
+        let nodeIndex: number;
+        let attempts = 0;
+        do {
+          const candidate = pool[Math.floor(Math.random() * pool.length)];
+          nodeIndex = candidate?.id ?? Math.floor(Math.random() * this.nodeList.length);
+          if (++attempts > pool.length * 2) {
+            nodeIndex = Math.floor(Math.random() * this.nodeList.length);
+          }
+        } while (usedNodeIds.has(nodeIndex));
+        usedNodeIds.add(nodeIndex);
+        this.players.set(playerId, new Player(playerId, this.nodeList[nodeIndex], team as TeamId, 100, true));
+      }
     }
   }
 
@@ -147,17 +151,35 @@ class Model {
    * @returns True if there is a clear line of sight, false if blocked by obstacles.
    */
   public hasLineOfSight(node1: Node, node2: Node): boolean {
+    const [a, b] = node1.id < node2.id
+      ? [node1.id, node2.id]
+      : [node2.id, node1.id];
+    const cached = this.losCache.get(`${a},${b}`);
+    if (cached !== undefined) return cached;
     const p1 = { x: node1.x, y: node1.y };
     const p2 = { x: node2.x, y: node2.y };
-
-    // Check if the line between nodes intersects with any obstacle segments
     for (const segment of this.Lines) {
-      if (segment.intersects(p1, p2)) {
-        return false; // Line of sight is blocked
+      if (segment.intersects(p1, p2)) return false;
+    }
+    return true;
+  }
+
+  private buildLOSCache(): void {
+    this.losCache = new Map();
+    const activeNodes = this.nodeList.filter(n => this.Edges.List[n.id] !== undefined);
+    for (let i = 0; i < activeNodes.length; i++) {
+      for (let j = i + 1; j < activeNodes.length; j++) {
+        const n1 = activeNodes[i];
+        const n2 = activeNodes[j];
+        const p1 = { x: n1.x, y: n1.y };
+        const p2 = { x: n2.x, y: n2.y };
+        let los = true;
+        for (const seg of this.Lines) {
+          if (seg.intersects(p1, p2)) { los = false; break; }
+        }
+        this.losCache.set(`${n1.id},${n2.id}`, los);
       }
     }
-
-    return true; // Clear line of sight
   }
 
   /**
@@ -295,6 +317,8 @@ class Model {
     this.obstacles = result.obstacles;
     this.Lines = result.lines;
     MapGenerator.applyObstaclesToGraph(this.Edges, this.nodeList, this.Lines);
+    MapGenerator.removeNodesInsideObstacles(this.Edges, this.nodeList, this.obstacles);
+    this.buildLOSCache();
   }
 
   /**

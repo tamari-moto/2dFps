@@ -1,8 +1,10 @@
 import { Model } from '../model/model';
+import { Player } from '../model/Player';
 import type { ObstacleData } from '../model/MapGenerator';
 import { GameEvent, StateMachine } from './StateMachine';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig, HUMAN_PLAYER_IDS } from '../config/GameConfig';
+import { PlayerConfig, HUMAN_PLAYER_IDS, AIConfig } from '../config/GameConfig';
+import { scoreNode } from './ai/NodeScorer';
 import { INetworkAdapter } from '../network/INetworkAdapter';
 import type { TurnAction, TurnResult } from '../schema/types';
 import { TurnManager } from './TurnManager';
@@ -17,6 +19,7 @@ export class GameController {
   private stateMachines: Map<string, StateMachine> = new Map();
   private turnManager: TurnManager;
   private inputLocked: boolean = false;
+  private autoLoop: boolean = true;
 
   private allHumanPlayerIds: string[] = [];
   private pendingNextNodeId: Map<string, number | undefined> = new Map();
@@ -29,6 +32,9 @@ export class GameController {
 
   /** Number of path animations still in progress; input unlocks when this reaches 0 */
   private pendingAnimCount = 0;
+
+  /** Monotonically increasing round counter, injected into TurnManager for ThreatMap. */
+  private roundNumber: number = 0;
 
   private inputCommandHandler: InputCommandHandler;
   private pendingPaths: Map<string, number[]> = new Map();
@@ -55,7 +61,7 @@ export class GameController {
       this.reachableNodesPerPlayer.set(id, new Set());
     }
 
-    this.turnManager = new TurnManager(model);
+    this.turnManager = new TurnManager(model, () => this.roundNumber, eventBus);
 
     this.networkAdapter.onTurnResult(this.applyTurnResult.bind(this));
     this.networkAdapter.onGameStarted(this.handleGameStarted.bind(this));
@@ -84,6 +90,25 @@ export class GameController {
     this.eventBus.on(GameEventType.INPUT_LOCKED, (data: { locked: boolean }) => {
       this.inputLocked = data.locked;
     });
+    this.eventBus.on(GameEventType.SPECTATOR_SET_AUTO_LOOP, ({ enabled }) => {
+      this.autoLoop = enabled;
+      this.eventBus.emit(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, { enabled });
+      if (enabled) this.startAutoLoop();
+    });
+    this.eventBus.on(GameEventType.SPECTATOR_SELECT_PLAYER, ({ playerId }) => {
+      if (this.inputLocked) return;
+      const player = this.model.getPlayer(playerId);
+      if (!player || !player.isAlive) return;
+      this.activePlayerId = playerId;
+      this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId });
+
+      if (player.isNPC) {
+        const scores = this.computeScoreNodeLabels(player);
+        this.eventBus.emit(GameEventType.VIS_SCORENODE_LABELS, { scores });
+      } else {
+        this.eventBus.emit(GameEventType.VIS_SCORENODE_LABELS, { scores: null });
+      }
+    });
     this.eventBus.on(GameEventType.NPC_ONLY_TURN, () => {
       if (this.inputLocked) return;
       this.executeNPCOnlyTurn();
@@ -95,7 +120,11 @@ export class GameController {
         this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
         this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
         this.resetAllStateMachines();
-        this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+        if (this.allHumanPlayerIds.length > 0) {
+          this.enterSelectMode(this.allHumanPlayerIds[0]);
+        } else {
+          this.startAutoLoop();
+        }
       }
     });
   }
@@ -190,10 +219,12 @@ export class GameController {
    * Executes all confirmed actions simultaneously once every human player has confirmed.
    */
   private executeRound(): void {
+    ++this.roundNumber;
     const allActions: TurnAction[] = Array.from(this.confirmedActions.values());
 
     if (this.networkAdapter.supportsNPC()) {
-      allActions.push(...this.turnManager.collectNPCActions());
+      const activeTeam = this.model.getPlayer(this.activePlayerId)?.team ?? null;
+      allActions.push(...this.turnManager.collectNPCActions(activeTeam));
     }
 
     const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
@@ -217,7 +248,11 @@ export class GameController {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
       this.resetAllStateMachines();
-      this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+      if (this.allHumanPlayerIds.length > 0) {
+        this.enterSelectMode(this.allHumanPlayerIds[0]);
+      } else {
+        this.startAutoLoop();
+      }
     }
   }
 
@@ -233,16 +268,16 @@ export class GameController {
 
   private executeNPCOnlyTurn(): void {
     if (!this.networkAdapter.supportsNPC()) return;
+    ++this.roundNumber;
 
     const activePlayer = this.model.getPlayer(this.activePlayerId);
-    if (!activePlayer) return;
-
-    const stayAction: TurnAction = {
+    const stayActions: TurnAction[] = activePlayer ? [{
       playerId: this.activePlayerId,
       moveToNodeId: activePlayer.node.id,
       shotAtNodeId: undefined,
-    };
-    const allActions: TurnAction[] = [stayAction, ...this.turnManager.collectNPCActions()];
+    }] : [];
+    const activeTeam = this.model.getPlayer(this.activePlayerId)?.team ?? null;
+    const allActions: TurnAction[] = [...stayActions, ...this.turnManager.collectNPCActions(activeTeam)];
 
     const resolved = resolveRoundPaths(allActions, this.model, PlayerConfig.MoveRange);
     this.pendingPaths = new Map(resolved.map(r => [r.playerId, r.path]));
@@ -264,13 +299,24 @@ export class GameController {
     if (this.pendingAnimCount === 0) {
       this.eventBus.emit(GameEventType.VIS_SET_ACTIVE_PLAYER, { playerId: this.activePlayerId });
       this.eventBus.emit(GameEventType.INPUT_LOCKED, { locked: false });
+      this.startAutoLoop();
+    }
+  }
+
+  private startAutoLoop(): void {
+    if (this.allHumanPlayerIds.length === 0 && this.autoLoop) {
+      setTimeout(() => this.eventBus.emit(GameEventType.NPC_ONLY_TURN), 0);
     }
   }
 
   private handleGameStarted(): void {
     console.log(`▶ Game started! (${this.networkAdapter.getMyPlayerId()})`);
     this.eventBus.emit(GameEventType.VIS_UPDATE_VIEW);
-    this.enterSelectMode(this.allHumanPlayerIds[0] ?? this.activePlayerId);
+    if (this.allHumanPlayerIds.length > 0) {
+      this.enterSelectMode(this.allHumanPlayerIds[0]);
+    } else {
+      this.startAutoLoop();
+    }
   }
 
   /**
@@ -337,6 +383,18 @@ export class GameController {
 
   getModel(): Model {
     return this.model;
+  }
+
+  private computeScoreNodeLabels(npc: Player): Map<number, number> {
+    const enemies = this.model.getEnemyPlayers(npc.id);
+    const reachable = this.model.getReachableNodes(npc.node.id, AIConfig.GoalSearchRadius);
+    const teamVisibleNodeIds = this.model.getTeamVisibleNodes(npc.id);
+    const threatMap = this.turnManager.getThreatMapForTeam(npc.team);
+    const result = new Map<number, number>();
+    for (const nodeId of reachable) {
+      result.set(nodeId, scoreNode(this.model, npc, nodeId, enemies, threatMap, teamVisibleNodeIds));
+    }
+    return result;
   }
 
   importObstacles(obstaclesData: ObstacleData[]): void {

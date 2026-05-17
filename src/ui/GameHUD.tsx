@@ -1,7 +1,8 @@
 import React from 'react';
 import type { ThreeSetup } from '../rendering/threeSetup';
 import { gameEventBus, GameEventType } from '../core/GameEventBus';
-import { PlayerConfig } from '../config/GameConfig';
+import { PlayerConfig, TEAM_COLORS } from '../config/GameConfig';
+import type { TeamId } from '../config/GameConfig';
 
 interface GameHUDProps {
   threeSetup: ThreeSetup | null;
@@ -14,9 +15,11 @@ interface PlayerHUDState {
   isActive: boolean;
   isConfirmed: boolean;
   isDead: boolean;
+  team: TeamId;
+  isNPC: boolean;
 }
 
-const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
+const PlayerCard: React.FC<{ state: PlayerHUDState; onSelect?: () => void }> = ({ state, onSelect }) => {
   const hpPct = Math.max(0, state.hp / state.maxHp);
   const hpColor = hpPct > 0.5 ? '#27ae60' : hpPct > 0.25 ? '#e67e22' : '#c0392b';
 
@@ -30,17 +33,23 @@ const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
     : state.isConfirmed ? 'rgba(20,100,50,0.85)'
     : 'rgba(40,40,60,0.7)';
 
+  const teamColor = '#' + TEAM_COLORS[state.team].toString(16).padStart(6, '0');
+
   return (
-    <div style={{
-      padding: '6px 10px',
-      borderRadius: '5px',
-      background: bgColor,
-      opacity: state.isDead ? 0.45 : 1,
-      minWidth: '90px',
-      color: 'white',
-      fontSize: '12px',
-      fontFamily: 'monospace',
-    }}>
+    <div
+      onClick={onSelect}
+      style={{
+        padding: '6px 10px',
+        borderRadius: '5px',
+        background: bgColor,
+        opacity: state.isDead ? 0.45 : 1,
+        minWidth: '90px',
+        color: 'white',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        border: `2px solid ${teamColor}`,
+        cursor: onSelect ? 'pointer' : 'default',
+      }}>
       <div style={{ fontWeight: 'bold', marginBottom: '3px' }}>{state.id}</div>
       <div style={{
         height: '6px',
@@ -65,16 +74,20 @@ const PlayerCard: React.FC<{ state: PlayerHUDState }> = ({ state }) => {
 
 const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
   const [gridVisible, setGridVisible] = React.useState(true);
+  const [losVisible, setLosVisible] = React.useState(true);
+  const [heatmapVisible, setHeatmapVisible] = React.useState(true);
   const [fogEnabled, setFogEnabled] = React.useState(PlayerConfig.FogOfWarEnabled);
   const [playerStates, setPlayerStates] = React.useState<PlayerHUDState[]>([]);
   const [confirmedCount, setConfirmedCount] = React.useState(0);
+  const [autoLoop, setAutoLoop] = React.useState(true);
+  const [inputLocked, setInputLocked] = React.useState(false);
 
   React.useEffect(() => {
     if (!threeSetup) return;
     const model = threeSetup.getModel();
     const states: PlayerHUDState[] = [];
     for (const [id, p] of model.players) {
-      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive });
+      states.push({ id, hp: p.health, maxHp: p.maxHealth, isActive: false, isConfirmed: false, isDead: !p.isAlive, team: p.team, isNPC: p.isNPC });
     }
     if (states.length > 0) states[0].isActive = true;
     setPlayerStates(states);
@@ -96,13 +109,6 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
       });
     };
 
-    const onInputLocked = (data: { locked: boolean }) => {
-      if (!data.locked) {
-        setPlayerStates(prev => prev.map(s => ({ ...s, isConfirmed: false, isActive: false })));
-        setConfirmedCount(0);
-      }
-    };
-
     const onHit = (data: { targetId: string }) => {
       if (!threeSetup) return;
       const model = threeSetup.getModel();
@@ -119,18 +125,29 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
       ));
     };
 
+    const onAutoLoopChanged = (data: { enabled: boolean }) => setAutoLoop(data.enabled);
+    const onInputLockedChange = (data: { locked: boolean }) => {
+      setInputLocked(data.locked);
+      if (!data.locked) {
+        setPlayerStates(prev => prev.map(s => ({ ...s, isConfirmed: false, isActive: false })));
+        setConfirmedCount(0);
+      }
+    };
+
     gameEventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, onActivePlayer);
     gameEventBus.on(GameEventType.PLAYER_ACTION_CONFIRMED, onActionConfirmed);
-    gameEventBus.on(GameEventType.INPUT_LOCKED, onInputLocked);
+    gameEventBus.on(GameEventType.INPUT_LOCKED, onInputLockedChange);
     gameEventBus.on(GameEventType.HIT_DETECTED, onHit);
     gameEventBus.on(GameEventType.VIS_HIDE_PLAYER, onHidePlayer);
+    gameEventBus.on(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, onAutoLoopChanged);
 
     return () => {
       gameEventBus.off(GameEventType.VIS_SET_ACTIVE_PLAYER, onActivePlayer);
       gameEventBus.off(GameEventType.PLAYER_ACTION_CONFIRMED, onActionConfirmed);
-      gameEventBus.off(GameEventType.INPUT_LOCKED, onInputLocked);
+      gameEventBus.off(GameEventType.INPUT_LOCKED, onInputLockedChange);
       gameEventBus.off(GameEventType.HIT_DETECTED, onHit);
       gameEventBus.off(GameEventType.VIS_HIDE_PLAYER, onHidePlayer);
+      gameEventBus.off(GameEventType.SPECTATOR_AUTO_LOOP_CHANGED, onAutoLoopChanged);
     };
   }, [threeSetup]);
 
@@ -140,12 +157,39 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
     setGridVisible(v => !v);
   };
 
+  const handleToggleLOS = () => {
+    if (!threeSetup) return;
+    const next = threeSetup.toggleLOS();
+    setLosVisible(next);
+  };
+
+  const handleToggleHeatmap = () => {
+    if (!threeSetup) return;
+    const next = threeSetup.toggleHeatmap();
+    setHeatmapVisible(next);
+  };
+
   const handleToggleFog = () => {
     PlayerConfig.FogOfWarEnabled = !PlayerConfig.FogOfWarEnabled;
     setFogEnabled(PlayerConfig.FogOfWarEnabled);
     gameEventBus.emit(GameEventType.VIS_UPDATE_VIEW);
   };
 
+  const handleToggleAutoLoop = () => {
+    gameEventBus.emit(GameEventType.SPECTATOR_SET_AUTO_LOOP, { enabled: !autoLoop });
+  };
+
+  const handleNextRound = () => {
+    if (!inputLocked) {
+      gameEventBus.emit(GameEventType.NPC_ONLY_TURN);
+    }
+  };
+
+  const handleSelectPlayer = (playerId: string) => {
+    gameEventBus.emit(GameEventType.SPECTATOR_SELECT_PLAYER, { playerId });
+  };
+
+  const isSpectatorMode = playerStates.length > 0 && playerStates.every(s => s.isNPC);
   const aliveCount = playerStates.filter(s => !s.isDead).length;
 
   const containerStyle: React.CSSProperties = {
@@ -178,12 +222,45 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
         グリッド: {gridVisible ? 'ON' : 'OFF'}
       </button>
       <button
+        onClick={handleToggleLOS}
+        style={{ ...baseButtonStyle, backgroundColor: losVisible ? '#e67e22' : '#444444' }}
+        aria-label={`視線: ${losVisible ? 'ON' : 'OFF'}`}
+      >
+        視線: {losVisible ? 'ON' : 'OFF'}
+      </button>
+      <button
         onClick={handleToggleFog}
         style={{ ...baseButtonStyle, backgroundColor: fogEnabled ? '#c0392b' : '#444444' }}
         aria-label={`霧: ${fogEnabled ? 'ON' : 'OFF'}`}
       >
         霧: {fogEnabled ? 'ON' : 'OFF'}
       </button>
+      <button
+        onClick={handleToggleHeatmap}
+        style={{ ...baseButtonStyle, backgroundColor: heatmapVisible ? '#8e44ad' : '#444444' }}
+        aria-label={`脅威図: ${heatmapVisible ? 'ON' : 'OFF'}`}
+      >
+        脅威図: {heatmapVisible ? 'ON' : 'OFF'}
+      </button>
+      {isSpectatorMode && (
+        <>
+          <button
+            onClick={handleToggleAutoLoop}
+            style={{ ...baseButtonStyle, backgroundColor: autoLoop ? '#8e44ad' : '#444444' }}
+          >
+            {autoLoop ? '自動実行中' : '手動モード'}
+          </button>
+          {!autoLoop && (
+            <button
+              onClick={handleNextRound}
+              disabled={inputLocked}
+              style={{ ...baseButtonStyle, backgroundColor: inputLocked ? '#555' : '#27ae60', opacity: inputLocked ? 0.5 : 1, cursor: inputLocked ? 'not-allowed' : 'pointer' }}
+            >
+              次のラウンド ▶
+            </button>
+          )}
+        </>
+      )}
       {playerStates.length > 0 && (
         <>
           <div style={{
@@ -208,7 +285,13 @@ const GameHUD: React.FC<GameHUDProps> = ({ threeSetup }) => {
             scrollbarWidth: 'thin',
             scrollbarColor: '#555 transparent',
           }}>
-            {playerStates.map(s => <PlayerCard key={s.id} state={s} />)}
+            {playerStates.map(s => (
+              <PlayerCard
+                key={s.id}
+                state={s}
+                onSelect={isSpectatorMode && !s.isDead ? () => handleSelectPlayer(s.id) : undefined}
+              />
+            ))}
           </div>
         </>
       )}

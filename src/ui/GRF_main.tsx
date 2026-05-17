@@ -56,8 +56,7 @@ const GRF_main = () => {
   }, []);
 
   const handleOffline = React.useCallback(() => {
-    const setup = startGame(new LocalAdapter());
-    setup?.enableFps();
+    startGame(new LocalAdapter());
   }, [startGame]);
 
   const handleOnline = React.useCallback(async (serverUrl: string) => {

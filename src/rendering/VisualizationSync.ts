@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { Model } from '../model/model';
 import { SceneManager } from './core/SceneManager';
-import { CameraConfig, PlayerConfig, RenderConfig } from '../config/GameConfig';
+import { CameraConfig, PlayerConfig, RenderConfig, AIConfig, TEAM_COLORS } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 import { PlayerAnimator } from './players/PlayerAnimator';
 import { PlayerLifecycleManager } from './players/PlayerLifecycleManager';
 import { PlayerEffects } from './players/PlayerEffects';
 import { CameraFollowController } from './cameras/CameraFollowController';
 import { NodeVisualizationManager } from './world/NodeVisualizationManager';
+import { LOSLineManager } from './world/LOSLineManager';
+import { ThreatHeatmapManager } from './world/ThreatHeatmapManager';
+import { ScoreNodeLabelManager } from './world/ScoreNodeLabelManager';
 import { TextBurstEffect } from './effects/TextBurstEffect';
 import { HPBarManager } from './players/HPBarManager';
 import { isPointInCone } from '../logic/ConeIntersection';
@@ -19,12 +22,15 @@ import { worldToGame } from './utils/MeshUtils';
  */
 export class VisualizationSync {
   private nodeVis:       NodeVisualizationManager;
+  private losLines:      LOSLineManager;
   private lifecycle:     PlayerLifecycleManager;
   private effects:       PlayerEffects;
   private animator:      PlayerAnimator;
   private camera:        CameraFollowController;
   private textBurstEffect: TextBurstEffect;
   private hpBarManager:  HPBarManager;
+  private heatmap:       ThreatHeatmapManager;
+  private scoreLabels:   ScoreNodeLabelManager;
   private model:         Model;
 
   private activePlayerId: string;
@@ -46,8 +52,13 @@ export class VisualizationSync {
     this.lifecycle     = new PlayerLifecycleManager(sceneManager, this.animator, model, meshMap, eventBus, this.hpBarManager);
     this.effects       = new PlayerEffects(meshMap, this.animator, model);
     this.nodeVis       = new NodeVisualizationManager(sceneManager, model);
+    this.losLines      = new LOSLineManager(sceneManager.getScene());
     this.camera        = new CameraFollowController(sceneManager);
     this.textBurstEffect = new TextBurstEffect(sceneManager);
+    this.heatmap       = new ThreatHeatmapManager(sceneManager);
+    this.heatmap.init(model.nodeList, model.Edges.List);
+    this.scoreLabels   = new ScoreNodeLabelManager(sceneManager);
+    this.scoreLabels.init(model.nodeList);
 
     // Initialize scene objects
     this.nodeVis.initializeNodes();
@@ -79,6 +90,15 @@ export class VisualizationSync {
     this.lifecycle.addPlayer(playerId, color);
   }
 
+  toggleLOS(): boolean {
+    this.losLines.toggle();
+    return this.losLines.isVisible();
+  }
+
+  toggleHeatmap(): boolean {
+    return this.heatmap.toggle();
+  }
+
   getMeshList(): THREE.Mesh[] {
     return this.nodeVis.getMeshList();
   }
@@ -100,15 +120,24 @@ export class VisualizationSync {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private doUpdateView(): void {
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
+    const activePlayer = this.model.getPlayer(this.activePlayerId)
+      ?? Array.from(this.model.players.values()).find(p => p.isAlive);
     if (!activePlayer) return;
 
-    this.updatePlayers();
+    this.updatePlayers(activePlayer);
     this.nodeVis.updateNodeColors(activePlayer);
+    this.losLines.update(this.model);
+
+    if ((AIConfig.ThreatMapTeams as number[]).includes(activePlayer.team)) {
+      this.heatmap.showOnly(TEAM_COLORS[activePlayer.team]);
+    } else {
+      this.heatmap.clear();
+    }
   }
 
-  private updatePlayers(): void {
-    const activePlayer = this.model.getPlayer(this.activePlayerId);
+  private updatePlayers(activePlayer?: ReturnType<typeof this.model.getPlayer>): void {
+    activePlayer ??= this.model.getPlayer(this.activePlayerId)
+      ?? Array.from(this.model.players.values()).find(p => p.isAlive);
 
     const visibleNodeIds = new Set<number>();
     if (PlayerConfig.FogOfWarEnabled && activePlayer) {
@@ -222,6 +251,18 @@ export class VisualizationSync {
       const player = this.model.getPlayer(data.playerId);
       if (player) {
         this.textBurstEffect.playAtGameCoords(player.node.x, player.node.y, RenderConfig.PlayerZOffset);
+      }
+    });
+
+    eventBus.on(GameEventType.VIS_THREAT_MAP_UPDATED, (data: { scores: Float32Array; teamColor: number }) => {
+      this.heatmap.update(data.scores, data.teamColor);
+    });
+
+    eventBus.on(GameEventType.VIS_SCORENODE_LABELS, (data) => {
+      if (data.scores === null) {
+        this.scoreLabels.clear();
+      } else {
+        this.scoreLabels.update(data.scores);
       }
     });
 
