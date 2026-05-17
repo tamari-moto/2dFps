@@ -4,31 +4,31 @@ import { TurnAction } from '../schema/types';
 export interface ResolvedAction {
   playerId: string;
   finalNodeId: number;
-  /** Full traversed path: [fromNodeId, step1, ..., finalNodeId] */
+  /** 実際に通過した経路: [fromNodeId, step1, ..., finalNodeId] */
   path: number[];
   shotAtNodeId: number | undefined;
 }
 
 /**
- * Computes collision-aware movement paths for all players in a round.
+ * ラウンド内のすべてのプレイヤーについて、衝突を考慮した移動経路を計算する。
  *
- * Algorithm:
- * 1. Compute BFS shortest path for each player (from current position to moveToNodeId).
- * 2. Step through the paths in parallel (step 1, 2, ..., maxPathLength).
- *    At each step, any node claimed by 2+ moving players causes all claimants
- *    to be frozen at their previous confirmed node.
- * 3. Also block movement into a node that is the starting position of a
- *    stationary player (one whose moveToNodeId === fromNodeId).
+ * アルゴリズム:
+ * 1. 各プレイヤーについて現在位置からmoveToNodeIdまでのBFS最短経路を計算する。
+ * 2. 経路を並行してステップごとに進める（ステップ1, 2, ..., maxPathLength）。
+ *    各ステップで2人以上の移動プレイヤーが同じノードを要求した場合、
+ *    該当プレイヤー全員を前の確定ノードで停止させる。
+ * 3. 停止中プレイヤー（moveToNodeId === fromNodeId）の開始ノードへの
+ *    移動も阻止する。
  *
- * Returns one ResolvedAction per input action with the collision-adjusted
- * finalNodeId and the full traversed path (including both endpoints).
+ * 入力アクションごとに1つのResolvedActionを返す。
+ * 衝突調整後のfinalNodeIdと通過した全経路（両端点を含む）が格納される。
  */
 export function resolveRoundPaths(
   actions: TurnAction[],
   model: Model,
   maxSteps: number,
 ): ResolvedAction[] {
-  // ── 1. Compute raw paths ────────────────────────────────────────────────
+  // ── 1. 生の経路を計算 ────────────────────────────────────────────────
   type PlayerPath = {
     playerId: string;
     fromNodeId: number;
@@ -59,7 +59,7 @@ export function resolveRoundPaths(
     }
 
     const raw = model.getPathToNode(fromId, action.moveToNodeId, maxSteps);
-    // raw = [fromId, step1, ..., toId] or null
+    // raw = [fromId, step1, ..., toId] またはnull
     const steps = raw ? raw.slice(1) : [];
 
     paths.push({
@@ -72,17 +72,17 @@ export function resolveRoundPaths(
     });
   }
 
-  // ── 2. Stationary player positions (block movement into their node) ──────
+  // ── 2. 停止中プレイヤーのノードを記録（そのノードへの移動を阻止）──────
   const stationaryNodes = new Set<number>();
   for (const p of paths) {
     if (p.stopped) stationaryNodes.add(p.fromNodeId);
   }
 
-  // ── 3. Step-by-step collision resolution ────────────────────────────────
+  // ── 3. ステップごとの衝突解決 ────────────────────────────────────────
   const maxLen = Math.max(...paths.map(p => p.steps.length), 0);
 
   for (let k = 0; k < maxLen; k++) {
-    // Build: nodeId → list of playerIds trying to step there at step k
+    // ステップkで各ノードへ移動しようとするプレイヤーIDのリストを構築
     const claimMap = new Map<number, string[]>();
 
     for (const p of paths) {
@@ -91,7 +91,7 @@ export function resolveRoundPaths(
 
       const targetNode = p.steps[k];
 
-      // Block: stationary player occupies target node
+      // 停止中プレイヤーが目標ノードを占有している場合は移動を阻止
       if (stationaryNodes.has(targetNode)) {
         p.stopped = true;
         continue;
@@ -102,7 +102,7 @@ export function resolveRoundPaths(
       claimMap.set(targetNode, existing);
     }
 
-    // Freeze all players involved in a collision (2+ claim same node)
+    // 衝突（2人以上が同じノードを要求）に関わるプレイヤーをすべて停止
     for (const [, claimants] of claimMap) {
       if (claimants.length >= 2) {
         for (const pid of claimants) {
@@ -112,18 +112,18 @@ export function resolveRoundPaths(
       }
     }
 
-    // Advance confirmed position for players still moving
+    // まだ移動中のプレイヤーの確定位置を前進させる
     for (const p of paths) {
       if (p.stopped) continue;
       if (k >= p.steps.length) continue;
       p.confirmed = p.steps[k];
-      if (k === p.steps.length - 1) p.stopped = true; // reached destination
+      if (k === p.steps.length - 1) p.stopped = true; // 目的地に到達
     }
   }
 
-  // ── 4. Build ResolvedAction[] ────────────────────────────────────────────
+  // ── 4. ResolvedAction[]を構築 ────────────────────────────────────────────
   return paths.map(p => {
-    // Reconstruct the traversed path up to the confirmed node
+    // 確定ノードまでの通過経路を再構成
     const confirmedIdx = p.steps.indexOf(p.confirmed);
     const traversedSteps = confirmedIdx >= 0 ? p.steps.slice(0, confirmedIdx + 1) : [];
     const path = [p.fromNodeId, ...traversedSteps];

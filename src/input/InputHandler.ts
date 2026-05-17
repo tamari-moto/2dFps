@@ -120,12 +120,12 @@ export class InputHandler {
 
     this.eventBus.emit(GameEventType.KEY_PRESSED, { key: event.key });
 
-    // Handle dynamic player selection (keys 1-9)
+    // 動的プレイヤー選択の処理（キー1〜9）
     if (event.key >= '1' && event.key <= '9') {
       const keyNumber = parseInt(event.key, 10);
       const playerIndex = keyNumber - 1;
 
-      // Check if this key corresponds to a player
+      // このキーがプレイヤーに対応するか確認
       if (playerIndex < this.playerIds.length) {
         this.eventBus.emit(GameEventType.PLAYER_SWITCHED, {
           previousPlayerId: '',

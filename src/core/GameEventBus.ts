@@ -1,34 +1,34 @@
 /**
- * Game event types enumeration
- * Defines all events that can occur in the game
+ * ゲームイベント種別の列挙
+ * ゲーム内で発生しうるすべてのイベントを定義する
  */
 export enum GameEventType {
-  // Player events
+  // プレイヤーイベント
   PLAYER_MOVED = 'player:moved',
   PLAYER_SELECTED = 'player:selected',
   PLAYER_SWITCHED = 'player:switched',
   PLAYER_SHOT = 'player:shot',
   PLAYER_ANGLE_CHANGED = 'player:angle_changed',
 
-  // Combat events
+  // 戦闘イベント
   COMBAT_RESOLVED = 'combat:resolved',
   HIT_DETECTED = 'hit:detected',
   MISS_DETECTED = 'miss:detected',
 
-  // Turn events
+  // ターンイベント
   TURN_STARTED = 'turn:started',
   TURN_ENDED = 'turn:ended',
   TURN_ACTION = 'turn:action',
 
-  // Input events
+  // 入力イベント
   NODE_CLICKED = 'node:clicked',
   CANVAS_CLICKED_EMPTY = 'canvas:clicked_empty',
   KEY_PRESSED = 'key:pressed',
 
-  // View events
+  // ビューイベント
   VIEW_UPDATED = 'view:updated',
 
-  // Visualization commands (GameController → VisualizationSync)
+  // 描画コマンド (GameController → VisualizationSync)
   VIS_UPDATE_VIEW = 'vis:update_view',
   VIS_SET_ACTIVE_PLAYER = 'vis:set_active_player',
   VIS_SET_SELECT_MESH = 'vis:set_select_mesh',
@@ -47,47 +47,47 @@ export enum GameEventType {
   VIS_ANIMATE_ALONG_PATH = 'vis:animate_along_path',
   VIS_PATH_ANIM_COMPLETE = 'vis:path_anim_complete',
 
-  // Map events
+  // マップイベント
   MAP_GENERATED = 'map:generated',
   OBSTACLES_UPDATED = 'obstacles:updated',
 
-  // Game state events
+  // ゲーム状態イベント
   GAME_STARTED = 'game:started',
   GAME_OVER = 'game:over',
 
-  // NPC events
+  // NPCイベント
   NPC_TURN_STARTED = 'npc:turn_started',
   NPC_TURNS_COMPLETE = 'npc:turns_complete',
   INPUT_LOCKED = 'input:locked',
 
-  // NPC-only turn (e.g. R key in FPS mode — active player stays, NPCs act)
+  // NPCのみのターン（例: FPSモードのRキー — アクティブプレイヤーは停止し、NPCのみ行動）
   NPC_ONLY_TURN = 'input:npc_only_turn',
 
-  // Player action confirmed (human player confirmed their move/shot for this round)
+  // プレイヤー行動確定（人間プレイヤーが移動・射撃を確定）
   PLAYER_ACTION_CONFIRMED = 'player:action_confirmed',
 
-  // Spectator (FPS) mode events
+  // スペクテーター（FPS）モードイベント
   FPS_MODE_TOGGLE_REQUESTED = 'fps:toggle_requested',
   FPS_MODE_CHANGED = 'fps:mode_changed',
 
-  // Spectator auto-loop control
+  // スペクテーター自動ループ制御
   SPECTATOR_SET_AUTO_LOOP = 'spectator:set_auto_loop',
   SPECTATOR_AUTO_LOOP_CHANGED = 'spectator:auto_loop_changed',
 
-  // Spectator player selection
+  // スペクテータープレイヤー選択
   SPECTATOR_SELECT_PLAYER = 'spectator:select_player',
 
-  // Ortho MAP overview mode events
+  // 俯瞰マップ（オルソ）モードイベント
   ORTHO_MODE_TOGGLE_REQUESTED = 'ortho:toggle_requested',
   ORTHO_MODE_CHANGED = 'ortho:mode_changed',
 
-  // ThreatMap heatmap visualization
+  // 脅威マップのヒートマップ描画
   VIS_THREAT_MAP_UPDATED = 'vis:threat_map_updated',
 
-  // ScoreNode label visualization
+  // スコアノードラベル描画
   VIS_SCORENODE_LABELS = 'vis:scorenode_labels',
 
-  // Network events (Phase 2+: used by ColyseusAdapter)
+  // ネットワークイベント（ColyseusAdapterで使用）
   NETWORK_CONNECTED = 'network:connected',
   NETWORK_DISCONNECTED = 'network:disconnected',
   NETWORK_ERROR = 'network:error',
@@ -99,10 +99,10 @@ export enum GameEventType {
 }
 
 /**
- * Event data interface for type safety
+ * 型安全のためのイベントデータインターフェース
  */
 export interface GameEventData {
-  // Player events
+  // プレイヤーイベント
   [GameEventType.PLAYER_MOVED]: {
     playerId: string;
     from: { x: number; y: number; id: number };
@@ -125,7 +125,7 @@ export interface GameEventData {
     angle: number;
   };
 
-  // Combat events
+  // 戦闘イベント
   [GameEventType.COMBAT_RESOLVED]: void;
   [GameEventType.HIT_DETECTED]: {
     attackerId: string;
@@ -137,12 +137,12 @@ export interface GameEventData {
     nodeId: number;
   };
 
-  // Turn events
+  // ターンイベント
   [GameEventType.TURN_STARTED]: void;
   [GameEventType.TURN_ENDED]: void;
   [GameEventType.TURN_ACTION]: void;
 
-  // Input events
+  // 入力イベント
   [GameEventType.NODE_CLICKED]: {
     nodeId: number;
     position: { x: number; y: number };
@@ -152,10 +152,10 @@ export interface GameEventData {
     key: string;
   };
 
-  // View events
+  // ビューイベント
   [GameEventType.VIEW_UPDATED]: void;
 
-  // Visualization commands
+  // 描画コマンド
   [GameEventType.VIS_UPDATE_VIEW]: void;
   [GameEventType.VIS_SET_ACTIVE_PLAYER]: {
     playerId: string;
@@ -190,15 +190,15 @@ export interface GameEventData {
   [GameEventType.VIS_ANIMATE_ALONG_PATH]: { playerId: string; path: number[]; finalAngle: number };
   [GameEventType.VIS_PATH_ANIM_COMPLETE]: { playerId: string };
 
-  // Map events
+  // マップイベント
   [GameEventType.MAP_GENERATED]: void;
   [GameEventType.OBSTACLES_UPDATED]: void;
 
-  // Game state events
+  // ゲーム状態イベント
   [GameEventType.GAME_STARTED]: void;
   [GameEventType.GAME_OVER]: void;
 
-  // NPC events
+  // NPCイベント
   [GameEventType.NPC_TURN_STARTED]: {
     playerId: string;
   };
@@ -207,10 +207,10 @@ export interface GameEventData {
     locked: boolean;
   };
 
-  // NPC-only turn
+  // NPCのみのターン
   [GameEventType.NPC_ONLY_TURN]: void;
 
-  // Player action confirmed
+  // プレイヤー行動確定
   [GameEventType.PLAYER_ACTION_CONFIRMED]: {
     playerId: string;
     moveToNodeId: number;
@@ -219,37 +219,37 @@ export interface GameEventData {
     color: number;
   };
 
-  // Spectator (FPS) mode events
+  // スペクテーター（FPS）モードイベント
   [GameEventType.FPS_MODE_TOGGLE_REQUESTED]: void;
   [GameEventType.FPS_MODE_CHANGED]: {
     enabled: boolean;
   };
 
-  // Spectator auto-loop control
+  // スペクテーター自動ループ制御
   [GameEventType.SPECTATOR_SET_AUTO_LOOP]: { enabled: boolean };
   [GameEventType.SPECTATOR_AUTO_LOOP_CHANGED]: { enabled: boolean };
 
-  // Spectator player selection
+  // スペクテータープレイヤー選択
   [GameEventType.SPECTATOR_SELECT_PLAYER]: { playerId: string };
 
-  // Ortho MAP overview mode events
+  // 俯瞰マップ（オルソ）モードイベント
   [GameEventType.ORTHO_MODE_TOGGLE_REQUESTED]: void;
   [GameEventType.ORTHO_MODE_CHANGED]: {
     enabled: boolean;
   };
 
-  // ThreatMap heatmap visualization
+  // 脅威マップのヒートマップ描画
   [GameEventType.VIS_THREAT_MAP_UPDATED]: {
     scores: Float32Array;
     teamColor: number;
   };
 
-  // ScoreNode label visualization
+  // スコアノードラベル描画
   [GameEventType.VIS_SCORENODE_LABELS]: {
     scores: Map<number, number> | null;
   };
 
-  // Network events
+  // ネットワークイベント
   [GameEventType.NETWORK_CONNECTED]: void;
   [GameEventType.NETWORK_DISCONNECTED]: void;
   [GameEventType.NETWORK_ERROR]: void;
@@ -319,7 +319,7 @@ export class GameEventBus {
 }
 
 /**
- * Global event bus instance
- * Can be imported and used throughout the application
+ * グローバルイベントバスインスタンス
+ * アプリケーション全体からインポートして使用できる
  */
 export const gameEventBus = new GameEventBus();

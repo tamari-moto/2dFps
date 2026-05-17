@@ -285,7 +285,7 @@ class Model {
    * Clears all existing edges and rebuilds the grid connectivity.
    */
   private resetGraphEdges(): void {
-    // Reset edges to original state
+    // エッジを初期状態にリセット
     this.Edges = new Graph();
     for (let i = 0; i < this.nodeList.length; i++) {
       this.Edges.addVertex(i);

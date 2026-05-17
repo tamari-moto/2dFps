@@ -94,7 +94,7 @@ export class PlayerAnimator {
 
     this.bodyAnims.set(playerId, anims);
 
-    // Revert to idle after movement completes
+    // 移動完了後にidleに戻る
     setTimeout(() => {
       if (this.animStates.get(playerId) === 'walk') {
         this.startIdle(playerId);

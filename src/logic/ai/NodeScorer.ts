@@ -4,11 +4,11 @@ import { AIConfig, MapConfig } from '../../config/GameConfig';
 import { ThreatMap } from './ThreatMap';
 
 /**
- * Evaluates a candidate move node for an NPC using ThreatMap-based estimation.
- * The function does NOT directly inspect enemies the team cannot see — it relies on
- *   - `threatMap`: per-node enemy presence probability (0..1) shared across the team
- *   - `teamVisibleNodeIds`: nodes any teammate is currently looking at
- * Enemies present in `enemies` are only used when their node is in `teamVisibleNodeIds`.
+ * ThreatMapベースの推定でNPCの移動候補ノードを評価する。
+ * チームが見えていない敵を直接参照しない — 以下に依存する:
+ *   - `threatMap`: チーム共有のノードごとの敵存在確率（0..1）
+ *   - `teamVisibleNodeIds`: いずれかのチームメンバーが現在視認中のノード
+ * `enemies`の敵はそのノードが`teamVisibleNodeIds`に含まれる場合のみ使用する。
  */
 export function scoreNode(
   model: Model,
@@ -23,7 +23,7 @@ export function scoreNode(
   const gridSize = MapConfig.NodesInGridSize;
   const nodeCount = model.nodeList.length;
 
-  // 1. Cover score: fewer graph edges = more walls around this node
+  // 1. カバースコア: グラフエッジが少ない = 周囲を壁に囲まれている
   const edgeCount = model.Edges.List[candidateNodeId]?.length ?? 0;
   const coverScore = 4 - edgeCount;
   const coverWeight = npc.health < AIConfig.RetreatHPThreshold
@@ -31,19 +31,19 @@ export function scoreNode(
     : AIConfig.CoverWeight;
   score += coverScore * coverWeight;
 
-  // 2. Enemy LOS exposure penalty (estimation-based)
-  //    a) Threat-weighted exposure from unobserved nodes that may hide an enemy
+  // 2. 敵LOS露出ペナルティ（推定ベース）
+  //    a) 敵が潜んでいる可能性がある未観測ノードからの脅威加重露出
   if (threatMap) {
     for (let nid = 0; nid < nodeCount; nid++) {
       const threat = threatMap.getScore(nid);
       if (threat <= AIConfig.ScorerThreatExposureMin) continue;
-      if (teamVisibleNodeIds.has(nid)) continue; // observed nodes handled below
+      if (teamVisibleNodeIds.has(nid)) continue; // 観測済みノードは下で処理
       if (model.hasLineOfSight(model.nodeList[nid], candidateNode)) {
         score += AIConfig.EnemyLOSPenalty * threat;
       }
     }
   }
-  //    b) Confirmed enemies the team is currently looking at — full penalty
+  //    b) チームが現在視認中の確認済み敵 — フルペナルティ
   for (const enemy of enemies) {
     if (!teamVisibleNodeIds.has(enemy.node.id)) continue;
     if (model.hasLineOfSight(enemy.node, candidateNode)) {
@@ -51,7 +51,7 @@ export function scoreNode(
     }
   }
 
-  // 3. Ambush bonus — only against enemies the team currently sees
+  // 3. 待ち伏せボーナス — チームが現在視認中の敵のみ対象
   for (const enemy of enemies) {
     if (!teamVisibleNodeIds.has(enemy.node.id)) continue;
     if (model.hasLineOfSight(candidateNode, enemy.node)) {
@@ -59,7 +59,7 @@ export function scoreNode(
     }
   }
 
-  // 4. Distance score — prefer the nearest visible enemy, else threat-weighted centroid
+  // 4. 距離スコア — 最も近い可視敵を優先、なければ脅威加重重心を使用
   const candidateCol = Math.floor(candidateNodeId / gridSize);
   const candidateRow = candidateNodeId % gridSize;
 

@@ -3,30 +3,30 @@ import { AIConfig } from '../../config/GameConfig';
 import type { TeamId } from '../../config/GameConfig';
 
 /**
- * Tracks enemy presence probability for a single team.
- * Updated once per round before NPC decisions; read-only during decideTurn.
+ * 単一チームの敵存在確率を追跡する。
+ * NPC行動決定前にラウンド1回更新され、decideTurn中は読み取り専用。
  *
- * Score model (cumulative diffusion):
- *   - Each round: scores are multiplied by ThreatAccumulationDecay, then BFS-diffused outward
- *   - Nodes observed this round: overwritten with 1.0 (enemy present) or 0.0 (clear)
- *   - Effect: threat "ripples" outward from sightings and fades over time
+ * スコアモデル（累積拡散）:
+ *   - 各ラウンド: スコアにThreatAccumulationDecayを乗算後、BFS拡散
+ *   - 今ラウンドに観測したノード: 1.0（敵あり）または0.0（クリア）で上書き
+ *   - 効果: 脅威が目撃地点から外側へ「波紋」のように広がり、時間とともに減衰
  */
 export class ThreatMap {
   readonly team: TeamId;
 
-  /** Last round number when each node was observed by any teammate. -Infinity = never. */
+  /** 各ノードをチームメンバーが最後に観測したラウンド番号。-Infinity = 未観測。 */
   private lastSeenRound: Float64Array;
 
-  /** Whether an enemy was present when each node was last observed. */
+  /** 各ノードを最後に観測したとき敵が存在したかどうか。 */
   private lastSeenHadEnemy: Uint8Array;
 
-  /** Cached threat scores, recomputed each round. */
+  /** キャッシュされた脅威スコア。ラウンドごとに再計算される。 */
   private score: Float32Array;
 
-  /** Nodes where an enemy death was confirmed (suppressed as diffusion sources). */
+  /** 敵の死亡が確認されたノード（拡散元として抑制）。 */
   private confirmedDeadAt: Set<number>;
 
-  /** Reusable BFS buffers — cleared and reused each _rescore call to avoid per-iteration allocations. */
+  /** 再利用可能なBFSバッファ — _rescoreの呼び出しごとにクリアして再利用（反復ごとのアロケーションを回避）。 */
   private bfsDiffused: Float32Array;
   private bfsVisited: Uint8Array;
   private bfsFrontier: number[];
@@ -45,25 +45,25 @@ export class ThreatMap {
   }
 
   /**
-   * Called once per round, before decideTurn for any NPC on this team.
-   * 1. Observes current team FOV and records sightings.
-   * 2. Marks confirmed enemy deaths.
-   * 3. Recomputes all threat scores.
+   * ラウンドに1回、このチームのいずれかのNPCのdecideTurn前に呼び出す。
+   * 1. チームの現在の視野を観測し、目撃情報を記録する。
+   * 2. 確認済みの敵の死亡をマークする。
+   * 3. すべての脅威スコアを再計算する。
    */
   observeAndRescore(model: Model, roundNumber: number): void {
     this._observe(model, roundNumber);
     this._rescore(model, roundNumber);
   }
 
-  /** Returns the threat score [0..1] for a given node. */
+  /** 指定ノードの脅威スコア [0..1] を返す。 */
   getScore(nodeId: number): number {
     return this.score[nodeId] ?? 0;
   }
 
   /**
-   * Returns the node ID with the highest threat score reachable from fromNodeId,
-   * excluding nodes currently visible (already known safe/threatened).
-   * Returns null if no candidate found.
+   * fromNodeIdから到達可能なノードの中で最も脅威スコアが高いノードIDを返す。
+   * 現在可視のノード（安全か脅威が既知）は除外する。
+   * 候補が見つからない場合はnullを返す。
    */
   getHighestThreatNodeFrom(
     fromNodeId: number,
@@ -87,11 +87,11 @@ export class ThreatMap {
   }
 
   // ---------------------------------------------------------------------------
-  // Private helpers
+  // プライベートヘルパー
   // ---------------------------------------------------------------------------
 
   private _observe(model: Model, roundNumber: number): void {
-    // Get a representative alive teammate to query team visibility
+    // チームの視野を取得するために代表となる生存チームメンバーを探す
     let repId: string | undefined;
     for (const [id, p] of model.players) {
       if (p.team === this.team && p.isAlive) {
@@ -103,7 +103,7 @@ export class ThreatMap {
 
     const visibleNodeIds = model.getTeamVisibleNodes(repId);
 
-    // Collect enemy player node IDs that are alive
+    // 生存中の敵プレイヤーのノードIDを収集
     const enemyNodeIds = new Set<number>();
     for (const [, p] of model.players) {
       if (p.team !== this.team && p.isAlive) {
@@ -111,7 +111,7 @@ export class ThreatMap {
       }
     }
 
-    // Record dead enemies whose bodies are visible — suppress as diffusion source
+    // 死亡が可視の敵を記録 — 拡散元として抑制
     for (const [, p] of model.players) {
       if (p.team !== this.team && !p.isAlive && visibleNodeIds.has(p.node.id)) {
         this.confirmedDeadAt.add(p.node.id);
@@ -119,7 +119,7 @@ export class ThreatMap {
       }
     }
 
-    // Update lastSeen for all currently visible nodes
+    // 現在可視のすべてのノードのlastSeenを更新
     for (const nodeId of visibleNodeIds) {
       this.lastSeenRound[nodeId] = roundNumber;
       this.lastSeenHadEnemy[nodeId] = enemyNodeIds.has(nodeId) ? 1 : 0;
@@ -133,18 +133,18 @@ export class ThreatMap {
     const sigma = AIConfig.ThreatSigma;
     const maxSteps = AIConfig.ThreatMaxDiffusionSteps;
 
-    // --- Pass 0: decay accumulated scores from previous round ---
+    // --- パス0: 前ラウンドから累積されたスコアを減衰 ---
     for (let id = 0; id < nodeCount; id++) {
       this.score[id] *= decay;
     }
 
-    // --- Pass 1: overwrite observed nodes with ground-truth values ---
+    // --- パス1: 観測済みノードを実際の値で上書き ---
     for (let id = 0; id < nodeCount; id++) {
       if (this.lastSeenRound[id] !== roundNumber) continue;
       this.score[id] = this.lastSeenHadEnemy[id] ? 1.0 : 0.0;
     }
 
-    // --- Pass 2: BFS diffusion — score[] is the wave source ---
+    // --- パス2: BFS拡散 — score[]を波源として拡散 ---
     const diffused = this.bfsDiffused;
     diffused.fill(0);
 
@@ -153,7 +153,7 @@ export class ThreatMap {
       if (src <= 0) continue;
       if (this.confirmedDeadAt.has(srcId)) continue;
 
-      // Reuse frontier/visited buffers — clear before use
+      // frontier/visitedバッファを再利用 — 使用前にクリア
       this.bfsVisited.fill(0);
       this.bfsFrontier.length = 0;
       this.bfsVisited[srcId] = 1;
@@ -183,7 +183,7 @@ export class ThreatMap {
       }
     }
 
-    // --- Pass 3: merge diffusion, clamp, re-apply observed overrides ---
+    // --- パス3: 拡散をマージし、クランプし、観測による上書きを再適用 ---
     for (let id = 0; id < nodeCount; id++) {
       if (this.lastSeenRound[id] === roundNumber) {
         this.score[id] = this.lastSeenHadEnemy[id] ? 1.0 : 0.0;

@@ -8,18 +8,18 @@ import { NPCGoalState } from './NPCGoalState';
 import { ThreatMap } from './ThreatMap';
 
 /**
- * Top-level NPC decision maker.
- * Produces a complete TurnAction for one NPC, following the given goal state.
+ * NPC行動決定のトップレベル関数。
+ * 指定されたゴール状態に従い、1体のNPCの完全なTurnActionを生成する。
  */
 export function decideTurn(model: Model, npc: Player, goal: NPCGoalState, threatMap: ThreatMap | null): TurnAction {
   const enemies = model.getEnemyPlayers(npc.id);
 
-  // 1. Follow path toward goal node, advance one step
+  // 1. ゴールノードへの経路を追跡し、1ステップ前進
   let moveToNodeId = npc.node.id;
 
   if (goal.goalNodeId !== npc.node.id) {
     const path = model.getPathToNode(npc.node.id, goal.goalNodeId, Infinity);
-    // path = [currentNode, step1, step2, ...]; take MoveRange steps forward
+    // path = [currentNode, step1, step2, ...]; MoveRange分だけ前進
     if (path && path.length > 1) {
       const nextIndex = Math.min(PlayerConfig.MoveRange, path.length - 1);
       const candidate = path[nextIndex];
@@ -29,7 +29,7 @@ export function decideTurn(model: Model, npc: Player, goal: NPCGoalState, threat
     }
   }
 
-  // 2. Calculate facing angle: prefer nearest visible enemy, else use ThreatMap
+  // 2. 向きの角度を計算: 最も近い可視敵を優先、なければThreatMapを参照
   const moveToNode = model.nodeList[moveToNodeId];
   let facingAngle = npc.angle;
 
@@ -39,7 +39,7 @@ export function decideTurn(model: Model, npc: Player, goal: NPCGoalState, threat
     const visibleEnemies = enemies.filter(e => visibleNodeIds.has(e.node.id));
 
     if (visibleEnemies.length > 0) {
-      // Highest priority: face the nearest visible enemy
+      // 最優先: 最も近い可視敵の方向を向く
       let nearestEnemy: Player | undefined;
       let nearestDist = Infinity;
       for (const enemy of visibleEnemies) {
@@ -53,16 +53,16 @@ export function decideTurn(model: Model, npc: Player, goal: NPCGoalState, threat
         facingAngle = model.getAngleBetweenNodes(moveToNode, nearestEnemy.node);
       }
     } else if (AIConfig.ThreatMapAngleEnabled && threatMap !== null) {
-      // No visible enemy: face the highest-threat node outside current FOV
+      // 可視敵なし: 現在の視野外で最も脅威スコアの高いノードの方向を向く
       const target = threatMap.getHighestThreatNodeFrom(moveToNodeId, model, visibleNodeIds);
       if (target !== null) {
         facingAngle = model.getAngleBetweenNodes(moveToNode, model.nodeList[target]);
       }
-      // If no threat candidate, keep previous angle (existing behaviour)
+      // 脅威候補なし: 前の角度を維持（既存の挙動）
     }
   }
 
-  // 3. Select shot target
+  // 3. 射撃対象を選択
   const shotAtNodeId = selectShotTarget(model, npc, moveToNode, facingAngle, enemies);
 
   return {

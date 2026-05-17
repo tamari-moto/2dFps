@@ -51,15 +51,15 @@ export class LocalAdapter implements INetworkAdapter {
     const player = this.model.getPlayer(action.playerId);
     if (!player) return;
 
-    // 1. Record position before move
+    // 1. 移動前の位置を記録
     const fromNode = player.node;
 
-    // 2. Move
+    // 2. 移動
     const newNode = this.model.nodeList[action.moveToNodeId];
     if (!newNode) return;
     this.model.setPlayerRef(action.playerId, newNode);
 
-    // 3. Update facing angle: toward shot target if provided, else toward move destination
+    // 3. 向き角度を更新: 射撃対象が指定されていればその方向、なければ移動先の方向
     let newAngle = player.angle;
     if (action.shotAtNodeId !== undefined) {
       const shotNode = this.model.nodeList[action.shotAtNodeId];
@@ -72,7 +72,7 @@ export class LocalAdapter implements INetworkAdapter {
       player.setAngle(newAngle);
     }
 
-    // 4. Shot resolution
+    // 4. 射撃解決
     const hits: TurnResult['hits'] = [];
     if (action.shotAtNodeId !== undefined) {
       this.resolveShot(action.playerId, action.shotAtNodeId, hits, newAngle);
@@ -86,7 +86,7 @@ export class LocalAdapter implements INetworkAdapter {
     });
   }
 
-  // ---- Private helpers -------------------------------------------------------
+  // ---- プライベートヘルパー -------------------------------------------------------
 
   private resolveShot(
     attackerId: string,
@@ -137,21 +137,21 @@ export class LocalAdapter implements INetworkAdapter {
   supportsNPC(): boolean { return true; }
 
   /**
-   * Resolves all players' actions simultaneously:
-   * 1. Snapshot from-nodes before any movement
-   * 2. Apply all moves atomically
-   * 3. Resolve all shots after movement but before damage is applied
-   * 4. Fire turnResultCallback for each result
+   * すべてのプレイヤーの行動を同時に解決する:
+   * 1. 移動前の出発ノードをスナップショット
+   * 2. すべての移動をアトミックに適用
+   * 3. 移動後・ダメージ適用前にすべての射撃を解決
+   * 4. 各結果についてturnResultCallbackを発火
    */
   sendRoundActions(actions: TurnAction[]): void {
-    // 1. Snapshot positions before any moves
+    // 1. 移動前の位置をスナップショット
     const fromNodes = new Map<string, Node>();
     for (const action of actions) {
       const player = this.model.getPlayer(action.playerId);
       if (player) fromNodes.set(action.playerId, player.node);
     }
 
-    // 2. Apply all moves atomically and build pending results
+    // 2. すべての移動をアトミックに適用し、待機中の結果を構築
     const pendingResults: TurnResult[] = [];
     for (const action of actions) {
       const player = this.model.getPlayer(action.playerId);
@@ -183,14 +183,14 @@ export class LocalAdapter implements INetworkAdapter {
       });
     }
 
-    // 3. Resolve all shots after all moves, before any damage is applied
+    // 3. 全移動後・ダメージ適用前にすべての射撃を解決
     for (let i = 0; i < actions.length; i++) {
       if (actions[i].shotAtNodeId !== undefined) {
         this.resolveShot(actions[i].playerId, actions[i].shotAtNodeId!, pendingResults[i].hits, pendingResults[i].newAngle);
       }
     }
 
-    // 4. Fire callbacks; GameController applies damage from each result
+    // 4. コールバックを発火; GameControllerが各結果からダメージを適用
     for (const result of pendingResults) {
       this.turnResultCallback?.(result);
     }

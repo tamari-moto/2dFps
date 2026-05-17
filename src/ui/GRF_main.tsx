@@ -44,7 +44,7 @@ const GRF_main = () => {
     setThreeSetup(setup);
     setAppState('playing');
 
-    // Online mode: when another player joins later, add them to the local model + scene.
+    // オンラインモード: 後から別プレイヤーが参加した場合にローカルモデル+シーンに追加する。
     if (adapter instanceof ColyseusAdapter) {
       const room = adapter.getRoom();
       adapter.onPlayerJoined((playerId: string) => {

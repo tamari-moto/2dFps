@@ -11,7 +11,7 @@ const ConsoleLogger: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const nextIdRef = React.useRef(0);
 
-  // Override global console methods
+  // グローバルコンソールメソッドをオーバーライド
   useEffect(() => {
     const originalLog = console.log;
     const originalWarn = console.warn;
@@ -33,7 +33,7 @@ const ConsoleLogger: React.FC = () => {
             type
           }
         ];
-        // Keep only the latest 10 entries
+        // 最新10件のみ保持
         return updated.slice(-10);
       });
     };
