@@ -294,3 +294,7 @@ getPathToNode(fromNodeId: number, toNodeId: number, maxSteps: number): number[] 
 
 - GitHub Pages: `npm run deploy`
 - base URL: `/2dFps/`
+
+## 用語集
+
+コードベース固有の用語・略語・設定定数の意味は [`docs/GLOSSARY.md`](docs/GLOSSARY.md) を参照。
