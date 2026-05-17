@@ -13,8 +13,8 @@ import { LocalAdapter } from '../network/LocalAdapter';
 import { applyServerConfig } from '../config/GameConfig';
 
 /**
- * Main setup class for the Three.js-based 2D FPS game
- * Orchestrates the game components and manages the rendering loop
+ * Three.jsベースの2D FPSゲームのメインセットアップクラス
+ * ゲームコンポーネントを統括し、レンダリングループを管理する
  */
 export class ThreeSetup {
   private sceneManager: SceneManager;
@@ -30,27 +30,27 @@ export class ThreeSetup {
     canvas: HTMLCanvasElement,
     adapter: INetworkAdapter = new LocalAdapter(),
   ) {
-    // Initialize event bus
+    // イベントバスを初期化
     this.eventBus = gameEventBus;
 
-    // Initialize scene management
+    // シーン管理を初期化
     this.sceneManager = new SceneManager(canvas);
 
-    // Camera input (OrbitControls / wheel FOV / panCamera)
+    // カメラ入力（OrbitControls / ホイールFOV / panCamera）
     this.cameraInput = new CameraInputController(this.sceneManager.getCamera(), canvas);
 
-    // Apply server-authoritative config before building the model.
-    // ColyseusAdapter fires this synchronously if server_config already arrived;
-    // LocalAdapter is a no-op so client defaults remain.
+    // モデル構築前にサーバー権威設定を適用する。
+    // server_configが既に届いていればColyseusAdapterが同期的に発火;
+    // LocalAdapterはno-opなのでクライアントのデフォルト値が維持される。
     adapter.onServerConfig((config) => { applyServerConfig(config); });
 
-    // Initialize game model via adapter
+    // アダプター経由でゲームモデルを初期化
     const model = adapter.initializeModel();
 
-    // Build edge graph lines from the initial model state
+    // 初期モデル状態からエッジグラフの線を構築
     this.sceneManager.buildEdgeGrid(model);
 
-    // Initialize visualization synchronization
+    // 描画同期を初期化
     this.visualizationSync = new VisualizationSync(
       this.sceneManager,
       model,
@@ -58,7 +58,7 @@ export class ThreeSetup {
       this.eventBus,
     );
 
-    // Initialize input handling
+    // 入力処理を初期化
     const playerIds = Array.from(model.players.keys());
     this.inputHandler = new InputHandler(
       canvas,
@@ -70,12 +70,12 @@ export class ThreeSetup {
       adapter.getMyPlayerId(),
     );
 
-    // Keep InputHandler's active player in sync
+    // InputHandlerのアクティブプレイヤーを同期し続ける
     this.eventBus.on(GameEventType.VIS_SET_ACTIVE_PLAYER, (data: { playerId: string }) => {
       this.inputHandler.setActivePlayerId(data.playerId);
     });
 
-    // Initialize game controller
+    // ゲームコントローラーを初期化
     this.gameController = new GameController(
       model,
       this.eventBus,
@@ -119,24 +119,24 @@ export class ThreeSetup {
       }
     });
 
-    // Re-apply obstacles + redraw if obstacles_ready arrives after initializeModel()
+    // initializeModel()後にobstacles_readyが届いた場合に障害物を再適用・再描画
     adapter.onObstaclesReady((obstacles) => {
-      // ObstaclePayload[].segments are plain objects; importObstacles() converts
-      // them to LineSegment instances internally via MapGenerator.importObstacles().
+      // ObstaclePayload[].segmentsはプレーンオブジェクト; importObstacles()が
+      // MapGenerator.importObstacles()経由でLineSegmentインスタンスに変換する。
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.gameController.importObstacles(obstacles as any);
       this.sceneManager.buildEdgeGrid(model);
     });
 
-    // Start render loop
+    // レンダーループを開始
     this.startRenderLoop();
 
-    // Initial view update
+    // 初期ビュー更新
     this.visualizationSync.updateView();
   }
 
   /**
-   * Starts the main rendering loop
+   * メインレンダリングループを開始する
    */
   private startRenderLoop(): void {
     const render = () => {
@@ -147,14 +147,14 @@ export class ThreeSetup {
   }
 
   /**
-   * Gets the game model
+   * ゲームモデルを取得する
    */
   getModel(): Model {
     return this.gameController.getModel();
   }
 
   /**
-   * Toggles background grid visibility
+   * 背景グリッドの表示を切り替える
    */
   toggleGrid(): void {
     this.sceneManager.toggleGrid();
@@ -169,14 +169,14 @@ export class ThreeSetup {
   }
 
   /**
-   * Returns all player IDs in the current game
+   * 現在のゲームの全プレイヤーIDを返す
    */
   getPlayerIds(): string[] {
     return Array.from(this.gameController.getModel().players.keys());
   }
 
   /**
-   * Adds a player to the model and scene (called when a remote player joins).
+   * プレイヤーをモデルとシーンに追加する（リモートプレイヤーが参加したときに呼ばれる）。
    */
   addPlayer(playerId: string, nodeId: number, color: number): void {
     const model = this.gameController.getModel();
@@ -195,7 +195,7 @@ export class ThreeSetup {
   }
 
   /**
-   * Disposes all resources
+   * すべてのリソースを破棄する
    */
   dispose(): void {
     this.fpsCamera.dispose();
@@ -207,7 +207,7 @@ export class ThreeSetup {
 }
 
 /**
- * Factory function to create and initialize the Three.js setup
+ * Three.jsセットアップを作成・初期化するファクトリ関数
  */
 export function setupThree(
   canvas: HTMLCanvasElement,

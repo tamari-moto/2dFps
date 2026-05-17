@@ -7,10 +7,10 @@ import { BackgroundGrid } from './BackgroundGrid';
 import type { Model } from '../../model/model';
 
 /**
- * Owns the Three.js renderer / scene / camera and the per-frame render loop.
- * Scene-decoration concerns (lighting, post-processing, fog, background grid)
- * are delegated to dedicated modules in `./` core. Camera input (orbit /
- * wheel / pan) lives in `cameras/CameraInputController`.
+ * Three.jsのrenderer / scene / cameraとフレームごとのレンダーループを管理する。
+ * シーン装飾（ライティング・ポストプロセス・フォグ・背景グリッド）は
+ * `./` core配下の専用モジュールに委譲する。カメラ入力（オービット/
+ * ホイール/パン）は `cameras/CameraInputController` にある。
  */
 export class SceneManager {
   private renderer: THREE.WebGLRenderer;
@@ -48,9 +48,9 @@ export class SceneManager {
     this.camera.updateProjectionMatrix();
 
     this.backgroundGrid = new BackgroundGrid(this.scene);
-    // Edge grid is built later via buildEdgeGrid(model) once the model is ready.
+    // エッジグリッドはモデル準備後にbuildEdgeGrid(model)で構築される。
 
-    // Origin axes helper (red=+X, green=+Y, blue=+Z) for debugging
+    // 原点の軸ヘルパー（赤=+X、緑=+Y、青=+Z）デバッグ用
     this.scene.add(new THREE.AxesHelper(MapConfig.NodeSpacing * 3));
 
     new LightingRig(this.scene, (cb) => this.addTickCallback(cb));

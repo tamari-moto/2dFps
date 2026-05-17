@@ -91,16 +91,16 @@ export class ColyseusAdapter implements INetworkAdapter {
       });
     });
 
-    // Other player left
+    // 他のプレイヤーが退出
     this.room.state.players.onRemove((_player: unknown, playerId: string) => {
       this.playerLeftCallback?.(playerId);
     });
 
-    // Wait for player_assigned message, then verify the player exists in state.
-    // In colyseus.js@0.15.x the initial state patch fires synchronously during
-    // joinOrCreate, so onAdd for the local player may already have fired before
-    // we can register it.  We therefore: (1) wait for the message, (2) check
-    // state.players synchronously, and (3) fall back to onAdd if not yet present.
+    // player_assignedメッセージを待ち、プレイヤーが状態に存在するか確認する。
+    // colyseus.js@0.15.xではjoinOrCreate中に初期状態パッチが同期的に発火するため、
+    // ローカルプレイヤーのonAddが登録前に発火している場合がある。
+    // そのため: (1)メッセージを待機, (2)state.playersを同期チェック,
+    // (3)未存在の場合はonAddにフォールバック。
     await new Promise<void>(resolve => {
       let resolved = false;
 
@@ -113,11 +113,11 @@ export class ColyseusAdapter implements INetworkAdapter {
 
       this.room.onMessage('player_assigned', (data: { playerId: string }) => {
         const assignedId = data.playerId;
-        // Check if this player is already in the state (sync patch arrived first)
+        // このプレイヤーが既に状態に含まれているか確認（同期パッチが先に届いた場合）
         if (this.room.state.players.has(assignedId)) {
           tryResolveWithId(assignedId);
         } else {
-          // State patch not yet applied – wait for it via onAdd
+          // 状態パッチ未適用 — onAdd経由で待機
           this.room.state.players.onAdd((_player: unknown, playerId: string) => {
             if (playerId === assignedId) {
               tryResolveWithId(assignedId);
@@ -129,32 +129,32 @@ export class ColyseusAdapter implements INetworkAdapter {
   }
 
   /**
-   * Initializes a local Model from the current server state.
-   * Should be called after connect().
+   * 現在のサーバー状態からローカルModelを初期化する。
+   * connect()の後に呼び出すこと。
    *
-   * Online mode: skips local obstacle generation to ensure server obstacles are used.
-   * Obstacles are applied immediately if obstacles_ready has arrived, or via callback later.
+   * オンラインモード: サーバー側の障害物を使うためローカルの障害物生成をスキップする。
+   * obstacles_readyが届いていれば即座に適用、未着の場合はコールバックで後から適用する。
    */
   initializeModel(): Model {
-    // Online mode: skip local obstacle generation; use server-provided obstacles
+    // オンラインモード: ローカルの障害物生成をスキップ; サーバー提供の障害物を使用
     this.model = new Model(false);
 
-    // Apply server obstacles if already received
+    // サーバー障害物が既に受信済みの場合は適用
     if (this.pendingObstacles) {
-      // ObstaclePayload[].segments are plain objects; importObstacles() converts
-      // them to LineSegment instances internally via MapGenerator.importObstacles().
+      // ObstaclePayload[].segmentsはプレーンオブジェクト; importObstacles()が
+      // MapGenerator.importObstacles()経由でLineSegmentインスタンスに変換する。
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.model.importObstacles(this.pendingObstacles.obstacles as any);
       this.pendingObstacles = null;
     } else {
-      // obstacles_ready not yet received: register callback to apply when it arrives
+      // obstacles_ready未受信: 届いたときに適用するコールバックを登録
       this.obstaclesReadyCallback = (obstacles: ObstaclePayload[]): void => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.model!.importObstacles(obstacles as any);
       };
     }
 
-    // Replace the local-play default players with the server's player set.
+    // ローカルプレイのデフォルトプレイヤーをサーバーのプレイヤーセットで置き換える。
     this.model.players.clear();
     this.room.state.players.forEach((sp: {
       id: string; nodeId: number; angle: number; health: number;
@@ -198,7 +198,7 @@ export class ColyseusAdapter implements INetworkAdapter {
 
   onGameStarted(callback: () => void): void {
     this.gameStartedCallback = callback;
-    // Fire immediately if game_started arrived before this callback was registered
+    // コールバック登録前にgame_startedが届いていた場合は即座に発火
     if (this.pendingGameStarted) {
       callback();
       this.pendingGameStarted = undefined;
@@ -207,7 +207,7 @@ export class ColyseusAdapter implements INetworkAdapter {
 
   onObstaclesReady(callback: (obstacles: ObstaclePayload[]) => void): void {
     this.obstaclesReadyCallback = callback;
-    // Fire immediately if obstacles_ready arrived before this callback was registered
+    // コールバック登録前にobstacles_readyが届いていた場合は即座に発火
     if (this.pendingObstacles) {
       callback(this.pendingObstacles.obstacles);
     }
@@ -215,7 +215,7 @@ export class ColyseusAdapter implements INetworkAdapter {
 
   onServerConfig(callback: (config: ServerConfigPayload) => void): void {
     this.serverConfigCallback = callback;
-    // Fire immediately if server_config arrived before this callback was registered
+    // コールバック登録前にserver_configが届いていた場合は即座に発火
     if (this.pendingServerConfig) {
       callback(this.pendingServerConfig);
     }

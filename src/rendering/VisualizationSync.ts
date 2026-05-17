@@ -45,7 +45,7 @@ export class VisualizationSync {
     this.model = model;
     this.activePlayerId = activePlayerId;
 
-    // Shared map — PlayerAnimator / PlayerLifecycleManager / PlayerEffects all reference it
+    // 共有マップ — PlayerAnimator / PlayerLifecycleManager / PlayerEffects が同じインスタンスを参照
     const meshMap = new Map<string, THREE.Object3D>();
     this.animator      = new PlayerAnimator(meshMap);
     this.hpBarManager  = new HPBarManager();
@@ -60,12 +60,12 @@ export class VisualizationSync {
     this.scoreLabels   = new ScoreNodeLabelManager(sceneManager);
     this.scoreLabels.init(model.nodeList);
 
-    // Initialize scene objects
+    // シーンオブジェクトを初期化
     this.nodeVis.initializeNodes();
     this.nodeVis.initializeWalls();
     this.lifecycle.initializePlayers();
 
-    // Snap camera to starting player (no animation)
+    // 開始プレイヤーにカメラをスナップ（アニメーションなし）
     const initialPlayer = model.getPlayer(activePlayerId);
     if (initialPlayer) {
       this.camera.snapTo(initialPlayer.node.x, initialPlayer.node.y, initialPlayer.angle);

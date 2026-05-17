@@ -151,7 +151,7 @@ export class NodeVisualizationManager {
     ring.rotation.x = -Math.PI / 2;
     group.add(ring);
 
-    // Facing arrow: triangle pointing in the angle direction (XZ plane)
+    // 向き矢印: 角度方向を指す三角形（XZ平面）
     const arrowSize = NodeConfig.CircleSize * 0.9;
     const arrowGeo = new THREE.BufferGeometry();
     const verts = new Float32Array([
@@ -170,7 +170,7 @@ export class NodeVisualizationManager {
       side: THREE.DoubleSide,
     });
     const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-    // angle is in degrees, atan2(dy,dx) convention → rotation.y = -(angle * PI/180) + PI/2
+    // angleは度数法、atan2(dy,dx)規約 → rotation.y = -(angle * PI/180) + PI/2
     arrow.rotation.y = -(angle * Math.PI / 180) + Math.PI / 2;
     group.add(arrow);
 

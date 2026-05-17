@@ -5,8 +5,8 @@ import { PlayerConfig, AIConfig } from '../../config/GameConfig';
 import { MapConfig } from '../../config/GameConfig';
 
 /**
- * Selects the best shot target for an NPC from the move-to position.
- * Returns the target node ID, or undefined if no enemy is visible.
+ * 移動先の位置からNPCの最適な射撃対象を選択する。
+ * 対象のノードIDを返す。可視の敵がいない場合はundefinedを返す。
  */
 export function selectShotTarget(
   model: Model,
@@ -29,7 +29,7 @@ export function selectShotTarget(
   for (const enemy of enemies) {
     if (!visibleNodeIds.has(enemy.node.id)) continue;
 
-    // Score: prioritize low-HP enemies and closer distance
+    // スコア: 低HP敵と近い距離を優先
     const moveCol = Math.floor(moveToNode.id / gridSize);
     const moveRow = moveToNode.id % gridSize;
     const enemyCol = Math.floor(enemy.node.id / gridSize);

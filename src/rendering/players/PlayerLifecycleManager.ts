@@ -115,7 +115,7 @@ export class PlayerLifecycleManager {
       });
     }
 
-    // Turn to face shot target simultaneously with movement
+    // 移動と同時に射撃対象の方向を向く
     tl.to(obj.rotation, {
       y: -(finalAngle * Math.PI / 180) + RenderConfig.PlayerFacingOffset,
       duration: dur,
