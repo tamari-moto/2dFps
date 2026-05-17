@@ -10,8 +10,8 @@ import { TEAM_COLORS, AIConfig } from '../config/GameConfig';
 import { GameEventBus, GameEventType } from '../core/GameEventBus';
 
 /**
- * Collects NPC turn decisions for simultaneous round execution.
- * NPCs decide based on the current model state (same snapshot the human planned against).
+ * 同時ラウンド実行に向けてNPCのターン行動を収集する。
+ * NPCは人間プレイヤーが計画したときと同じモデル状態のスナップショットを基に行動を決定する。
  */
 export class TurnManager {
   private model: Model;
@@ -28,14 +28,14 @@ export class TurnManager {
   }
 
   /**
-   * Returns the intended TurnAction for every alive NPC.
-   * Does NOT execute or apply any actions — the caller submits them as a round.
-   * visibleTeam: only emit VIS_THREAT_MAP_UPDATED for this team (avoids 6x emit per round).
+   * 生存中のすべてのNPCの意図するTurnActionを返す。
+   * 行動の実行・適用は行わない — 呼び出し元がラウンドとして送信する。
+   * visibleTeam: このチームに対してのみVIS_THREAT_MAP_UPDATEDを発火（1ラウンドに複数回発火を回避）。
    */
   collectNPCActions(visibleTeam: TeamId | null = null): TurnAction[] {
     const aliveNPCs = this.getAliveNPCs();
 
-    // Remove goals for NPCs that are no longer alive
+    // 死亡したNPCのゴールを削除
     for (const id of this.npcGoals.keys()) {
       if (!aliveNPCs.some(n => n.id === id)) {
         this.npcGoals.delete(id);
@@ -44,7 +44,7 @@ export class TurnManager {
 
     const roundNumber = this.getRoundNumber();
 
-    // Update ThreatMaps once per team before any NPC on that team decides
+    // 各チームのいずれかのNPCが行動を決定する前に、チームごとにThreatMapを1回更新
     this._updateThreatMaps(aliveNPCs, roundNumber);
 
     const actions = aliveNPCs.map(npc => {
@@ -56,7 +56,7 @@ export class TurnManager {
       return decideTurn(this.model, npc, updated, threatMap);
     });
 
-    // Emit threat scores for heatmap visualization — active team only to avoid N×nodeCount updates
+    // ヒートマップ描画用に脅威スコアを発火 — N×nodeCount回の発火を避けるためアクティブチームのみ
     if (visibleTeam !== null && (AIConfig.ThreatMapTeams as number[]).includes(visibleTeam)) {
       const map = this.threatMaps.get(visibleTeam);
       if (map) {

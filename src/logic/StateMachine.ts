@@ -1,6 +1,6 @@
 /**
- * State machine for player turn management
- * Implements the State pattern: each state is an independent class.
+ * プレイヤーターン管理の状態機械
+ * Stateパターンの実装: 各状態が独立したクラスとして定義される。
  */
 
 export enum State {
@@ -19,7 +19,7 @@ export enum GameEvent {
 }
 
 /**
- * State interface — each concrete state knows its own valid transitions.
+ * 状態インターフェース — 各具体状態クラスが自身の有効な遷移を把握する。
  */
 interface IState {
   readonly name: State;
@@ -57,7 +57,7 @@ class ShotState implements IState {
   readonly name = State.Shot;
   transition(event: GameEvent): IState | null {
     if (event === GameEvent.Complete)   return new IdleState();
-    if (event === GameEvent.ShotPlayer) return new ShotState(); // Can change shot target
+    if (event === GameEvent.ShotPlayer) return new ShotState(); // 射撃対象の変更可
     if (event === GameEvent.Cancel)     return new IdleState();
     return null;
   }

@@ -17,8 +17,8 @@ import { isPointInCone } from '../logic/ConeIntersection';
 import { worldToGame } from './utils/MeshUtils';
 
 /**
- * Thin orchestrator: constructs the four specialized managers and wires them
- * to GameEventBus. External API is unchanged so threeSetup.ts needs no edits.
+ * 薄いオーケストレーター: 専門マネージャを構築してGameEventBusに配線する。
+ * 外部APIは変更なし。threeSetup.tsの修正は不要。
  */
 export class VisualizationSync {
   private nodeVis:       NodeVisualizationManager;

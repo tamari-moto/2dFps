@@ -27,13 +27,13 @@ export class GameController {
   private reachableNodesPerPlayer: Map<string, Set<number>> = new Map();
   private confirmedActions: Map<string, TurnAction> = new Map();
 
-  /** True while sendRoundActions callbacks are being processed; suppresses per-result VIS_UPDATE_VIEW */
+  /** sendRoundActionsのコールバック処理中はtrue; 結果ごとのVIS_UPDATE_VIEW発火を抑制 */
   private batchProcessing = false;
 
-  /** Number of path animations still in progress; input unlocks when this reaches 0 */
+  /** 進行中の経路アニメーション数; 0になると入力がアンロックされる */
   private pendingAnimCount = 0;
 
-  /** Monotonically increasing round counter, injected into TurnManager for ThreatMap. */
+  /** 単調増加するラウンドカウンタ。ThreatMap用にTurnManagerへ注入される。 */
   private roundNumber: number = 0;
 
   private inputCommandHandler: InputCommandHandler;
@@ -142,7 +142,7 @@ export class GameController {
    * or executes the round if all players have confirmed.
    */
   confirmPlayerAction(sm: StateMachine): void {
-    // Shot→Idle (Complete) or Move→Idle (Cancel)
+    // Shot→Idle（Complete）またはMove→Idle（Cancel）
     sm.transition(GameEvent.Complete) || sm.transition(GameEvent.Cancel);
 
     const playerId = this.activePlayerId;

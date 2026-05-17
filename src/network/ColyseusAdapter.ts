@@ -45,20 +45,20 @@ export class ColyseusAdapter implements INetworkAdapter {
       this.room = await this.client.joinOrCreate('game_room');
     }
 
-    // Register all message handlers immediately after join, before awaiting anything.
-    // This ensures no messages are missed while waiting for player_assigned.
+    // joinの直後、awaitの前にすべてのメッセージハンドラを登録する。
+    // player_assigned待機中にメッセージを取りこぼさないようにするため。
 
-    // Server error messages (NOT_YOUR_TURN, INVALID_ACTION, etc.)
+    // サーバーエラーメッセージ（NOT_YOUR_TURN, INVALID_ACTION等）
     this.room.onMessage('error', (data: { code: string }) => {
       console.warn('[ColyseusAdapter] server error:', data.code);
     });
 
-    // Game lifecycle messages
+    // ゲームライフサイクルメッセージ
     this.room.onMessage('game_started', () => {
       if (this.gameStartedCallback) {
         this.gameStartedCallback();
       } else {
-        // Callback not yet registered — cache the flag
+        // コールバック未登録 — フラグをキャッシュ
         this.pendingGameStarted = true;
       }
     });
@@ -73,19 +73,19 @@ export class ColyseusAdapter implements INetworkAdapter {
     });
     this.room.onMessage('player_left', () => {});
 
-    // Turn result from server
+    // サーバーからのターン結果
     this.room.onMessage('turn_result', (data: TurnResult) => {
       this.turnResultCallback?.(data);
     });
 
-    // Forward future player arrivals to the joined callback.
-    // Note: onAdd fires for every player including the local one during state sync.
-    // We skip the local player; the callback receives the playerId for remote players.
+    // 今後のプレイヤー参加をjoinedコールバックに転送する。
+    // 注: onAddは状態同期中にローカルプレイヤーを含む全プレイヤーで発火する。
+    // ローカルプレイヤーはスキップし、コールバックはリモートプレイヤーのplayerIdを受け取る。
     this.room.state.players.onAdd((_player: unknown, playerId: string) => {
       if (playerId === this.myPlayerId) return;
-      // player is the live PlayerState reference — changes will be reflected in it.
-      // Delay one microtask so that initializePlayers() on the server has time to
-      // push its state delta (nodeId, color) before we read them.
+      // playerはライブなPlayerState参照 — 変更は自動反映される。
+      // initializePlayers()のサーバー状態デルタ（nodeId, color）が届くまで
+      // マイクロタスク1つ分遅延させる。
       Promise.resolve().then(() => {
         this.playerJoinedCallback?.(playerId);
       });
